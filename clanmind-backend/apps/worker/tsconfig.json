@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["@cloudflare/workers-types", "vitest/globals"],
+    "paths": {
+      "@clanmind/shared": ["../../packages/shared/src/index.ts"],
+      "@clanmind/contracts": ["../../packages/contracts/src/index.ts"],
+      "@clanmind/db": ["../../packages/db/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "vitest.config.ts"]
+}

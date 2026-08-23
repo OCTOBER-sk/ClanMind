@@ -1,0 +1,64 @@
+# ClanMind Worker configuration (spec §3.1, §162)
+name = "clanmind-worker"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+# --- Durable Objects: one group realtime room per Group (§15.2) ---
+[durable_objects]
+bindings = [{ name = "GROUP_ROOM", class_name = "GroupRoom" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GroupRoom"]
+
+# --- R2: shared cloud object storage (§83) ---
+[[r2_buckets]]
+binding = "SHARED_OBJECTS"
+bucket_name = "clanmind-shared-objects"
+
+# Non-secret configuration. Secrets (service keys, JWT secret, provider keys)
+# are set via `wrangler secret put` and must never be committed (§162, §164).
+[vars]
+SUPABASE_URL = ""
+ENVIRONMENT = "local"
+LOG_LEVEL = "info"
+
+# §178 initial limits — configuration-driven, never hard-coded in business
+# logic. These are the documented defaults; per-Group overrides live in
+# quota_states, not here.
+LIMITS_JSON = """
+{
+  "message_body_max_chars": 8000,
+  "attachment_max_bytes": 26214400,
+  "attachments_per_message_max": 10,
+  "ai_context_token_budget": 32000,
+  "ai_run_soft_timeout_seconds": 120,
+  "ai_run_hard_timeout_seconds": 300,
+  "tool_calls_per_run_max": 8,
+  "tool_total_time_per_run_seconds": 60,
+  "deep_research_search_batches_max": 6,
+  "deep_research_sources_considered_max": 25,
+  "deep_research_sources_cited_max": 8,
+  "artifact_text_max_bytes": 512000,
+  "artifact_binary_max_bytes": 10485760,
+  "group_members_initial_max": 25,
+  "projects_active_per_group_max": 20,
+  "messages_per_minute_per_user": 30,
+  "ai_requests_per_minute_per_group": 10,
+  "github_actions_per_hour_per_group": 20,
+  "invite_token_lifetime_days": 7,
+  "signed_url_lifetime_seconds": 900,
+  "group_soft_delete_recovery_days": 30
+}
+"""
+
+# Client/protocol version metadata (§165)
+[vars.client_versions]
+minimum_client_version = "1.0.0"
+recommended_client_version = "1.1.0"
+protocol_version = "1"
+
+# §158 background jobs + §124 outbox consumers run on a cron trigger.
+[triggers]
+crons = ["* * * * *"]

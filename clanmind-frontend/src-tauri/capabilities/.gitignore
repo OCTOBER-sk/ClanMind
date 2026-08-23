@@ -1,0 +1,5 @@
+{
+  "files": {
+    "schema": ["../gen/schemas/desktop-schema.json"]
+  }
+}

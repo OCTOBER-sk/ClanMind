@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment — never commit secrets (spec §162, §164)
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+
+# Cloudflare / Supabase local state
+.wrangler/
+.supabase/
+
+# Test output
+coverage/
+
+# OS noise
+.DS_Store
+Thumbs.db

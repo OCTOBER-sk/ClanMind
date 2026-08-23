@@ -1,0 +1,468 @@
+@import "tailwindcss";
+
+/* ============================================================
+   ClanMind Design Tokens — §4 of Frontend Spec
+   All Tailwind utilities that consume colors must use these
+   CSS variables, never hard-coded palette values.
+   ============================================================ */
+@theme {
+  /* Surfaces */
+  --color-cm-bg: var(--color-background);
+  --color-cm-surface: var(--color-surface);
+  --color-cm-surface-raised: var(--color-surface-raised);
+  --color-cm-surface-hover: var(--color-surface-hover);
+  --color-cm-surface-pressed: var(--color-surface-pressed);
+
+  /* Borders */
+  --color-cm-border: var(--color-border);
+  --color-cm-border-strong: var(--color-border-strong);
+
+  /* Text */
+  --color-cm-text: var(--color-text);
+  --color-cm-text-secondary: var(--color-text-secondary);
+  --color-cm-text-tertiary: var(--color-text-tertiary);
+  --color-cm-text-disabled: var(--color-text-disabled);
+
+  /* Semantic */
+  --color-cm-primary: var(--color-primary);
+  --color-cm-primary-fg: var(--color-primary-foreground);
+  --color-cm-success: var(--color-success);
+  --color-cm-success-bg: var(--color-success-bg);
+  --color-cm-warning: var(--color-warning);
+  --color-cm-warning-bg: var(--color-warning-bg);
+  --color-cm-danger: var(--color-danger);
+  --color-cm-danger-bg: var(--color-danger-bg);
+  --color-cm-info: var(--color-info);
+  --color-cm-info-bg: var(--color-info-bg);
+
+  /* Motion durations */
+  --duration-micro: 100ms;
+  --duration-small: 150ms;
+  --duration-standard: 220ms;
+  --duration-large: 350ms;
+
+  /* Easing */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Radius scale */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+
+  /* Shadow scale */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -1px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.05);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04);
+}
+
+@layer base {
+  /* ─── Light mode ─── */
+  :root {
+    /* Surfaces */
+    --color-background: #ffffff;
+    --color-surface: #f9fafb;
+    --color-surface-raised: #ffffff;
+    --color-surface-hover: #f3f4f6;
+    --color-surface-pressed: #e5e7eb;
+
+    /* Borders */
+    --color-border: #e5e7eb;
+    --color-border-strong: #d1d5db;
+
+    /* Text */
+    --color-text: #111827;
+    --color-text-secondary: #4b5563;
+    --color-text-tertiary: #9ca3af;
+    --color-text-disabled: #d1d5db;
+
+    /* Semantic */
+    --color-primary: #111827;
+    --color-primary-foreground: #ffffff;
+    --color-success: #10b981;
+    --color-success-bg: #ecfdf5;
+    --color-warning: #f59e0b;
+    --color-warning-bg: #fffbeb;
+    --color-danger: #ef4444;
+    --color-danger-bg: #fef2f2;
+    --color-info: #3b82f6;
+    --color-info-bg: #eff6ff;
+
+    /* Focus ring */
+    --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #111827;
+
+    /* Spectral gradient — used ONLY for Odin-active, AI generation,
+       artifact construction, progress milestones, selection accent */
+    --spectral-gradient: linear-gradient(
+      135deg,
+      #ff5f6d 0%,
+      #ffc371 20%,
+      #80ff72 40%,
+      #7ee8fa 60%,
+      #eec0c6 80%,
+      #7e57c2 100%
+    );
+  }
+
+  /* ─── Dark mode ─── */
+  .dark {
+    --color-background: #090a0f;
+    --color-surface: #11131a;
+    --color-surface-raised: #181b24;
+    --color-surface-hover: #212530;
+    --color-surface-pressed: #2a2f3d;
+
+    --color-border: #232733;
+    --color-border-strong: #373e4f;
+
+    --color-text: #f9fafb;
+    --color-text-secondary: #9ca3af;
+    --color-text-tertiary: #6b7280;
+    --color-text-disabled: #4b5563;
+
+    --color-primary: #f9fafb;
+    --color-primary-foreground: #090a0f;
+    --color-success: #34d399;
+    --color-success-bg: rgba(16, 185, 129, 0.12);
+    --color-warning: #fbbf24;
+    --color-warning-bg: rgba(245, 158, 11, 0.12);
+    --color-danger: #f87171;
+    --color-danger-bg: rgba(239, 68, 68, 0.12);
+    --color-info: #60a5fa;
+    --color-info-bg: rgba(59, 130, 246, 0.12);
+
+    --focus-ring: 0 0 0 2px #090a0f, 0 0 0 4px #60a5fa;
+  }
+
+  /* ─── Global resets ─── */
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  html {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      Helvetica,
+      Arial,
+      sans-serif;
+    color: var(--color-text);
+    background-color: var(--color-background);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden; /* desktop app — no body scroll */
+    user-select: none;
+    /* Tauri: prevent text cursor on drag */
+    -webkit-user-drag: none;
+  }
+
+  #root {
+    height: 100%;
+  }
+
+  /* Allow text selection in content areas */
+  .selectable-text,
+  .selectable-text * {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  /* Code font */
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family:
+      "JetBrains Mono",
+      "Fira Code",
+      "Cascadia Code",
+      ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      "Courier New",
+      monospace;
+    font-size: 0.8125rem; /* 13px */
+    font-variant-ligatures: contextual;
+  }
+}
+
+/* ============================================================
+   Spectral Accent System — §3.3 & §3.2
+   Use ONLY for: Odin active state, AI generation status,
+   artifact construction, progress/milestone animation,
+   selected visual state, onboarding moments.
+   NEVER for: body text, every card, permanent button fills,
+   default message backgrounds, every loading state.
+   ============================================================ */
+
+@keyframes spectral-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Spectral edge draw — used for diagram edges, runs ONCE */
+@keyframes spectral-draw {
+  from { stroke-dashoffset: 200; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* One-time completion glow */
+@keyframes spectral-glow-once {
+  0%   { box-shadow: 0 0 0 0 transparent; }
+  40%  { box-shadow: 0 0 0 6px rgba(126, 87, 194, 0.35); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Odin active pulse — subdued, slow */
+@keyframes spectral-pulse-slow {
+  0%   { opacity: 0.7; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+/* Progress sweep for milestone moments */
+@keyframes spectral-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+/* Reaction scale — §29 */
+@keyframes reaction-pop {
+  0%   { transform: scale(0.85); }
+  60%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+/* Node arrival — §98 */
+@keyframes node-arrive {
+  0%   { opacity: 0; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Streaming cursor blink */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* Toast slide in */
+@keyframes toast-slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes toast-slide-out {
+  from { transform: translateX(0);    opacity: 1; }
+  to   { transform: translateX(100%); opacity: 0; }
+}
+
+/* Panel open/close — §248 */
+@keyframes panel-open {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes panel-close {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(16px); }
+}
+
+/* Fade in — generic */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Scale in — dialogs */
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ─── Utility classes ─── */
+
+.spectral-active {
+  background: var(--spectral-gradient);
+  background-size: 200% 200%;
+  animation: spectral-shift 3s ease infinite;
+}
+
+.spectral-text {
+  background: var(--spectral-gradient);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: spectral-shift 3s ease infinite;
+}
+
+.spectral-border {
+  position: relative;
+}
+.spectral-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--spectral-gradient);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Odin working indicator — subdued, not distracting */
+.odin-working {
+  background: var(--spectral-gradient);
+  background-size: 200% 200%;
+  animation: spectral-shift 4s ease infinite;
+  opacity: 0.7;
+}
+
+/* Streaming cursor */
+.streaming-cursor::after {
+  content: "▋";
+  animation: cursor-blink 1s step-end infinite;
+  color: var(--color-text-tertiary);
+  font-size: 0.9em;
+  margin-left: 1px;
+}
+
+/* Reaction pop animation */
+.reaction-pop {
+  animation: reaction-pop 120ms var(--ease-standard) forwards;
+}
+
+/* Node arrival */
+.node-arrive {
+  animation: node-arrive 200ms var(--ease-decelerate) forwards;
+}
+
+/* Panel animations */
+.panel-open {
+  animation: panel-open var(--duration-standard) var(--ease-decelerate) forwards;
+}
+.panel-close {
+  animation: panel-close var(--duration-small) var(--ease-accelerate) forwards;
+}
+
+/* Completion glow — fire once */
+.completion-glow {
+  animation: spectral-glow-once 800ms var(--ease-standard) forwards;
+}
+
+/* ============================================================
+   Reduced Motion — §6
+   Critical: replace animations with instant state changes.
+   Never remove critical information.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  /* Disable all spectral animations */
+  .spectral-active,
+  .odin-working {
+    animation: none !important;
+    background-size: 100% 100% !important;
+  }
+
+  .spectral-text {
+    animation: none !important;
+    background-size: 100% 100% !important;
+  }
+
+  /* Disable large motion */
+  .panel-open,
+  .panel-close,
+  .node-arrive,
+  .reaction-pop,
+  .completion-glow,
+  .streaming-cursor::after {
+    animation: none !important;
+  }
+
+  /* Kill all transitions */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   Scrollbar styling — clean, minimal
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
+}
+
+/* ============================================================
+   Focus ring — WCAG 2.2 §7
+   Applied via JS/component layer using the CSS variable.
+   ============================================================ */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-md);
+}
+
+/* ============================================================
+   Accessibility helpers
+   ============================================================ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ============================================================
+   Tauri window drag region
+   Must be set on the custom titlebar / top bar when native
+   titlebar is disabled.
+   ============================================================ */
+.tauri-drag-region {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.tauri-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}

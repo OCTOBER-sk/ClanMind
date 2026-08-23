@@ -1,0 +1,35 @@
+{
+  "name": "@clanmind/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@clanmind/ai-providers": "workspace:*",
+    "@clanmind/auth": "workspace:*",
+    "@clanmind/contracts": "workspace:*",
+    "@clanmind/db": "workspace:*",
+    "@clanmind/domain": "workspace:*",
+    "@clanmind/search": "workspace:*",
+    "@clanmind/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.45.0",
+    "hono": "^4.6.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.5.0",
+    "@cloudflare/workers-types": "^5.20260822.1",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.0",
+    "wrangler": "^3.80.0"
+  }
+}

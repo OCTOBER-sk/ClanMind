@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Local env secrets (committed templates only)
+.env.local
+.env.*.local
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.log
+
+# Local agent tooling state
+.zcode/
+
+# Parked inner repo metadata (backend was vendored into this monorepo for push;
+# restore with: Rename-Item clanmind-backend\.git_disabled_for_monorepo_push .git)
+**/.git_disabled_for_monorepo_push/

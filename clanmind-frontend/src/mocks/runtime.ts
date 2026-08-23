@@ -1,0 +1,36 @@
+/**
+ * Demo runtime registry — the seam between production code and demo-only
+ * behavior. Runtime modules depend ONLY on this interface; the implementation
+ * is loaded exclusively when VITE_DEMO_MODE=1 and is absent from prod bundles.
+ */
+
+import type { RealtimeSocketLike } from '@/realtime/connection';
+
+export interface DemoAiRunOptions {
+  messageId: string;
+  groupId: string;
+  projectId?: string | null;
+  prompt: string;
+  aiName: string;
+}
+
+export interface DemoRuntime {
+  /** Starts a full §134A run driven by real socket events; returns cancel. */
+  simulateAiRun(opts: DemoAiRunOptions): () => void;
+  /** §141 quota-failure injection for a message's run. */
+  applyQuotaState(messageId: string, canContinueWithByok: boolean): void;
+  /** §149/§150 proactive Odin message through the normal pipeline. */
+  postProactiveOdinMessage(groupId: string, projectId: string | undefined, aiName: string): void;
+  /** Socket factory handed to RealtimeClient in demo mode. */
+  socketFactory(url: string): RealtimeSocketLike;
+}
+
+let current: DemoRuntime | null = null;
+
+export function installDemoRuntime(runtime: DemoRuntime): void {
+  current = runtime;
+}
+
+export function getDemoRuntime(): DemoRuntime | null {
+  return current;
+}

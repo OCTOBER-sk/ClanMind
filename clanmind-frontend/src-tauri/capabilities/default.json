@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Main window capability — narrowly scoped native permissions per §294",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "fs:default",
+    "notification:default",
+    "shell:allow-open",
+    "store:default",
+    "updater:default"
+  ]
+}
