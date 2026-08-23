@@ -115,7 +115,13 @@ export async function request<T = unknown>(
         }
         if (isTransientFailure(apiErr) && attempt < maxRetries) {
           attempt += 1;
-          await sleep(backoffDelay(attempt));
+          // BE §178 — honor the server's RATE_LIMITED hint when present
+          // instead of blind exponential backoff.
+          const retryAfter =
+            apiErr.code === 'RATE_LIMITED' ? apiErr.retryAfterSeconds : undefined;
+          await sleep(
+            retryAfter !== undefined ? Math.min(retryAfter * 1000, 30_000) : backoffDelay(attempt),
+          );
           continue;
         }
         throw apiErr;

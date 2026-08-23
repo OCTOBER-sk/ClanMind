@@ -81,11 +81,18 @@ export const useGroupStore = create<GroupState>((set, get) => ({
 
     set({ flagsLoading: true });
     try {
-      // In production this would be an API call; for now we simulate with a delay
-      await new Promise<void>((resolve) => setTimeout(resolve, 200));
-      // Simulate flags being returned — real impl would call API here
-      const simulatedFlags: ServerFeatureFlags = { ...DEFAULT_FLAGS };
-      set({ featureFlags: simulatedFlags, flagsLoading: false });
+      if (__DEMO_MODE__) {
+        // Demo-only: deterministic flags from the dataset. The real Worker
+        // has no §165A flags endpoint yet — LIVE mode keeps the safe
+        // all-off defaults (never assume a flag is enabled until the server
+        // says so), it never fakes a response.
+        await new Promise<void>((resolve) => setTimeout(resolve, 200));
+        set({ featureFlags: { ...DEFAULT_FLAGS }, flagsLoading: false });
+        return;
+      }
+      // LIVE — no server endpoint yet (documented in INTEGRATION_NOTES);
+      // keep the safe defaults and record that the fetch was a no-op.
+      set({ featureFlags: { ...DEFAULT_FLAGS }, flagsLoading: false });
     } catch {
       set({ flagsLoading: false });
     }

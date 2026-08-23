@@ -105,11 +105,13 @@ export function createDemoTransport(ds: DemoDataset): Transport {
       return ok({ signed_out: true });
     }],
 
-    ['GET', '/groups', () => ok(ds.groups)],
+    // Real BE (handlers/groups.ts) wraps lists as { items } — demo matches.
+    ['GET', '/groups', () => ok({ items: ds.groups })],
 
     ['GET', '/groups/:groupId/projects', (p) =>
-      ok(ds.projects.filter((proj) => proj.group_id === p.groupId))],
+      ok({ items: ds.projects.filter((proj) => proj.group_id === p.groupId) })],
 
+    // BE §105/§156 — Page<Message>: { items, next_cursor }.
     ['GET', '/groups/:groupId/messages', (p, req) => {
       const limit = Number(req.query?.limit ?? 50);
       const before = req.query?.before as string | undefined;
@@ -121,8 +123,8 @@ export function createDemoTransport(ds: DemoDataset): Transport {
         if (idx > 0) endIdx = idx;
       }
       const start = Math.max(0, endIdx - limit);
-      const data = ordered.slice(start, endIdx);
-      return ok({ data, next_before: start > 0 ? data[0]?.id ?? null : null });
+      const items = ordered.slice(start, endIdx);
+      return ok({ items, next_cursor: start > 0 ? items[0]?.id ?? null : null });
     }],
 
     ['POST', '/groups/:groupId/messages', async (p, req) => {
@@ -135,7 +137,10 @@ export function createDemoTransport(ds: DemoDataset): Transport {
         sender_user_id: ds.currentUser.id,
         visibility: String(body.visibility ?? 'GROUP'),
         body: String(body.body ?? ''),
-        reply_to_id: (body.reply_to_message_id as string | null) ?? null,
+        reply_to_id:
+          (body.reply_to_id as string | null) ??
+          (body.reply_to_message_id as string | null) ??
+          null,
         client_message_id: String(body.client_message_id ?? `op_${serverSequence}`),
         server_sequence: ++serverSequence,
         created_at: new Date().toISOString(),
@@ -163,27 +168,26 @@ export function createDemoTransport(ds: DemoDataset): Transport {
       return ok({ id: target.id, deleted_at: wire.deleted_at });
     }],
 
-    ['POST', '/ai/runs', (_p, req) => {
+    // BE §106 — group-scoped canonical start path; streaming rides the socket.
+    ['POST', '/groups/:groupId/ai/runs', (p, req) => {
       const body = (req.body ?? {}) as Record<string, unknown>;
       const runId = `run_${Date.now()}`;
       getDemoHub().startAiRun({
         runId,
         messageId: String(body.message_id ?? ''),
-        groupId: String(body.group_id ?? ''),
+        groupId: p.groupId,
         projectId: (body.project_id as string | null) ?? null,
-        prompt: String(body.prompt ?? ''),
+        prompt: String(body.message ?? body.prompt ?? ''),
         aiName: String(body.ai_name ?? 'Odin'),
       });
       return ok(
         {
-          id: runId,
-          group_id: body.group_id,
-          project_id: body.project_id ?? null,
-          mode: String(body.mode ?? 'ASSIST'),
-          status: 'QUEUED',
-          created_at: new Date().toISOString(),
+          run_id: runId,
+          response: '',
+          tool_calls: 0,
+          truncated: false,
         },
-        201,
+        202,
       );
     }],
 

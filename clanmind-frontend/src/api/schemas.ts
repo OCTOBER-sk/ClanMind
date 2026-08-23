@@ -35,10 +35,16 @@ export const QuotaErrorDetailsSchema = z
 
 // ─── Identity / profile (BE §6, §23) ────────────────────────────────────────
 
+/**
+ * BE §23 profile row — the real column is `email_snapshot` (email is a
+ * snapshot at provisioning, not a live join). `email` stays optional so
+ * demo fixtures and future backfills both parse.
+ */
 export const ProfileSchema = z
   .object({
     id: IdSchema,
-    email: z.string(),
+    email: z.string().nullish(),
+    email_snapshot: z.string().nullish(),
     display_name: z.string(),
     avatar_object_id: z.string().nullable().optional(),
     created_at: IsoDateSchema,
@@ -129,11 +135,11 @@ export const MessageSchema = z
   })
   .passthrough();
 
-/** Cursor pagination shape (BE §156): `before=<cursor>&limit=50`. */
+/** Cursor pagination (BE §156/§105): `?before=<cursor>&limit=50` → Page<Message>. */
 export const MessagePageSchema = z
   .object({
-    data: z.array(MessageSchema),
-    next_before: z.string().nullable(),
+    items: z.array(MessageSchema),
+    next_cursor: z.string().nullable(),
   })
   .passthrough();
 

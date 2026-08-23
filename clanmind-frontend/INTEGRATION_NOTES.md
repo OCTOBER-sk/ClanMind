@@ -43,3 +43,161 @@ shape for profile hydration via `GET /api/v1/me`.
   (e.g. presence snapshot?) so demo hub matches byte-for-byte.
 - Q3: Confirm `sync.request(from_sequence)` response arrives as `sync.events`
   with `payload.events[]` ordered by sequence.
+
+---
+
+## 2026-08-23 — Integration pass (FE ↔ BE code-level wiring)
+
+Integration engineer session connecting the frontend LIVE path to the real
+backend contracts. Verification: backend `pnpm -r typecheck` + `pnpm -r test`
+green (15 pkgs / 262 tests); frontend `tsc -b`, `lint`, `test` (34), `build`
+all green; production bundle verified mock-free (`demo-token` /
+`installDemoMode` absent from `dist/assets`).
+
+### D5 — WS transport framing: the client accepts BOTH server framings
+The real GroupRoom wraps broadcast envelopes as `{type:"event", envelope:{…}}`,
+sends handshake/error replies as plain `{type:"connection.ready"…}` /
+`{type:"error", code, message}` control objects with TOP-LEVEL fields, replies
+to `sync.request` with a plain `{type:"sync.events", events:[envelope…]}`, and
+confirms the sender's `message.send` with a plain
+`{type:"message.created", source:"self", message}`. The demo hub speaks bare
+envelopes + enveloped ready/error. Neither framing violates §17/§114 outright,
+so per protocol rule "never paper over": `RealtimeClient.handleFrame` now
+accepts every frame kind in BOTH framings — unwrap `{type:"event"}`, merge
+top-level vs nested `payload` ready fields, hard-stop on `CLIENT_UPDATE_REQUIRED`
+from either error framing, route inner envelopes of plain `sync.events` replies,
+and normalize the self-confirm into the event stream (fields derived only from
+the actual frame). Regression-tested against the exact group-room.ts shapes.
+
+### D6 — C→S builders now mirror `@clanmind/contracts` exactly
+Every FE frame previously failed the room's zod validation (no
+`client_operation_id`; `device_id` missing; OFFLINE sent by clients;
+`through_sequence` instead of `up_to_sequence`). Fixed in `src/realtime/events.ts`:
+- all commands carry `client_operation_id` (≥8 chars, §19);
+- `connection.hello` carries persistent per-device `device_id` (uuid) and
+  optional `last_server_sequence` for reconnect resume;
+- `presence.update` restricted to ONLINE|IDLE|AWAY (offline is server-derived,
+  BE §16 disconnect debounce);
+- `sync.ack` uses `up_to_sequence`;
+- `message.send` mirrors `messageSendSchema` (body/project_id/reply_to_id/
+  mention_user_ids); private scope stays REST-only (room is group-scoped).
+
+### D7 — Event vocabulary: FE consumes both §114 names and the §18 fan-out set
+The real outbox→room broadcaster publishes §18 taxonomy event_types verbatim
+(`ai.run.started`, `ai.response.delta/completed/failed`,
+`presence.typing.started/stopped`, …), while the demo hub uses the §114
+protocol names (`ai.status/tool/delta/completed/failed`, `typing.updated`).
+Both are spec-sanctioned sets (§18 domain taxonomy vs §114 WS list); renaming
+the backend wholesale would churn 262 green tests without an arbiter ruling.
+Decision: `src/realtime/dispatch.ts` (new shared module, replaces
+`src/mocks/demoDispatch.ts` per D2) handles both vocabularies with one store
+projection each. Mapping recorded:
+- `ai.run.started {run_id}` → RUNNING status (needs runId→shell binding from REST start)
+- `ai.response.delta {run_id, delta}` ≡ `ai.delta` (run-keyed)
+- `ai.response.completed {run_id, message_id}` ≡ `ai.completed` (final text arrives via the persisted AI `message.created`)
+- `ai.response.failed {run_id, failure_code}` ≡ `ai.failed`
+- `presence.typing.started|stopped {user_id}` ≡ `typing.updated {user_id, typing}`
+Unbound live runs buffer their deltas until the REST response binds run_id →
+bubble (`bindRunToMessage`), so early streams are never lost.
+
+### D8 — LIVE mode is now wired end-to-end (was entirely unwired)
+Previously `initRealtime()` was ONLY called by the demo installer — live mode
+had no socket, no dispatch, and no data fetch. New `src/live/liveRuntime.ts`:
+- bootstraps stores from the real API (GET `/groups`, `/groups/:id/projects`,
+  `/groups/:id/members`, `/groups/:id/messages?limit=50`), all zod-validated;
+- connects the per-group Durable-Object room via `wsRoomEndpoint(groupId)`
+  (derives `ws(s)://<API origin>/api/v1/groups/:id/ws` from VITE_API_BASE_URL;
+  VITE_WS_URL overrides the origin). One room per socket — the active group;
+  switching groups re-points via `connectToGroup()`;
+- feeds `dispatchRealtimeEvent`, wires `markProtocolUpdateRequired`
+  (§309A.2) and a §17.1 gap handler that emits `sync.request`;
+- fetches GET `/client-versions` for the §309A.1 recommended-update banner.
+`App.tsx` branches demo (hub) vs live (bootstrap + realtime) at runtime;
+demo remains behind the compile gate and untouched behaviorally.
+
+### D9 — Messages POST body aligned to handlers/messages.ts (+ Q1 resolved)
+FE sent `visibility`/`recipient_id`/`reply_to_message_id`/`attachment_ids`;
+the backend schema expects `private_to` ("ai" | teammate uuid, §2.4),
+`reply_to_id`, and resolves mention tokens server-side. Controller fixed.
+Unknown keys were silently stripped before — reply targets were being LOST.
+**Q1 RESOLVED:** both are accepted and serve different layers — the
+`Idempotency-Key` header drives operation-level replay dedupe
+(middleware/idempotency.ts falls back to `client_operation_id` in the JSON
+body), while body `client_message_id` is the message identity inside the §122
+RPC. Client keeps sending both (header = op identity, body = message id).
+
+### D10 — Error contract wired end-to-end (BE §102/§94/§178)
+- `ApiError.retryAfterSeconds` parses `details.error.details.retry_after_seconds`;
+  `api/client` honors it for RATE_LIMITED 429 retries (capped 30s) instead of
+  blind backoff.
+- `quotaExhaustionOf(err)` extracts APPLICATION_AI_QUOTA_EXHAUSTED +
+  `can_continue_with_byok` from ALL three real orchestrator shapes
+  (`details.error.details.body`, `.details` itself, JSON-in-message).
+- The live AI-start path surfaces quota exhaustion onto the failed shell run
+  so MessageRow renders AiQuotaCard with the BYOK branch exactly like demo.
+- CLIENT_UPDATE_REQUIRED (REST 426 / WS error frame) reaches the existing
+  blocking gate unchanged.
+
+### D11 — Profile schema: `email_snapshot` (BE §23)
+GET /me returns `email_snapshot`, not `email`; the old strict FE schema would
+have thrown CONTRACT_VIOLATION on every live profile fetch. Schema loosened +
+consumer reconciles display_name/email_snapshot.
+
+### D12 — List/pagination envelopes aligned to real BE shapes
+Real lists wrap as `{items:[…]}` and message pages as `Page<Message>` =
+`{items, next_cursor}` (BE §156). FE `MessagePageSchema` updated from the
+invented `{data, next_before}`; demo transport routes rewritten to the real
+shapes (groups/projects `{items}`, messages `{items,next_cursor}`, AI start
+moved to the canonical POST `/groups/:id/ai/runs` returning 202
+`{run_id, response, tool_calls, truncated}`).
+
+### D13 — Backend additive changes (spec-arbitrated)
+1. `handlers/messages.ts`: `message.created` publish payload now carries the
+   FULL §39 row alongside `preview` — clients must be able to render the
+   realtime message after persistence (§105) without a fetch-back; the stub
+   payload made live chat rendering impossible.
+2. `group-room.ts` hello reply now includes `minimum_client_version` /
+   `recommended_client_version` (§165 metadata on EVERY connect, per FE
+   §309A's check-on-every-connection requirement).
+No other backend behavior changed; worker tests stay green.
+
+### D14 — Feature-flag simulation confined to demo
+`useGroupStore.refetchFeatureFlags` faked a 200 ms server response in ALL
+modes. The real Worker has no §165A flags endpoint yet, so live mode now keeps
+the safe all-off DEFAULT_FLAGS synchronously (§165A: never assume enabled) and
+the fake latency exists only under the compile-time demo gate. Open item for
+the backend stream: expose per-group feature flags.
+
+### Q2 RESOLVED
+`connection.hello` → `{type:"connection.ready", protocol_version, sequence,
+minimum_client_version, recommended_client_version}` (plain control frame;
+metadata added this pass). After `room.subscribe` → same shape plus a
+top-level `presence` snapshot array. No enveloped variant is emitted by the
+real room; the demo hub's enveloped form continues to be accepted.
+
+### Q3 RESOLVED — answer differs from the question's assumption
+The real room answers `sync.request` with a PLAIN control frame
+`{type:"sync.events", from_sequence, events: [§17 envelopes…], fallback?}`
+— NOT an enveloped event with `payload.events[]`. Events ARE ordered by
+sequence ascending; `fallback:true` + empty `events[]` means the ring window
+was exhausted (client should page Postgres history per §157). The client now
+delivers each inner envelope directly through its validated pipeline. The
+demo hub does not implement sync.request yet (no gap injection in demo).
+
+### D15 — OPEN backend gap: artifact content is unreachable over the wire
+`artifact.created` fan-out payloads are stubs (`{artifact_id, version}`) and
+every §109 artifacts route returns metadata-only rows — `content_ref` points
+into object storage; no endpoint returns inline version content. The FE
+artifact viewer consumes inline content (FE §97/§98), so a live artifact
+cannot be rendered contract-honestly today. The dispatch therefore ignores
+`artifact.created` (unknown-type tolerance) instead of projecting half-filled
+rows. Needed from the backend: either inline `content` on version GETs or a
+signed-URL surface the client can resolve. Demo mode is unaffected (the hub
+emits full §75-style rows).
+
+Related open items observed during this pass (backend stream):
+- No §165A feature-flags endpoint exists yet (see D14).
+- `task.created` / `decision.proposed` / `github.*` fan-out payloads are
+  notify-stubs; live store projections for Tasks/Decisions/GitHub remain
+  phase P7/P8 work (vocabulary itself is consumed by the shared dispatch's
+  unknown-type tolerance).

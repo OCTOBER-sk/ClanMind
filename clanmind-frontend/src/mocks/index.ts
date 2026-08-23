@@ -19,7 +19,7 @@ import {
 } from './transportRoutes';
 import { applyDemoHydration } from './hydrate';
 import { getDemoHub } from './wsHub';
-import { handleDemoEvent } from './demoDispatch';
+import { dispatchRealtimeEvent } from '@/realtime/dispatch';
 import { installDemoRuntime, type DemoRuntime } from './runtime';
 
 export interface DemoModeHandle {
@@ -162,7 +162,7 @@ export function installDemoMode(): DemoModeHandle {
     getToken: async () => 'demo-token',
     socketFactory: runtime.socketFactory,
     onStatus: () => {},
-    onEvent: (event) => handleDemoEvent(event),
+    onEvent: (event) => dispatchRealtimeEvent(event),
     onReady: () => {},
     onProtocolRequired: markProtocolUpdateRequired,
     onSequenceGap: () => {},

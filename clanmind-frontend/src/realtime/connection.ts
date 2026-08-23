@@ -13,6 +13,7 @@ import {
   ConnectionReadyPayloadSchema,
   ServerErrorPayloadSchema,
   clientEvents,
+  CLIENT_PROTOCOL_VERSION,
   type ClientEventFrame,
   type ConnectionReadyPayload,
   type RealtimeEvent,
@@ -169,8 +170,10 @@ export class RealtimeClient {
    * `connection.ready` flips status to connected — gating them on
    * 'connected' deadlocks the handshake (hello dropped → no ready →
    * forever 'connecting'), which is exactly the smoke-T4 WS stall.
+   * `ping` is not a §114 command — hibernating rooms answer it at the
+   * transport layer without waking the DO.
    */
-  private sendRaw(frameData: ClientEventFrame): boolean {
+  private sendRaw(frameData: ClientEventFrame | { type: 'ping'; request_id: string }): boolean {
     if (!this.ws) return false;
     try {
       this.ws.send(JSON.stringify(frameData));
@@ -212,7 +215,14 @@ export class RealtimeClient {
     socket.onopen = () => {
       this.attempts = 0;
       this.lastIncomingAt = Date.now();
-      this.sendRaw(clientEvents.hello());
+      // Reconnects announce their last applied §17 sequence so the room can
+      // hydrate its ring allocator past already-seen events (§20.2 resume).
+      const lastSeq = [...this.desiredGroups]
+        .map((g) => this.lastSequenceByGroup.get(g))
+        .filter((n): n is number => typeof n === 'number');
+      this.sendRaw(
+        clientEvents.hello(lastSeq.length > 0 ? { lastServerSequence: Math.max(...lastSeq) } : undefined),
+      );
       this.startHeartbeat();
     };
 
@@ -240,22 +250,106 @@ export class RealtimeClient {
       return; // non-JSON frame — ignore, never crash the stream
     }
 
-    // Control-plane replies (pong / acks) are plain objects, not envelopes.
+    // ── Control plane + transport framing ──────────────────────────────────
+    // The real GroupRoom (apps/worker/src/realtime/group-room.ts) speaks:
+    //   • broadcast events   → { type: "event", envelope: {…§17…} }
+    //   • handshake replies  → { type: "connection.ready", …top-level fields }
+    //   • error replies      → { type: "error", code, message }
+    // The demo hub speaks bare envelopes + enveloped ready/error. A
+    // conforming client must accept BOTH framings for every frame kind so
+    // neither server can ever strand it pre-ready or blind to errors.
     if (
       parsedJson &&
       typeof parsedJson === 'object' &&
       'type' in (parsedJson as Record<string, unknown>)
     ) {
-      const ctrl = parsedJson as { type: string; payload?: unknown };
-      if (ctrl.type === 'pong') return;
-      if (ctrl.type === 'connection.ready') {
-        this.completeHandshake(ConnectionReadyPayloadSchema.catch({}).parse(ctrl.payload ?? {}));
+      const ctrl = parsedJson as Record<string, unknown>;
+      const kind = ctrl.type;
+
+      if (kind === 'pong') return;
+
+      // Real-room fan-out wrapper — unwrap and continue as an envelope.
+      if (kind === 'event' && ctrl.envelope !== undefined) {
+        this.handleEnvelope(ctrl.envelope);
         return;
       }
+
+      if (kind === 'connection.ready') {
+        // Version metadata rides top-level on real control frames (plus a
+        // presence snapshot after room.subscribe); the demo hub nests
+        // everything under `payload`. Accept either location.
+        const nested = typeof ctrl.payload === 'object' && ctrl.payload !== null ? (ctrl.payload as Record<string, unknown>) : {};
+        const merged = {
+          ...nested,
+          protocol_version: ctrl.protocol_version ?? nested.protocol_version,
+          minimum_client_version: ctrl.minimum_client_version ?? nested.minimum_client_version,
+          recommended_client_version:
+            ctrl.recommended_client_version ?? nested.recommended_client_version,
+          sequence: ctrl.sequence ?? nested.sequence,
+          ...(ctrl.presence !== undefined || nested.presence !== undefined
+            ? { presence: ctrl.presence ?? nested.presence }
+            : {}),
+        };
+        this.completeHandshake(ConnectionReadyPayloadSchema.catch({}).parse(merged));
+        return;
+      }
+
+      if (kind === 'error') {
+        const errPayload = ServerErrorPayloadSchema.catch({}).parse({
+          code: ctrl.code,
+          message: ctrl.message,
+        });
+        if (errPayload.code === 'CLIENT_UPDATE_REQUIRED') {
+          this.protocolStop(errPayload.code ?? 'CLIENT_UPDATE_REQUIRED', errPayload.message);
+          return;
+        }
+        // Other control-plane errors are terminal for the request that caused
+        // them but not for the socket. Nothing here may fabricate envelope
+        // fields, so they stay out of the event stream.
+        return;
+      }
+
+      // Data-bearing control replies from the real room (§157 / §105):
+      //   • sync.events   → { type, from_sequence, events: [envelope…] }
+      //   • message.created (sender confirmation) → { type, source:"self", message }
+      // Each carries genuine §17 envelopes / §39 rows — route them into the
+      // event stream instead of dropping them on the floor.
+      if (kind === 'sync.events' && Array.isArray(ctrl.events)) {
+        for (const inner of ctrl.events) this.handleEnvelope(inner);
+        return;
+      }
+
+      if (kind === 'message.created' && ctrl.message && typeof ctrl.message === 'object') {
+        const m = ctrl.message as { id?: unknown; server_sequence?: unknown };
+        if (typeof m.id === 'string' && m.id.length > 0) {
+          const selfEvent = {
+            protocol_version: CLIENT_PROTOCOL_VERSION,
+            event_id: `evt_self_${m.id}`,
+            event_type: 'message.created',
+            sequence: typeof m.server_sequence === 'number' ? m.server_sequence : 0,
+            group_id: [...this.desiredGroups][0] ?? '',
+            actor_id: null,
+            visibility: 'GROUP',
+            occurred_at: new Date().toISOString(),
+            payload: { source: 'self', message: ctrl.message },
+            request_id: typeof ctrl.request_id === 'string' ? ctrl.request_id : null,
+          };
+          this.trackSequence(selfEvent as RealtimeEvent);
+          this.opts.onEvent(selfEvent as RealtimeEvent);
+        }
+        return;
+      }
+
+      // Remaining plain frames ({ type: "sync.ack", ok, … }) are pure acks.
       return;
     }
 
-    const env = RealtimeEnvelopeSchema.safeParse(parsedJson);
+    this.handleEnvelope(parsedJson);
+  }
+
+  /** Validate + route a §17 envelope (bare or unwrapped). */
+  private handleEnvelope(candidate: unknown): void {
+    const env = RealtimeEnvelopeSchema.safeParse(candidate);
     if (!env.success) return;
     const event = env.data as RealtimeEvent;
 
@@ -270,25 +364,28 @@ export class RealtimeClient {
     if (event.event_type === 'error') {
       const errPayload = ServerErrorPayloadSchema.catch({}).parse(event.payload ?? {});
       if (errPayload.code === 'CLIENT_UPDATE_REQUIRED') {
-        // FE §309A.2 — blocking state; stop retrying against an incompatible
-        // protocol. Status MUST land on a terminal value here: leaving it as
-        // 'connecting' made the connectivity layer report "Reconnecting…"
-        // forever while nothing was actually retrying.
-        this.userClosed = true;
-        this.clearTimers();
-        this.setStatus('idle');
-        this.ws?.close(1000, 'protocol mismatch');
-        this.ws = null;
-        this.opts.onProtocolRequired({
-          code: errPayload.code ?? 'CLIENT_UPDATE_REQUIRED',
-          message: errPayload.message,
-        });
+        this.protocolStop(errPayload.code ?? 'CLIENT_UPDATE_REQUIRED', errPayload.message);
         return;
       }
     }
 
     this.trackSequence(event);
     this.opts.onEvent(event);
+  }
+
+  /**
+   * FE §309A.2 — blocking state; stop retrying against an incompatible
+   * protocol. Status MUST land on a terminal value here: leaving it as
+   * 'connecting' made the connectivity layer report "Reconnecting…"
+   * forever while nothing was actually retrying.
+   */
+  private protocolStop(code: string, message?: string): void {
+    this.userClosed = true;
+    this.clearTimers();
+    this.setStatus('idle');
+    this.ws?.close(1000, 'protocol mismatch');
+    this.ws = null;
+    this.opts.onProtocolRequired({ code, message });
   }
 
   /** Shared ready transition for both ready framings (plain + enveloped). */

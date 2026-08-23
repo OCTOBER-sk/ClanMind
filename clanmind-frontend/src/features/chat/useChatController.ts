@@ -10,12 +10,14 @@
 
 import { useCallback } from 'react';
 import { api } from '@/api/client';
+import { ApiError, quotaExhaustionOf } from '@/api/errors';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useGroupStore } from '@/state/useGroupStore';
 import { useChatStore } from '@/state/useChatStore';
+import { useArtifactStore } from '@/state/useArtifactStore';
 import { useSyncStore } from '@/state/useSyncStore';
 import { getDemoRuntime } from '@/mocks/runtime';
-import type { Message } from '@/types';
+import type { AiRun, Message } from '@/types';
 
 function targetsAi(text: string): boolean {
   const t = text.toLowerCase();
@@ -25,6 +27,16 @@ function targetsAi(text: string): boolean {
     t.startsWith('/ask') ||
     t.startsWith('/deepresearch')
   );
+}
+
+/** Strip the trigger token — the run prompt is the request itself (BE §115). */
+function aiPromptOf(text: string): string {
+  const t = text.trim();
+  const slash = /^(\/research|\/deepresearch|\/ask)\s+/i.exec(t);
+  if (slash) return t.slice(slash[0].length).trim() || t;
+  const at = /@odin\s*/i.exec(t);
+  if (at) return t.replace(at[0], '').trim() || t;
+  return t;
 }
 
 export interface SendMessageInput {
@@ -107,15 +119,19 @@ export function useChatController() {
 
       // Delivered path — server persists first, echo arrives via socket
       // (deduped by id); the REST result reconciles the local copy.
+      // Body mirrors handlers/messages.ts sendMessageBody exactly:
+      // private scope rides `private_to` ("ai" | teammate id, §2.4), replies
+      // use `reply_to_id`; mention tokens are resolved server-side.
+      const isPrivateAi = newMsg.visibility === 'PRIVATE_AI';
+      const isPrivatePair = newMsg.visibility === 'PRIVATE_PAIR';
       void api
         .post(`/groups/${newMsg.group_id}/messages`, {
           project_id: newMsg.project_id ?? null,
           client_message_id: clientOperationId,
           body: newMsg.body,
-          visibility: newMsg.visibility,
-          reply_to_message_id: newMsg.reply_to_message_id ?? null,
-          recipient_id: newMsg.recipient_id ?? null,
-          attachment_ids: [],
+          reply_to_id: newMsg.reply_to_message_id ?? null,
+          ...(isPrivateAi ? { private_to: 'ai' as const } : {}),
+          ...(isPrivatePair && newMsg.recipient_id ? { private_to: newMsg.recipient_id } : {}),
         })
         .then(() => {
           useChatStore.getState().updateMessage(newMsg.id, { is_pending: false });
@@ -129,10 +145,9 @@ export function useChatController() {
         });
 
       // §134A — AI trigger creates the shell immediately; run events arrive
-      // through the same socket pipeline as production.
+      // through the same socket pipeline in BOTH modes (D2).
       if (targetsAi(newMsg.body)) {
         const runtime = getDemoRuntime();
-        if (!runtime) return; // Live-mode AI runs arrive via WS from BE (P5).
         const aiShellId = `msg_ai_${Date.now()}`;
         const aiName = activeGroup.ai_name || 'Odin';
         const shell: Message = {
@@ -155,24 +170,65 @@ export function useChatController() {
         };
         useChatStore.getState().addMessage(shell);
 
-        // §141 — typing "quota" exercises the exact quota error contract.
-        if (/quota/i.test(newMsg.body)) {
-          setTimeout(() => {
-            useChatStore.getState().updateMessage(aiShellId, {
-              body: 'Application AI quota reached for this Group.',
-            });
-            runtime.applyQuotaState(aiShellId, /byok/i.test(newMsg.body));
-          }, 900);
+        if (runtime) {
+          // Demo hub — deterministic §134A timeline.
+          // §141 — typing "quota" exercises the exact quota error contract.
+          if (/quota/i.test(newMsg.body)) {
+            setTimeout(() => {
+              useChatStore.getState().updateMessage(aiShellId, {
+                body: 'Application AI quota reached for this Group.',
+              });
+              runtime.applyQuotaState(aiShellId, /byok/i.test(newMsg.body));
+            }, 900);
+            return;
+          }
+          runtime.simulateAiRun({
+            messageId: aiShellId,
+            groupId: activeGroup.id,
+            projectId: activeProject?.id ?? null,
+            prompt: newMsg.body,
+            aiName,
+          });
           return;
         }
 
-        runtime.simulateAiRun({
-          messageId: aiShellId,
-          groupId: activeGroup.id,
-          projectId: activeProject?.id ?? null,
-          prompt: newMsg.body,
-          aiName,
-        });
+        // LIVE — REST is the canonical start path (BE §106; WS ai.run answers
+        // NOT_AVAILABLE_ON_WS). Streaming deltas reach the room via the
+        // realtime port and are projected by dispatchRealtimeEvent.
+        void api
+          .post<{ run_id?: string }>(`/groups/${activeGroup.id}/ai/runs`, {
+            message: aiPromptOf(newMsg.body),
+            project_id: activeProject?.id ?? null,
+            mode: 'ASSIST',
+          })
+          .then((res) => {
+            if (typeof res?.run_id !== 'string') return;
+            // Lazy — keeps the live runtime out of non-live chunks.
+            void import('@/live/liveRuntime').then((m) => m.bindRunId(res.run_id!, aiShellId));
+          })
+          .catch((err: unknown) => {
+            // §94 quota contract → AiQuotaCard BYOK branch on the failed shell.
+            const exhaustion = quotaExhaustionOf(err);
+            const failedRun: Partial<AiRun> = {
+              id: `run_${aiShellId}`,
+              group_id: activeGroup.id,
+              status: 'FAILED',
+              mode: 'ASSIST',
+              prompt: newMsg.body,
+              error_code:
+                err instanceof ApiError && err.code === 'APPLICATION_AI_QUOTA_EXHAUSTED'
+                  ? 'APPLICATION_AI_QUOTA_EXHAUSTED'
+                  : 'RUN_START_FAILED',
+              ...(exhaustion ? { can_continue_with_byok: exhaustion.canContinueWithByok } : {}),
+              completed_at: new Date().toISOString(),
+            };
+            useArtifactStore.getState().setAiRunByMessage(aiShellId, failedRun as AiRun);
+            if (!exhaustion) {
+              useChatStore.getState().updateMessage(aiShellId, {
+                body: "I couldn't start that run. The request failed before reaching the model.",
+              });
+            }
+          });
       }
     },
     [user],

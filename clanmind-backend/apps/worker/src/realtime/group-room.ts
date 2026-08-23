@@ -178,6 +178,10 @@ export class GroupRoom implements DurableObject {
           type: "connection.ready",
           protocol_version: EVENT_PROTOCOL_VERSION,
           sequence: this.core.currentSequence(),
+          // §165 version metadata on EVERY connect (FE §309A checks it
+          // per-connection, not only at cold start).
+          minimum_client_version: this.env.CLIENT_MINIMUM_VERSION,
+          recommended_client_version: this.env.CLIENT_RECOMMENDED_VERSION,
         });
         return;
       }

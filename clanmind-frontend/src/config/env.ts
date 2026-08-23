@@ -1,10 +1,12 @@
 /**
  * ClanMind environment configuration — validated once at boot (fail-fast).
  *
- * Live mode requires VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY and
- * VITE_WS_URL. Demo mode (VITE_DEMO_MODE=1) runs the full app against the
- * in-repo deterministic demo runtime (src/mocks) which implements the exact
- * backend contracts — it must never be bundled into production builds.
+ * Live mode requires VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY;
+ * the realtime socket derives from the API origin (`/api/v1/groups/:id/ws`,
+ * BE §16/§104) unless VITE_WS_URL overrides it explicitly. Demo mode
+ * (VITE_DEMO_MODE=1) runs the full app against the in-repo deterministic
+ * demo runtime (src/mocks) which implements the exact backend contracts —
+ * it must never be bundled into production builds.
  */
 
 import { z } from 'zod';
@@ -36,6 +38,7 @@ export const demoMode: boolean = __DEMO_MODE__;
 
 export const env = {
   apiBaseUrl: raw.VITE_API_BASE_URL.replace(/\/+$/, ''),
+  /** Optional explicit WS origin/base; when empty the API origin is upgraded. */
   wsUrl: raw.VITE_WS_URL ?? '',
   supabaseUrl: raw.VITE_SUPABASE_URL ?? '',
   supabasePublishableKey: raw.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
@@ -48,7 +51,6 @@ export const env = {
 export function assertLiveConfig(): void {
   if (demoMode) return;
   const missing: string[] = [];
-  if (!env.wsUrl) missing.push('VITE_WS_URL');
   if (!env.supabaseUrl) missing.push('VITE_SUPABASE_URL');
   if (!env.supabasePublishableKey) missing.push('VITE_SUPABASE_PUBLISHABLE_KEY');
   if (missing.length > 0) {
@@ -56,4 +58,27 @@ export function assertLiveConfig(): void {
       `[config] Live mode requires ${missing.join(', ')} — set them or enable VITE_DEMO_MODE for local development.`,
     );
   }
+}
+
+/**
+ * BE §16/§104 — one Durable-Object room per Group, reached through
+ * `GET /api/v1/groups/:groupId/ws?token=…`. Builds the absolute WS URL for
+ * that room: `ws(s)://<API origin>/api/v1/groups/<id>/ws`. An explicit
+ * VITE_WS_URL overrides the origin (useful when the Worker fronts a
+ * different host than the page origin).
+ */
+export function wsRoomEndpoint(groupId: string): string {
+  const path = `${env.apiBaseUrl}/groups/${encodeURIComponent(groupId)}/ws`;
+  let overrideOrigin: string | null = null;
+  if (env.wsUrl) {
+    try {
+      overrideOrigin = new URL(env.wsUrl).origin;
+    } catch {
+      overrideOrigin = null; // malformed override — fall back to API origin
+    }
+  }
+  const url = new URL(path, overrideOrigin ?? window.location.origin);
+  if (url.protocol === 'https:') url.protocol = 'wss:';
+  else if (url.protocol === 'http:') url.protocol = 'ws:';
+  return url.toString();
 }

@@ -30,19 +30,21 @@ export function useMyProfile(options: { enabled?: boolean } = {}): void {
   });
 
   // Reconcile server truth into the cached shell identity when it drifts.
+  // BE §23 carries `email_snapshot` (email is not a live column).
   useEffect(() => {
     if (!data || !userId || data.id !== userId) return;
     const current = useAuthStore.getState().user;
-    if (
+    const serverEmail = data.email ?? data.email_snapshot ?? undefined;
+    const drifted =
       current &&
       typeof data.display_name === 'string' &&
       data.display_name.length > 0 &&
-      (current.name !== data.display_name || current.email !== data.email)
-    ) {
+      (current.name !== data.display_name || (serverEmail !== undefined && current.email !== serverEmail));
+    if (current && drifted) {
       useAuthStore.getState().setUser({
         ...current,
         name: data.display_name,
-        email: data.email,
+        ...(serverEmail !== undefined ? { email: serverEmail } : {}),
       });
     }
   }, [data, userId]);

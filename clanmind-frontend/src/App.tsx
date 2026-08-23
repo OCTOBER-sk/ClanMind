@@ -42,19 +42,30 @@ export function App() {
   }, []);
 
   // Real connectivity → SyncBanner truth (FE §185). Realtime is initialised
-  // at boot (demo hub or live socket); connectivity derives banner state.
+  // at boot: demo installs its hub + socket (src/mocks); LIVE mode bootstraps
+  // workspace data from the real backend and connects the group room.
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
-    void import('@/realtime/connection')
-      .then(({ getRealtime }) => {
-        // The dynamic import can resolve AFTER this effect's cleanup ran
-        // (StrictMode double-mount) — never wire into a torn-down lifecycle.
-        if (!cancelled) initConnectivity(getRealtime());
-      })
-      .catch(() => {
-        // Realtime not initialised yet (live mode pre-P1) — banner stays neutral.
-      });
+    void (async () => {
+      try {
+        const { demoMode } = await import('@/config/env');
+        if (demoMode) {
+          const { getRealtime } = await import('@/realtime/connection');
+          if (!cancelled) initConnectivity(getRealtime());
+          return;
+        }
+        const live = await import('@/live/liveRuntime');
+        if (cancelled) return;
+        await live.bootstrapLiveWorkspace();
+        if (cancelled) return;
+        const { useGroupStore } = await import('@/state/useGroupStore');
+        live.ensureLiveRealtime(useGroupStore.getState().activeGroup?.id);
+      } catch {
+        // Bootstrap failure keeps cached local state usable (FE §182);
+        // the SyncBanner reflects whatever realtime status exists.
+      }
+    })();
     return () => {
       cancelled = true;
       shutdownConnectivity();

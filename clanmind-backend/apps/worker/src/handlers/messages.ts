@@ -94,7 +94,9 @@ export function messageRoutes(): Hono<{ Bindings: Env; Variables: AuthVariables 
     });
     // Broadcast is async (§122) — fan out after persistence; the DO dedupes
     // against the outbox consumer delivery. Private events carry only their
-    // conversation audience (§11.2).
+    // conversation audience (§11.2). The payload carries the FULL §39 row so
+    // clients can render the message without a fetch-back (§105 realtime
+    // delivery after persistence); `preview` stays for lightweight surfaces.
     void services.realtime.publish({
       group_id: groupId,
       event_type: "message.created",
@@ -103,6 +105,7 @@ export function messageRoutes(): Hono<{ Bindings: Env; Variables: AuthVariables 
       visibility,
       audience_user_ids: audience,
       payload: {
+        message,
         message_id: message.id,
         server_sequence: message.server_sequence,
         preview: message.body.slice(0, 140),
