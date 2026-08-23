@@ -9,7 +9,12 @@ import {
   PinService,
   PrivateConversationService,
   AiAgentService,
+  ApprovalEngine,
+  ArtifactService,
   AttachmentService,
+  DecisionService,
+  MeetingService,
+  TaskService,
   createHmacSignedUrlCodec,
   MemoryService,
   ProfileService,
@@ -78,6 +83,21 @@ export interface TestState {
   projectRows: Project[];
   instructionRows: ProjectInstruction[];
   messageRows: Message[];
+  memoryRows: import("@clanmind/domain").Memory[];
+  candidateRows: import("@clanmind/domain").MemoryCandidate[];
+  notificationRows: NotificationRow[];
+  artifactRows: import("@clanmind/domain").Artifact[];
+  artifactVersionRows: import("@clanmind/domain").ArtifactVersion[];
+  decisionRows: import("@clanmind/domain").Decision[];
+  taskRows: import("@clanmind/domain").Task[];
+  meetingSessionRows: import("@clanmind/domain").MeetingSession[];
+  meetingCandidateRows: import("@clanmind/domain").MeetingCandidate[];
+  activityRows: Record<string, unknown>[];
+  pinRows: import("@clanmind/domain").MessagePin[];
+  reactionRows: import("@clanmind/domain").MessageReaction[];
+  githubConnRows: Record<string, unknown>[];
+  githubActionRows: Record<string, unknown>[];
+  webhookEventRows: Record<string, unknown>[];
   outboxEvents: import("@clanmind/domain").OutboxEventInput[];
   realtimePublishes: {
     group_id: string;
@@ -494,9 +514,12 @@ export function makeTestServices(): TestState {
     },
   };
 
+  const activityRows: Record<string, unknown>[] = [];
   const activityRepo: ActivityRepository = {
     async insert(input) {
-      return { ...input, id: crypto.randomUUID(), occurred_at: new Date().toISOString() };
+      const row = { ...input, id: crypto.randomUUID(), occurred_at: new Date().toISOString() };
+      activityRows.push(row);
+      return row as never;
     },
     async listByGroup() {
       return [];
@@ -506,9 +529,24 @@ export function makeTestServices(): TestState {
     },
   };
 
+  // §13/§125 in-memory search implementing the SAME ACL contract as
+  // SupabaseMessageSearchRepository: GROUP rows plus only the private
+  // conversations where the requester is a member — never group-wide private.
   const searchRepo: MessageSearchRepository = {
-    async search() {
-      return [];
+    async search(input) {
+      const q = input.query.trim().toLowerCase();
+      const allowedConversations = new Set<string>();
+      if (input.include_private === true) {
+        for (const [convId, members] of convMembers) {
+          if (members.includes(input.requester_user_id)) allowedConversations.add(convId);
+        }
+      }
+      return messageRows.filter((m) => {
+        if (m.group_id !== input.group_id || m.deleted_at) return false;
+        if (q.length > 0 && !m.body.toLowerCase().includes(q)) return false;
+        if (m.visibility === "GROUP") return true;
+        return allowedConversations.has(m.private_conversation_id ?? "");
+      });
     },
   };
 
@@ -648,7 +686,12 @@ export function makeTestServices(): TestState {
       if (row) row.unpinned_at = new Date().toISOString();
     },
     async listOpen(groupId) {
-      return pinRows.filter((p) => p.group_id === groupId && !p.unpinned_at);
+      // §39B contract (mirrors the SQL): only GROUP-visibility pins surface.
+      return pinRows.filter((p) => {
+        if (p.group_id !== groupId || p.unpinned_at) return false;
+        const message = messageRows.find((m) => m.id === p.message_id);
+        return message?.visibility === "GROUP";
+      });
     },
   };
 
@@ -777,6 +820,10 @@ export function makeTestServices(): TestState {
       const row = {
         disconnected_at: null,
         connected_at: new Date().toISOString(),
+        repo_full_name:
+          input.owner_login && input.repo_name
+            ? `${String(input.owner_login)}/${String(input.repo_name)}`
+            : null,
         ...input,
       };
       const existing = githubConnRows.findIndex((r) => r.group_id === input.group_id);
@@ -793,11 +840,310 @@ export function makeTestServices(): TestState {
     },
   };
   const seenDeliveries = new Set<string>();
+  const webhookEventRows: {
+    delivery_id: string;
+    event_type: string;
+    installation_id: number | null;
+    payload: Record<string, unknown>;
+    group_id: string | null;
+  }[] = [];
   const webhookEvents = {
-    async beginDelivery(input: { delivery_id: string }) {
-      if (seenDeliveries.has(input.delivery_id)) return true;
-      seenDeliveries.add(input.delivery_id);
+    async beginDelivery(input: { delivery_id: string; event_type: string; installation_id: number | null; payload: Record<string, unknown> }) {
+      if (webhookEventRows.some((r) => r.delivery_id === input.delivery_id)) return true;
+      webhookEventRows.push({ ...input, group_id: null });
       return false;
+    },
+    async attachGroup(deliveryId: string, groupId: string) {
+      const row = webhookEventRows.find((r) => r.delivery_id === deliveryId);
+      if (row) row.group_id = groupId;
+    },
+  };
+
+  // §109–§112 in-memory project-intelligence stores.
+  const artifactRows: import("@clanmind/domain").Artifact[] = [];
+  const artifactVersionRows: import("@clanmind/domain").ArtifactVersion[] = [];
+  const artifactsRepo: import("@clanmind/domain").ArtifactRepository = {
+    ...(() => {
+      const now = () => new Date().toISOString();
+      return {
+        async insert(input) {
+          const a: import("@clanmind/domain").Artifact = {
+            ...input,
+            id: crypto.randomUUID(),
+            created_by_ai_id: null,
+            status: "ACTIVE",
+            pinned: false,
+            current_version_id: null,
+            created_at: now(),
+            updated_at: now(),
+            deleted_at: null,
+          };
+          artifactRows.push(a);
+          return a;
+        },
+        async findById(id) {
+          return artifactRows.find((a) => a.id === id) ?? null;
+        },
+        async update(id, input) {
+          const a = artifactRows.find((x) => x.id === id);
+          if (!a) return null;
+          Object.assign(a, input, { updated_at: now() });
+          return a;
+        },
+        async listByProject(projectId) {
+          return artifactRows.filter((a) => a.project_id === projectId && !a.deleted_at);
+        },
+        async nextVersionNumber(artifactId) {
+          return (
+            artifactVersionRows.filter((v) => v.artifact_id === artifactId).length + 1
+          );
+        },
+        async insertVersion(input) {
+          const v: import("@clanmind/domain").ArtifactVersion = {
+            ...input,
+            version_number:
+              input.version_number ??
+              artifactVersionRows.filter((x) => x.artifact_id === input.artifact_id).length + 1,
+            id: crypto.randomUUID(),
+            created_at: now(),
+          };
+          artifactVersionRows.push(v);
+          return v;
+        },
+        async findVersion(artifactId, versionNumber) {
+          return (
+            artifactVersionRows.find(
+              (v) => v.artifact_id === artifactId && v.version_number === versionNumber,
+            ) ?? null
+          );
+        },
+        async listVersions(artifactId) {
+          return artifactVersionRows
+            .filter((v) => v.artifact_id === artifactId)
+            .sort((a, b) => a.version_number - b.version_number);
+        },
+        async addLink() {},
+      };
+    })(),
+  };
+  const decisionRows: import("@clanmind/domain").Decision[] = [];
+  let decisionSeq = 0;
+  const decisionsRepo: import("@clanmind/domain").DecisionRepository = {
+    async insert(input) {
+      decisionSeq += 1;
+      const d: import("@clanmind/domain").Decision = {
+        ...input,
+        id: crypto.randomUUID(),
+        status: "PROPOSED",
+        version: 1,
+        options: null,
+        selected_option: null,
+        rationale: null,
+        approved_by: null,
+        approved_at: null,
+        created_at: new Date(Date.now() + decisionSeq).toISOString(),
+        updated_at: new Date(Date.now() + decisionSeq).toISOString(),
+      };
+      decisionRows.push(d);
+      return d;
+    },
+    async findById(id) {
+      return decisionRows.find((d) => d.id === id) ?? null;
+    },
+    async listByProject(projectId) {
+      return decisionRows.filter((d) => d.project_id === projectId);
+    },
+    async compareAndSetStatus(input) {
+      const d = decisionRows.find(
+        (x) =>
+          x.id === input.id &&
+          x.version === input.expectedVersion &&
+          x.status === input.from,
+      );
+      if (!d) return null;
+      d.status = input.to;
+      d.version = input.expectedVersion + 1;
+      d.updated_at = new Date().toISOString();
+      if (input.approved_by) {
+        d.approved_by = input.approved_by;
+        d.approved_at = d.updated_at;
+      }
+      return d;
+    },
+    async supersedeOthers(projectId, excludingId) {
+      for (const d of decisionRows) {
+        if (d.project_id === projectId && d.status === "APPROVED" && d.id !== excludingId) {
+          d.status = "SUPERSEDED";
+        }
+      }
+    },
+  };
+  const taskRows: import("@clanmind/domain").Task[] = [];
+  const taskDeps: { task_id: string; depends_on_task_id: string }[] = [];
+  const tasksRepo: import("@clanmind/domain").TaskRepository = {
+    async insert(input) {
+      const t: import("@clanmind/domain").Task = {
+        ...input,
+        id: crypto.randomUUID(),
+        status: "TODO",
+        priority: "MEDIUM",
+        version: 1,
+        created_by_ai_id: null,
+        due_at: null,
+        completed_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      taskRows.push(t);
+      return t;
+    },
+    async findById(id) {
+      return taskRows.find((t) => t.id === id) ?? null;
+    },
+    async listByProject(projectId) {
+      return taskRows.filter((t) => t.project_id === projectId);
+    },
+    async compareAndUpdate(input) {
+      const t = taskRows.find(
+        (x) => x.id === input.id && x.version === input.expectedVersion && x.status !== "CANCELLED",
+      );
+      if (!t) return null;
+      Object.assign(t, input.patch, {
+        version: input.expectedVersion + 1,
+        updated_at: new Date().toISOString(),
+      });
+      if (input.patch.status === "DONE") t.completed_at = t.updated_at;
+      return t;
+    },
+    async addDependency(taskId, dependsOnTaskId) {
+      taskDeps.push({ task_id: taskId, depends_on_task_id: dependsOnTaskId });
+    },
+    async dependenciesOf(taskId) {
+      return taskDeps.filter((d) => d.task_id === taskId).map((d) => d.depends_on_task_id);
+    },
+  };
+  const meetingSessionRows: import("@clanmind/domain").MeetingSession[] = [];
+  const meetingCandidateRows: import("@clanmind/domain").MeetingCandidate[] = [];
+  const meetingSummaryRows = new Map<string, string>();
+  const meetingsRepo: import("@clanmind/domain").MeetingRepository = {
+    async insertSession(input) {
+      const s: import("@clanmind/domain").MeetingSession = {
+        ...input,
+        id: crypto.randomUUID(),
+        started_at: new Date().toISOString(),
+        ended_at: null,
+        status: "ACTIVE",
+        summary_artifact_id: null,
+      };
+      meetingSessionRows.push(s);
+      return s;
+    },
+    async findSession(id) {
+      return meetingSessionRows.find((s) => s.id === id) ?? null;
+    },
+    async endSession(id, summaryArtifactId) {
+      const s = meetingSessionRows.find((x) => x.id === id);
+      if (s) {
+        s.status = "ENDED";
+        s.ended_at = new Date().toISOString();
+        s.summary_artifact_id = summaryArtifactId;
+      }
+    },
+    async insertCandidate(input) {
+      const cRow: import("@clanmind/domain").MeetingCandidate = {
+        ...input,
+        id: crypto.randomUUID(),
+        status: "PENDING",
+        promoted_to_type: null,
+        promoted_to_id: null,
+        created_at: new Date().toISOString(),
+        resolved_at: null,
+      };
+      meetingCandidateRows.push(cRow);
+      return cRow;
+    },
+    async findCandidate(id) {
+      return meetingCandidateRows.find((c) => c.id === id) ?? null;
+    },
+    async resolveCandidate(id, status, promoted) {
+      const cRow = meetingCandidateRows.find((x) => x.id === id);
+      if (cRow) {
+        cRow.status = status;
+        cRow.promoted_to_type = promoted?.promoted_to_type ?? null;
+        cRow.promoted_to_id = promoted?.promoted_to_id ?? null;
+        cRow.resolved_at = new Date().toISOString();
+      }
+    },
+    async listCandidates(sessionId) {
+      return meetingCandidateRows.filter((c) => c.meeting_session_id === sessionId);
+    },
+    async upsertSummary(input) {
+      meetingSummaryRows.set(input.meeting_session_id, input.summary_text);
+    },
+  };
+
+  // §78 github_actions store (approval state joins through ai_action_id).
+  const githubActionRows: Record<string, unknown>[] = [];
+  const githubActions = {
+    async insert(input: Record<string, unknown>) {
+      const row = { id: crypto.randomUUID(), pr_number: null, completed_at: null, ...input };
+      githubActionRows.push(row);
+      return row;
+    },
+    async findById(id: string) {
+      return githubActionRows.find((r) => r.id === id) ?? null;
+    },
+    async listByProjectWithStatus(projectId: string) {
+      return githubActionRows
+        .filter((r) => r.project_id === projectId)
+        .map((r) => ({ ...(r as Record<string, unknown>), status: "WAITING_APPROVAL", risk_level: "HIGH" }));
+    },
+  };
+
+  // §78A in-memory ai_actions store + approval engine for REST GitHub flows.
+  const actionRows: import("@clanmind/domain").AiAction[] = [];
+  const approvalRows: import("@clanmind/domain").AiActionApproval[] = [];
+  const actionsRepo: import("@clanmind/domain").ActionRepository = {
+    async insert(input) {
+      const now = new Date().toISOString();
+      const action: import("@clanmind/domain").AiAction = {
+        ...input,
+        id: crypto.randomUUID(),
+        created_at: now,
+        updated_at: now,
+        status: input.status ?? "PROPOSED",
+      };
+      actionRows.push(action);
+      return action;
+    },
+    async findById(id) {
+      return actionRows.find((a) => a.id === id) ?? null;
+    },
+    async setStatus(id, status) {
+      const a = actionRows.find((x) => x.id === id);
+      if (a) {
+        a.status = status;
+        a.updated_at = new Date().toISOString();
+      }
+    },
+    async findApproval(actionId) {
+      return approvalRows.find((ap) => ap.action_id === actionId) ?? null;
+    },
+    async insertApproval(input) {
+      const approval: import("@clanmind/domain").AiActionApproval = {
+        ...input,
+        id: crypto.randomUUID(),
+        approved_at: new Date().toISOString(),
+      };
+      approvalRows.push(approval);
+      return approval;
+    },
+    async completeApproval(actionId, result) {
+      const approval = approvalRows.find((ap) => ap.action_id === actionId);
+      if (approval) {
+        approval.execution_result = result;
+        approval.executed_at = new Date().toISOString();
+      }
     },
   };
 
@@ -816,13 +1162,20 @@ export function makeTestServices(): TestState {
     }),
     deletion,
     nicknames: new NicknameService(nicknameRepo),
-    messages: new MessageService(messageRepo, { message_body_max_chars: 8000 }),
+    messages: new MessageService(messageRepo, { message_body_max_chars: 8000 }, outbox),
     realtime,
     reactions: new ReactionService(reactionRepo),
     pins: new PinService(pinRepo),
     privateConversations: new PrivateConversationService(convRepo),
     ai: new AiAgentService(agentRepo),
     memory: new MemoryService(memRepo, candRepo),
+    artifacts: new ArtifactService(artifactsRepo, {
+      artifact_text_max_bytes: 512_000,
+      artifact_binary_max_bytes: 10_485_760,
+    }),
+    decisions: new DecisionService(decisionsRepo, async () => undefined),
+    tasks: new TaskService(tasksRepo),
+    meetings: new MeetingService(meetingsRepo),
     attachments: new AttachmentService(attachmentRepo, storagePort),
     signedUrls,
     search: new SearchService(searchRepo),
@@ -838,7 +1191,10 @@ export function makeTestServices(): TestState {
     ),
     jobs: NOOP_JOB_QUEUE,
     githubConnections: githubConnections as unknown as AppServices["githubConnections"],
+    githubActions: githubActions as unknown as AppServices["githubActions"],
     webhookEvents: webhookEvents as unknown as AppServices["webhookEvents"],
+    actions: actionsRepo,
+    approvals: new ApprovalEngine(actionsRepo),
   };
   return {
     services,
@@ -850,6 +1206,21 @@ export function makeTestServices(): TestState {
     projectRows,
     instructionRows,
     messageRows,
+    memoryRows,
+    candidateRows,
+    notificationRows,
+    artifactRows,
+    artifactVersionRows,
+    decisionRows,
+    taskRows,
+    meetingSessionRows,
+    meetingCandidateRows,
+    activityRows,
+    pinRows,
+    reactionRows,
+    githubConnRows,
+    githubActionRows,
+    webhookEventRows,
     outboxEvents,
   };
 }

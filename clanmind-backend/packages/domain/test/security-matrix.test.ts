@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   AiOrchestrator,
+  ContextEngine,
   MemoryService,
   NotificationService,
   NotificationWorkerConsumer,
   privacyAuthorizes,
   sanitizeToolOutput,
+  type ContextItem,
   type MemoryCandidateRepository,
   type MemoryRepository,
   type NotificationRepository,
@@ -34,13 +36,51 @@ function row(partial: Partial<OutboxRow>): OutboxRow {
   };
 }
 
+function contextItem(partial: Partial<ContextItem>): ContextItem {
+  return {
+    slice: "group_memory",
+    content: "",
+    source_type: "memory",
+    source_id: crypto.randomUUID(),
+    importance: 1,
+    confidence: 1,
+    relevance: 1,
+    recency: 1,
+    tokens: 10,
+    authorized: true,
+    ...partial,
+  };
+}
+
 describe("§55A privacy crossing matrix — every Never row", () => {
-  it("PRIVATE_PAIR → public Group AI context: NEVER", () => {
-    expect(
-      privacyAuthorizes("PUBLIC_GROUP", U1, { slice: "recent_conversation" }),
-    ).toBe(true); // shared slices are fine
-    // A private pair message body never enters public context assembly:
-    // user-private memory is the structured carrier — verified next.
+  it("PRIVATE_PAIR → public Group AI context: NEVER (engine drops unauthorized)", () => {
+    // Positive control: shared slices are authorized and survive assembly.
+    const engine = new ContextEngine([], 1000);
+    const assembled = engine.assemble({
+      candidates: [
+        contextItem({ slice: "recent_conversation", content: "shared transcript", tokens: 5 }),
+      ],
+      explicitReferences: [],
+    });
+    expect(assembled.competitive).toHaveLength(1);
+    expect(assembled.competitive[0]?.slice).toBe("recent_conversation");
+
+    // Negative (§54A.5): an item the privacy filter marked unauthorized is
+    // dropped BEFORE ranking — it never reaches the prompt even when its
+    // score would dominate.
+    const leaked = engine.assemble({
+      candidates: [
+        contextItem({
+          slice: "recent_conversation",
+          content: "secret pair-chat content ghp_aaaaaaaaaaaaaaaaaaaa",
+          tokens: 5,
+          authorized: false,
+        }),
+      ],
+      explicitReferences: [],
+    });
+    expect(leaked.competitive).toHaveLength(0);
+    expect(JSON.stringify(leaked)).not.toContain("secret pair-chat");
   });
 
   it("PRIVATE_PAIR → group/project memory: never automatically", async () => {
@@ -58,7 +98,27 @@ describe("§55A privacy crossing matrix — every Never row", () => {
     expect(result.candidate?.recommended_scope).not.toBe("PROJECT");
   });
 
-  it("User A's PRIVATE_AI → public context: NEVER (§55A row 3)", () => {
+  it("User A's PRIVATE_AI run → public context: NEVER (§55A row 3)", async () => {
+    // The structured carrier of a PRIVATE_AI exchange is user-private memory:
+    // proposing from a private AI run lands USER_PRIVATE for A, never stored.
+    const mem = memoryHarness();
+    const result = await mem.proposeFromRun({
+      group_id: "g1",
+      project_id: null,
+      user_id: U1,
+      visibility: "PRIVATE_AI",
+      content: "Insight from a private AI conversation with Odin",
+      confidence: 0.99,
+    });
+    expect(result.stored).toBe(false);
+    expect(result.candidate?.recommended_scope).toBe("USER_PRIVATE");
+    expect(result.candidate?.user_id).toBe(U1);
+
+    // Authorization denies B any view of A's private items and denies the
+    // public context entirely.
+    expect(
+      privacyAuthorizes("PRIVATE_AI", U2, { slice: "user_private_memory", owner_user_id: U1 }),
+    ).toBe(false);
     expect(
       privacyAuthorizes("PUBLIC_GROUP", U1, { slice: "user_private_memory", owner_user_id: U1 }),
     ).toBe(false);
@@ -121,6 +181,19 @@ describe("§55A privacy crossing matrix — every Never row", () => {
     });
     expect(JSON.stringify(sanitized)).not.toContain("ghp_");
     expect(JSON.stringify(sanitized)).not.toContain("Bearer abcdef");
+  });
+
+  it("sanitizeToolOutput recurses into nested objects and arrays (§88)", () => {
+    const secret = "ghp_" + "c".repeat(30);
+    const sanitized = sanitizeToolOutput({
+      a: { b: `token ${secret}` },
+      list: [{ deep: { deeper: secret } }],
+      plain: "safe value",
+    });
+    const rendered = JSON.stringify(sanitized);
+    expect(rendered).not.toContain(secret);
+    expect(rendered).toContain("gh_***");
+    expect(rendered).toContain("safe value");
   });
 });
 

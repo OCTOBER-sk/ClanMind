@@ -18,11 +18,15 @@ import {
   type AiRunRepository,
   type ApprovalGate,
   type ContextItem,
+  type Decision,
   type EventOutbox,
   type JobQueue,
   type MemoryService,
   type MembershipService,
+  type ModelRouteRepository,
+  type ProviderConfigRepository,
   type RealtimePort,
+  type SecretStore,
   type ToolCallLedger,
   type ToolExecutor,
   type UsageRepository,
@@ -83,10 +87,17 @@ export interface AiRuntime {
   engine: ContextEngine;
   registry: ToolRegistry;
   router: ModelRouterService;
+  /** §31 provider configs + §32 model routes (admin surface §107). */
+  configRepo: ProviderConfigRepository;
+  routeRepo: ModelRouteRepository;
+  /** §63.2 envelope secret store for BYOK credentials. */
+  secrets: SecretStore;
   providers: ProviderConfigService;
   usage: UsageService;
   lifecycle: RunLifecycle;
   runs: AiRunRepository;
+  /** §78A action repository (approve/reject handlers load actions here). */
+  actionRepo: ActionRepository;
   approvalEngine: ApprovalEngine;
   artifacts: ArtifactService;
   decisions: DecisionService;
@@ -251,21 +262,10 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
   });
 
   // §134: approved decisions become high-priority project memory candidates.
-  const decisions = new DecisionService(new SupabaseDecisionRepository(db), async (decision) => {
-    const groupId = await projectIdToGroupId(db, decision.project_id);
-    if (!groupId) return;
-    await deps.memory
-      .registerMemory({
-        group_id: groupId,
-        project_id: decision.project_id,
-        memory_type: "decision",
-        content: decision.title,
-        confidence: 0.95,
-        source_type: "approved_decision",
-        fromApprovedDecision: true,
-      })
-      .catch(() => undefined);
-  });
+  const decisions = new DecisionService(
+    new SupabaseDecisionRepository(db),
+    approvedDecisionMemoryHook(db, deps.memory),
+  );
   const tasks = new TaskService(new SupabaseTaskRepository(db));
 
   const executors = new Map<string, ToolExecutor>();
@@ -429,10 +429,14 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
     engine,
     registry,
     router,
+    configRepo,
+    routeRepo,
+    secrets,
     providers,
     usage,
     lifecycle,
     runs,
+    actionRepo,
     approvalEngine,
     artifacts,
     decisions,
@@ -443,13 +447,39 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
   return runtime;
 }
 
-async function projectIdToGroupId(db: SupabaseClient, projectId: string): Promise<string | null> {
+export async function projectIdToGroupId(db: SupabaseClient, projectId: string): Promise<string | null> {
   const { data } = await db
     .from("projects")
     .select("group_id")
     .eq("id", projectId)
     .maybeSingle();
   return (data as { group_id: string } | null)?.group_id ?? null;
+}
+
+/**
+ * §134: an approved decision becomes high-priority project memory. Shared by
+ * the AI runtime's DecisionService and the REST-facing instance in
+ * services.ts so both paths promote identically.
+ */
+export function approvedDecisionMemoryHook(
+  db: SupabaseClient,
+  memory: MemoryService,
+): (decision: Decision) => Promise<void> {
+  return async (decision) => {
+    const groupId = await projectIdToGroupId(db, decision.project_id);
+    if (!groupId) return;
+    await memory
+      .registerMemory({
+        group_id: groupId,
+        project_id: decision.project_id,
+        memory_type: "decision",
+        content: decision.title,
+        confidence: 0.95,
+        source_type: "approved_decision",
+        fromApprovedDecision: true,
+      })
+      .catch(() => undefined);
+  };
 }
 
 /**

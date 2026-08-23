@@ -1,5 +1,6 @@
 import { AppError } from "@clanmind/shared";
 import type { Page } from "@clanmind/shared";
+import type { EventOutbox } from "../common/ports";
 
 /** §39 message row. */
 export interface Message {
@@ -67,6 +68,9 @@ export class MessageService {
   constructor(
     private readonly messages: MessageRepository,
     private readonly limits: { message_body_max_chars: number },
+    /** Optional §123 outbox: edit/delete events fan out through the
+     * broadcaster when wired (send already emits via the §122 RPC). */
+    private readonly outbox?: EventOutbox,
   ) {}
 
   async send(
@@ -102,12 +106,42 @@ export class MessageService {
     });
     const updated = await this.messages.updateBody(message.id, body, new Date().toISOString());
     if (!updated) throw new AppError("NOT_FOUND", "Message not found.");
+    // §114: the outbox broadcaster fans message.updated out to room clients.
+    await this.outbox?.publish({
+      event_type: "message.edited",
+      aggregate_type: "message",
+      aggregate_id: updated.id,
+      group_id: updated.group_id,
+      actor_id: actorUserId,
+      payload: {
+        message_id: updated.id,
+        visibility: updated.visibility,
+        private_conversation_id: updated.private_conversation_id,
+        project_id: updated.project_id,
+        group_id: updated.group_id,
+        edited_at: updated.edited_at,
+      },
+    });
     return updated;
   }
 
   async softDelete(messageId: string, actorUserId: string): Promise<void> {
-    await this.requireEditable(messageId, actorUserId);
+    const message = await this.requireEditable(messageId, actorUserId);
     await this.messages.softDelete(messageId, new Date().toISOString());
+    await this.outbox?.publish({
+      event_type: "message.deleted",
+      aggregate_type: "message",
+      aggregate_id: message.id,
+      group_id: message.group_id,
+      actor_id: actorUserId,
+      payload: {
+        message_id: message.id,
+        visibility: message.visibility,
+        private_conversation_id: message.private_conversation_id,
+        project_id: message.project_id,
+        group_id: message.group_id,
+      },
+    });
   }
 
   /**

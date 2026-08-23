@@ -66,20 +66,31 @@ export class NotificationWorkerConsumer implements OutboxConsumer {
       return;
     }
 
+    // §95A: a PRIVATE_AI AI_RESPONSE must still notify its single owner —
+    // the requester is the only authorized recipient, so the blanket private
+    // suppression below never applies to this event type.
+    if (row.event_type === "ai.response.completed") {
+      const visibility = row.payload["visibility"];
+      await this.notifications.notify({
+        // §95A: PRIVATE_* responses notify ONLY the owning requester.
+        recipients: row.actor_id ? [row.actor_id] : [],
+        group_id: row.group_id ?? "",
+        project_id: (row.payload["project_id"] as string | undefined) ?? null,
+        category: "AI_RESPONSE",
+        subject_type: "ai_run",
+        subject_id: row.aggregate_id,
+        title:
+          visibility === "PRIVATE_PAIR" || visibility === "PRIVATE_AI"
+            ? "Your private Odin response is ready"
+            : "Odin completed a response",
+        delivered_realtime: true,
+      });
+      return;
+    }
+
     if (isPrivate) return; // §98A-analog: no private rows in shared surfaces
 
     switch (row.event_type) {
-      case "ai.response.completed":
-        await this.notifications.notify({
-          recipients: row.actor_id ? [row.actor_id] : [],
-          group_id: row.group_id ?? "",
-          category: "AI_RESPONSE",
-          subject_type: "ai_run",
-          subject_id: row.aggregate_id,
-          title: "Odin completed a response",
-          delivered_realtime: true,
-        });
-        break;
       case "ai.action.proposed":
       case "decision.proposed":
         // Approval requests go to admins/owner; recipient resolution is
@@ -127,12 +138,16 @@ export class ActivityBuilderConsumer implements OutboxConsumer {
 
     const summary = this.render(row);
     if (!summary) return;
+    // §98A/§2.6: AI-initiated runs are attributed to the agent (actor_ai_id),
+    // never to the requester as a human actor.
+    const isAiActor =
+      row.aggregate_type === "ai_run" || row.payload["sender_type"] === "AI";
     await this.activity.record({
       group_id: row.group_id ?? "",
       project_id: (row.payload["project_id"] as string | undefined) ?? null,
-      actor_type: row.actor_id ? "USER" : "SYSTEM",
-      actor_user_id: row.actor_id,
-      actor_ai_id: null,
+      actor_type: isAiActor ? "AI" : row.actor_id ? "USER" : "SYSTEM",
+      actor_user_id: isAiActor ? null : row.actor_id,
+      actor_ai_id: isAiActor ? row.actor_id : null,
       activity_type: row.event_type,
       summary,
       subject_type: row.aggregate_type,
@@ -164,6 +179,18 @@ export class ActivityBuilderConsumer implements OutboxConsumer {
         return `Task completed`;
       case "artifact.created":
         return `Artifact created`;
+      case "ai.response.completed":
+        return `Odin completed a response`;
+      case "ai.action.proposed":
+        return `Odin proposed an action for approval`;
+      case "github.connected":
+        return `GitHub repository connected`;
+      case "github.disconnected":
+        return `GitHub repository disconnected`;
+      case "github.action.proposed":
+        return `GitHub write proposed for approval`;
+      case "meeting.ended":
+        return `Meeting ended`;
       case "github.pr.created":
         return `Pull request opened`;
       case "github.pr.merged":

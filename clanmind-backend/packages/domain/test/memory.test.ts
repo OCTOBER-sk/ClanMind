@@ -295,4 +295,46 @@ describe("§38/§126 retrieval", () => {
       true,
     );
   });
+
+  it("U2's private retrieval returns ZERO of U1's USER_PRIVATE rows even with include_user_private (§55A row 6)", async () => {
+    const r = makeRepos();
+    const svc = new MemoryService(r.memRepo, r.candRepo);
+    // Seed U1 private + shared rows.
+    await svc.acceptCandidate(
+      (
+        await svc.proposeFromRun({
+          group_id: G1,
+          project_id: null,
+          user_id: U1,
+          visibility: "PRIVATE_AI",
+          content: "U1 private preference: dark mode everywhere.",
+          confidence: 0.7,
+        })
+      ).candidate!.id,
+      U1,
+    );
+    await svc.registerMemory({
+      group_id: G1,
+      project_id: null,
+      memory_type: "fact",
+      content: "Group convention: ship on Thursdays",
+      confidence: 0.9,
+      source_type: "message",
+      fromApprovedDecision: false,
+    });
+
+    const u2Context = await svc.retrieveForContext({
+      group_id: G1,
+      project_id: null,
+      user_id: U2,
+      include_user_private: true, // the adversarial request
+      limit: 50,
+    });
+    const leaked = u2Context.filter(
+      (m) => m.scope_type === "USER_PRIVATE" && m.user_id === U1,
+    );
+    expect(leaked).toHaveLength(0);
+    // Shared rows still flow to B; only A's private scope is invisible.
+    expect(u2Context.some((m) => m.scope_type === "GROUP")).toBe(true);
+  });
 });

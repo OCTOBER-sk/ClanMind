@@ -13,6 +13,11 @@ import { messageRoutes } from "./handlers/messages";
 import { engagementRoutes } from "./handlers/engagement";
 import { attachmentRoutes } from "./handlers/attachments";
 import { searchRoutes } from "./handlers/search";
+import { aiRoutes } from "./handlers/ai";
+import { aiConfigRoutes } from "./handlers/ai-config";
+import { memoryRoutes } from "./handlers/memory";
+import { intelRoutes } from "./handlers/intel";
+import { githubRoutes, githubWebhookRoutes } from "./handlers/github";
 
 export type AppEnv = { Bindings: Env; Variables: AuthVariables };
 
@@ -94,6 +99,10 @@ export function createApp(services: AppServices): Hono<AppEnv> {
     }),
   );
 
+  // §80 webhook first: HMAC-verified, never JWT-gated. Sub-app `use("*")`
+  // middleware composes globally in Hono, so auth-gated routers must mount
+  // AFTER this one or they would 401 GitHub's deliveries.
+  app.route("/", githubWebhookRoutes());
   app.route("/", meRoutes());
   app.route("/", groupRoutes());
   app.route("/", memberRoutes());
@@ -103,6 +112,12 @@ export function createApp(services: AppServices): Hono<AppEnv> {
   app.route("/", engagementRoutes());
   app.route("/", attachmentRoutes());
   app.route("/", searchRoutes());
+  // §106–§113: AI runs/config, memory, project intelligence, GitHub.
+  app.route("/", aiRoutes());
+  app.route("/", aiConfigRoutes());
+  app.route("/", memoryRoutes());
+  app.route("/", intelRoutes());
+  app.route("/", githubRoutes());
 
   // Keep AppError referenced so tree-shaking never drops the contract import.
   void AppError;

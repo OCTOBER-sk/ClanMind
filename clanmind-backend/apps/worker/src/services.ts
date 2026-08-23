@@ -11,7 +11,11 @@ import {
   PinService,
   PrivateConversationService,
   AiAgentService,
+  ApprovalEngine,
+  ArtifactService,
   AttachmentService,
+  DecisionService,
+  MeetingService,
   NotificationService,
   ActivityService,
   SearchService,
@@ -23,6 +27,7 @@ import {
   ReactionService,
   RealtimeBroadcasterConsumer,
   ProjectService,
+  TaskService,
   ProfileRepository,
   GroupRepository,
   MembershipRepository,
@@ -44,6 +49,7 @@ import {
   IdempotencyRepository,
   JobRepository,
   JobQueue,
+  type ActionRepository,
   type JobHandler,
   type RealtimePort,
   type OutboxRepository,
@@ -90,13 +96,20 @@ import {
 } from "./repositories/jobs.repo";
 import { SupabaseIdempotencyRepository } from "./repositories/idempotency.repo";
 import {
+  SupabaseArtifactRepository,
+  SupabaseDecisionRepository,
+  SupabaseMeetingRepository,
+  SupabaseTaskRepository,
   SupabaseMemoryCandidateRepository,
   SupabaseMemoryRepository,
 } from "./repositories/project-intel.repo";
+import { approvedDecisionMemoryHook } from "./ai/runtime";
 import {
   SupabaseGithubConnectionRepository,
+  SupabaseGithubActionsRepository,
   SupabaseWebhookEventStore,
 } from "./repositories/github.repo";
+import { SupabaseActionRepository } from "./repositories/ai-runtime.repo";
 import type { Env } from "./env";
 
 /**
@@ -122,6 +135,11 @@ export interface AppServices {
   privateConversations: PrivateConversationService;
   ai: AiAgentService;
   memory: MemoryService;
+  /** §109–§112 project-intelligence services (REST-facing instances). */
+  artifacts: ArtifactService;
+  decisions: DecisionService;
+  tasks: TaskService;
+  meetings: MeetingService;
   attachments: AttachmentService;
   signedUrls: SignedUrlCodec;
   search: SearchService;
@@ -130,7 +148,11 @@ export interface AppServices {
   idempotency: IdempotencyService;
   jobs: JobQueue;
   githubConnections: SupabaseGithubConnectionRepository;
+  githubActions: SupabaseGithubActionsRepository;
   webhookEvents: SupabaseWebhookEventStore;
+  /** §78A action store + approval engine for REST-side GitHub flows. */
+  actions: ActionRepository;
+  approvals: ApprovalEngine;
 }
 
 /** Outbox repository view over Supabase for the §124 processor. */
@@ -224,7 +246,7 @@ export function buildServices(env: Env): AppServices {
     nicknames: new NicknameService(new SupabaseNicknameRepository(db)),
     messages: new MessageService(new SupabaseMessageRepository(db), {
       message_body_max_chars: limits.message_body_max_chars,
-    }),
+    }, outbox),
     realtime,
     reactions: new ReactionService(new SupabaseReactionRepository(db)),
     pins: new PinService(new SupabasePinRepository(db)),
@@ -233,6 +255,19 @@ export function buildServices(env: Env): AppServices {
     ),
     ai: new AiAgentService(new SupabaseAiAgentRepository(db)),
     memory,
+    // §109–§112 REST-facing project-intelligence services. The decisions
+    // instance carries the §134 approved-decision→memory hook so the REST
+    // approve path and the AI tool path promote identically.
+    artifacts: new ArtifactService(new SupabaseArtifactRepository(db), {
+      artifact_text_max_bytes: limits.artifact_text_max_bytes,
+      artifact_binary_max_bytes: limits.artifact_binary_max_bytes,
+    }),
+    decisions: new DecisionService(
+      new SupabaseDecisionRepository(db),
+      approvedDecisionMemoryHook(db, memory),
+    ),
+    tasks: new TaskService(new SupabaseTaskRepository(db)),
+    meetings: new MeetingService(new SupabaseMeetingRepository(db)),
     attachments: new AttachmentService(
       new SupabaseAttachmentRepository(db),
       new R2ObjectStorage(env),
@@ -244,7 +279,10 @@ export function buildServices(env: Env): AppServices {
     idempotency: new IdempotencyService(new SupabaseIdempotencyRepository(db)),
     jobs: jobQueue,
     githubConnections: new SupabaseGithubConnectionRepository(db),
+    githubActions: new SupabaseGithubActionsRepository(db),
     webhookEvents: new SupabaseWebhookEventStore(db),
+    actions: new SupabaseActionRepository(db),
+    approvals: new ApprovalEngine(new SupabaseActionRepository(db)),
   };
 }
 
@@ -276,6 +314,63 @@ export function buildBackgroundRuntime(env: Env): {
     },
   };
   runner.register(deletionHandler);
+
+  // §115 step 22 follow-up: a completed run's exchange proposes at most one
+  // memory candidate. The assistant answer slice is bounded (≤500 chars) and
+  // proposeFromRun enforces §37/§137 rules (never private→shared, no secrets).
+  const memoryExtractionHandler: JobHandler = {
+    job_type: "memory.extraction",
+    async execute(payload) {
+      const runId = payload["run_id"];
+      const groupId = payload["group_id"];
+      const visibility = payload["visibility"];
+      if (
+        typeof runId !== "string" ||
+        typeof groupId !== "string" ||
+        typeof visibility !== "string"
+      ) {
+        return;
+      }
+      if (!["GROUP", "PRIVATE_PAIR", "PRIVATE_AI"].includes(visibility)) return;
+
+      const { data: run, error: runError } = await db
+        .from("ai_runs")
+        .select("id, group_id, project_id, requester_user_id")
+        .eq("id", runId)
+        .maybeSingle();
+      if (runError || !run) return;
+      const runRow = run as {
+        id: string;
+        group_id: string;
+        project_id: string | null;
+        requester_user_id: string;
+      };
+
+      // Final AI message for the run (client_message_id convention §115).
+      const { data: aiMessage } = await db
+        .from("messages")
+        .select("id, body")
+        .eq("client_message_id", `ai_run_${runId}`)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (!aiMessage) return;
+      const aiBody = (aiMessage as { id: string; body: string }).body ?? "";
+
+      // The candidate content is the assistant's answer slice (≤500 chars);
+      // the triggering user request remains reachable via run.input_message_id.
+      const answerSlice = aiBody.replace(/\s+/g, " ").trim().slice(0, 500);
+      if (answerSlice.length < 8) return;
+      await services.memory.proposeFromRun({
+        group_id: runRow.group_id,
+        project_id: runRow.project_id,
+        user_id: runRow.requester_user_id,
+        visibility: visibility as "GROUP" | "PRIVATE_PAIR" | "PRIVATE_AI",
+        content: answerSlice,
+        confidence: 0.6,
+      });
+    },
+  };
+  runner.register(memoryExtractionHandler);
 
   const processor = new OutboxProcessor(new SupabaseOutboxRepositoryView(db), log);
   processor.register(

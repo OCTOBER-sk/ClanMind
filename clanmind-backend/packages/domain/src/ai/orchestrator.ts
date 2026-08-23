@@ -184,10 +184,19 @@ export class AiOrchestrator {
 
     // Step 10–13: context + tools resolved through the engine/registry.
     const assembled = this.contextEngine.assemble(input.contextCandidates);
+    // §60: the RANKED competitive slices are part of the prompt — dropping
+    // them would silently discard memory/decisions/recent-conversation
+    // context that §54A.2 selected. Provenance markers keep items traceable.
+    const rankedContext = assembled.competitive
+      .map((item) => `[${item.slice}|${item.source_type}:${item.source_id}] ${item.content}`)
+      .join("\n");
     const request: ModelRequest = {
       model_id: run.model_id,
       messages: [
         { role: "system", content: JSON.stringify(assembled.fixed) },
+        ...(rankedContext.length > 0
+          ? [{ role: "system" as const, content: `CONTEXT (ranked):\n${rankedContext}` }]
+          : []),
         { role: "user", content: input.userRequest },
       ],
       max_tokens: 4096,

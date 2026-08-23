@@ -5,6 +5,7 @@ import { extractMentionTokens } from "@clanmind/domain";
 import type { Env } from "../env";
 import type { AuthVariables } from "../middleware/auth";
 import { requireAuthenticatedUser } from "../middleware/auth";
+import { enforceRateLimit } from "../ai";
 
 /** §105 message endpoints. Realtime delivery happens after persistence. */
 const sendMessageBody = z.object({
@@ -29,6 +30,13 @@ export function messageRoutes(): Hono<{ Bindings: Env; Variables: AuthVariables 
     const user = c.get("user");
     const groupId = c.req.param("groupId");
     await services.membership.requireMember(groupId, user.user_id);
+
+    // §178/§91 anti-abuse: per-user message burst cap before any write.
+    enforceRateLimit(
+      `msg:${user.user_id}`,
+      services.limits.messages_per_minute_per_user,
+      60_000,
+    );
 
     const parsed = sendMessageBody.safeParse(await c.req.json().catch(() => ({})));
     if (!parsed.success) throw new AppError("VALIDATION_FAILED", "Invalid request body.");

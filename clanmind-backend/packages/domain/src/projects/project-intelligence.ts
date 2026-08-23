@@ -45,6 +45,8 @@ export interface ArtifactRepository {
   nextVersionNumber(artifactId: string): Promise<number>;
   insertVersion(input: Omit<ArtifactVersion, "id" | "created_at" | "version_number"> & { version_number?: number }): Promise<ArtifactVersion>;
   findVersion(artifactId: string, versionNumber: number): Promise<ArtifactVersion | null>;
+  /** Immutable version history for §109 version lists (oldest → newest). */
+  listVersions(artifactId: string): Promise<ArtifactVersion[]>;
   addLink(input: { artifact_id: string; target_type: string; target_id: string; relation: string }): Promise<void>;
 }
 
@@ -136,6 +138,37 @@ export class ArtifactService {
     });
   }
 
+  /** §109 version history for an artifact; 404s unknown/deleted artifacts. */
+  async listVersions(artifactId: string): Promise<ArtifactVersion[]> {
+    const artifact = await this.artifacts.findById(artifactId);
+    if (!artifact || artifact.status === "DELETED") {
+      throw new AppError("NOT_FOUND", "Artifact not found.");
+    }
+    return this.artifacts.listVersions(artifactId);
+  }
+
+  async listByProject(projectId: string) {
+    return this.artifacts.listByProject(projectId);
+  }
+
+  async findById(artifactId: string): Promise<Artifact | null> {
+    return this.artifacts.findById(artifactId);
+  }
+
+  /** Current version row for share/content reads (§109). */
+  async currentVersionText(
+    artifactId: string,
+  ): Promise<(ArtifactVersion & { artifact: Artifact }) | null> {
+    const artifact = await this.artifacts.findById(artifactId);
+    if (!artifact || artifact.status === "DELETED" || !artifact.current_version_id) {
+      return null;
+    }
+    // The current version number is derivable from the immutable chain.
+    const versions = await this.artifacts.listVersions(artifactId);
+    const current = versions.find((v) => v.id === artifact.current_version_id) ?? null;
+    return current ? { ...current, artifact } : null;
+  }
+
   async pin(artifactId: string, pinned: boolean): Promise<void> {
     await this.artifacts.update(artifactId, { pinned });
   }
@@ -182,6 +215,14 @@ export class DecisionService {
       throw new AppError("VALIDATION_FAILED", "Decision title is required.");
     }
     return this.decisions.insert(input);
+  }
+
+  async findById(id: string): Promise<Decision | null> {
+    return this.decisions.findById(id);
+  }
+
+  async listByProject(projectId: string): Promise<Decision[]> {
+    return this.decisions.listByProject(projectId);
   }
 
   async approve(input: { id: string; approver: string; expectedVersion: number }): Promise<Decision> {
@@ -249,6 +290,14 @@ export class TaskService {
       throw new AppError("VALIDATION_FAILED", "Task title is required.");
     }
     return this.tasks.insert(input);
+  }
+
+  async findById(id: string): Promise<Task | null> {
+    return this.tasks.findById(id);
+  }
+
+  async listByProject(projectId: string): Promise<Task[]> {
+    return this.tasks.listByProject(projectId);
   }
 
   /** §21.2 optimistic concurrency: update where version = expected. */
@@ -337,6 +386,14 @@ export class MeetingService {
 
   async start(input: { group_id: string; project_id: string | null; started_by: string }): Promise<MeetingSession> {
     return this.meetings.insertSession(input);
+  }
+
+  async findSession(id: string): Promise<MeetingSession | null> {
+    return this.meetings.findSession(id);
+  }
+
+  async listCandidates(sessionId: string): Promise<MeetingCandidate[]> {
+    return this.meetings.listCandidates(sessionId);
   }
 
   async detect(input: {

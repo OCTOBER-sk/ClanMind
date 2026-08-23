@@ -128,6 +128,16 @@ export class SupabaseArtifactRepository implements ArtifactRepository {
     return (data as ArtifactVersion) ?? null;
   }
 
+  async listVersions(artifactId: string): Promise<ArtifactVersion[]> {
+    const { data, error } = await this.db
+      .from("artifact_versions")
+      .select("*")
+      .eq("artifact_id", artifactId)
+      .order("version_number", { ascending: true });
+    if (error) throw error;
+    return (data as ArtifactVersion[]) ?? [];
+  }
+
   async addLink(input: {
     artifact_id: string;
     target_type: string;

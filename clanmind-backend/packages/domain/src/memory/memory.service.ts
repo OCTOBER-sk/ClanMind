@@ -286,6 +286,36 @@ export class MemoryService {
     await this.memories.archive(id);
   }
 
+  async getMemory(id: string): Promise<Memory | null> {
+    return this.memories.findById(id);
+  }
+
+  async getCandidate(id: string): Promise<MemoryCandidate | null> {
+    return this.candidates.findById(id);
+  }
+
+  /** §108 listing — shared scopes only; private rows are never listed here. */
+  async listGroupMemories(groupId: string, _viewerUserId: string): Promise<Memory[]> {
+    return this.memories.searchInScope({
+      group_id: groupId,
+      scope_type: "GROUP",
+      limit: 100,
+    });
+  }
+
+  async listProjectMemories(projectId: string, groupId: string): Promise<Memory[]> {
+    return this.memories.searchInScope({
+      group_id: groupId,
+      scope_type: "PROJECT",
+      project_id: projectId,
+      limit: 100,
+    });
+  }
+
+  async listCandidates(groupId: string): Promise<MemoryCandidate[]> {
+    return this.candidates.listByGroup(groupId, "PENDING");
+  }
+
   async updateMemory(id: string, input: Partial<Pick<Memory, "content" | "importance" | "confidence">>): Promise<Memory> {
     const updated = await this.memories.update(id, input);
     if (!updated) throw new AppError("NOT_FOUND", "Memory not found.");

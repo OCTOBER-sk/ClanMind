@@ -70,6 +70,11 @@ function artifactRepo() {
     async findVersion(artifactId, versionNumber) {
       return versions.find((v) => v.artifact_id === artifactId && v.version_number === versionNumber) ?? null;
     },
+    async listVersions(artifactId) {
+      return versions
+        .filter((v) => v.artifact_id === artifactId)
+        .sort((a, b) => a.version_number - b.version_number);
+    },
     async addLink() {},
   };
   return { artifacts, versions, r };

@@ -118,4 +118,86 @@ export class SupabaseWebhookEventStore {
     // Empty result ⇒ conflict ignored ⇒ duplicate delivery.
     return (data ?? []).length === 0;
   }
+
+  /** §80 step 4: map event to its Group once the installation resolves. */
+  async attachGroup(deliveryId: string, groupId: string): Promise<void> {
+    const { error } = await this.db
+      .from("github_webhook_events")
+      .update({ group_id: groupId })
+      .eq("delivery_id", deliveryId);
+    if (error) throw error;
+  }
+}
+
+/** §78 — GitHub-specific fields; approval state joins through ai_action_id. */
+export interface GithubActionRow {
+  id: string;
+  ai_action_id: string;
+  group_id: string;
+  project_id: string | null;
+  action_type: "create_branch" | "apply_patch" | "create_pr" | "merge_pr";
+  branch_name: string | null;
+  base_sha?: string | null;
+  target_sha: string | null;
+  pr_number: number | null;
+  preview_json: Record<string, unknown> | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export class SupabaseGithubActionsRepository {
+  constructor(private readonly db: SupabaseClient) {}
+
+  async insert(input: {
+    ai_action_id: string;
+    group_id: string;
+    project_id: string | null;
+    action_type: GithubActionRow["action_type"];
+    branch_name: string | null;
+    target_sha: string | null;
+    preview_json: Record<string, unknown> | null;
+  }): Promise<GithubActionRow> {
+    const { data, error } = await this.db
+      .from("github_actions")
+      .insert({
+        ai_action_id: input.ai_action_id,
+        group_id: input.group_id,
+        project_id: input.project_id,
+        action_type: input.action_type,
+        branch_name: input.branch_name,
+        target_sha: input.target_sha,
+        preview_json: input.preview_json,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data as GithubActionRow;
+  }
+
+  async findById(id: string): Promise<GithubActionRow | null> {
+    const { data, error } = await this.db
+      .from("github_actions")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return (data as GithubActionRow) ?? null;
+  }
+
+  /** §78A.2: status/risk/payload always come from the joined ai_actions row. */
+  async listByProjectWithStatus(
+    projectId: string,
+  ): Promise<(GithubActionRow & { status: string; risk_level: string })[]> {
+    const { data, error } = await this.db
+      .from("github_actions")
+      .select("*, ai_actions!inner(status, risk_level)")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return ((data as unknown[]) ?? []).map((row) => {
+      const r = row as GithubActionRow & { ai_actions: { status: string; risk_level: string } };
+      const { ai_actions, ...rest } = r;
+      return { ...rest, status: ai_actions.status, risk_level: ai_actions.risk_level };
+    });
+  }
 }

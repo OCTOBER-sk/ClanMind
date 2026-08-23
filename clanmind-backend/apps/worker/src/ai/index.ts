@@ -1,3 +1,4 @@
+import { AppError } from "@clanmind/shared";
 import type { Env } from "../env";
 import type { AppServices } from "../services";
 import { buildAiRuntime, type AiRuntime, type AiRuntimeDeps } from "./runtime";
@@ -36,6 +37,10 @@ export function getAiRuntime(env: Env, services: AppServices): AiRuntime {
  */
 const buckets = new Map<string, { windowStart: number; count: number }>();
 
+/**
+ * Throws the §102 contract error so Hono's onError renders 429 + Retry-After
+ * details instead of a generic 500.
+ */
 export function enforceRateLimit(
   key: string,
   max: number,
@@ -50,15 +55,9 @@ export function enforceRateLimit(
   }
   bucket.count += 1;
   if (bucket.count > max) {
-    const retryAfterMs = bucket.windowStart + windowMs - now;
-    const error = new Error("RATE_LIMITED") as Error & {
-      code?: string;
-      status?: number;
-      retry_after_seconds?: number;
-    };
-    error.code = "RATE_LIMITED";
-    error.status = 429;
-    error.retry_after_seconds = Math.ceil(retryAfterMs / 1000);
-    throw error;
+    const retryAfterSeconds = Math.max(1, Math.ceil((bucket.windowStart + windowMs - now) / 1000));
+    throw new AppError("RATE_LIMITED", "Too many requests; slow down.", {
+      retry_after_seconds: retryAfterSeconds,
+    });
   }
 }
