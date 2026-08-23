@@ -2,11 +2,29 @@ import React, { useState } from 'react';
 import { Dialog } from '@/design-system/components/Dialog';
 import { Button } from '@/design-system/components/Button';
 import { useMeetingStore } from '@/state/useMeetingStore';
+import { useGroupStore } from '@/state/useGroupStore';
+import { getDemoRuntime } from '@/mocks/runtime';
 import type { MeetingCandidate } from '@/types';
 
-/** §126 — Start Meeting Mode confirmation */
-export function MeetingStartDialog() {
+/**
+ * §126 — Start Meeting Mode confirmation.
+ * Group/project context comes from the active selection (§11: no fixture IDs
+ * in runtime code). Optional props let callers pin a specific scope.
+ */
+export function MeetingStartDialog({ groupId, projectId }: { groupId?: string; projectId?: string }) {
   const { isStartDialogOpen, setStartDialogOpen, startMeeting } = useMeetingStore();
+  const storeGroupId = useGroupStore((s) => s.activeGroup?.id);
+  const storeProjectId = useGroupStore((s) => s.activeProject?.id);
+
+  // §124A demo richness hook lives in the runtime seam; production builds get
+  // a null registry here (see mocks/runtime.ts).
+  const handleStart = () => {
+    const gid = groupId ?? storeGroupId;
+    if (!gid) return;
+    startMeeting(gid, projectId ?? storeProjectId ?? '');
+    const sessionId = useMeetingStore.getState().currentSession?.id;
+    if (sessionId) getDemoRuntime()?.seedMeeting(sessionId);
+  };
 
   return (
     <Dialog
@@ -20,11 +38,7 @@ export function MeetingStartDialog() {
           <Button size="sm" variant="ghost" onClick={() => setStartDialogOpen(false)}>
             Cancel
           </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={() => startMeeting('grp_robotics_1', 'proj_flight_ctrl')}
-          >
+          <Button size="sm" variant="primary" onClick={handleStart}>
             Start meeting
           </Button>
         </>

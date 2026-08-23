@@ -21,6 +21,7 @@ import { Input } from '@/design-system/components/Input';
 import { cn } from '@/design-system/utils';
 import { SyncDiagnosticsView } from '@/features/sync/SyncDiagnosticsView';
 import { useSyncStore } from '@/state/useSyncStore';
+import { useAuthStore } from '@/state/useAuthStore';
 import type { Group, GroupMember, GroupRole, ServerFeatureFlags, NotificationCategory } from '@/types';
 
 export interface SettingsViewProps {
@@ -606,7 +607,7 @@ export function SettingsView({
             pendingOperations={pendingOperations}
             conflicts={conflicts}
             onResolveConflict={(id, strategy) =>
-              useSyncStore.getState().resolveConflict(id, strategy, 'user_arun_1')
+              useSyncStore.getState().resolveConflict(id, strategy, useAuthStore.getState().user?.id ?? '')
             }
           />
         )}

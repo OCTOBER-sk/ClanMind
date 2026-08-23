@@ -30,7 +30,7 @@ export interface ProjectDataState {
 }
 
 export const useProjectDataStore = create<ProjectDataState>((set) => ({
-  // §11 — runtime starts empty; demo hydration (src/mocks) or live queries fill these.
+  // Â§11 â€” runtime starts empty; demo hydration (src/mocks) or live queries fill these.
   tasks: [],
   decisions: [],
   memories: [],

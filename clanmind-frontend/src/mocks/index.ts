@@ -8,8 +8,9 @@
 import { setTransportOverride } from '@/api/transport';
 import { initRealtime } from '@/realtime/connection';
 import { useArtifactStore } from '@/state/useArtifactStore';
-import type { Message } from '@/types';
+import type { Message, MeetingCandidate } from '@/types';
 import { useChatStore } from '@/state/useChatStore';
+import { useMeetingStore } from '@/state/useMeetingStore';
 import { createDemoDataset } from './dataset';
 import { createDemoTransport } from './transportRoutes';
 import { applyDemoHydration } from './hydrate';
@@ -76,6 +77,75 @@ export function installDemoMode(): DemoModeHandle {
     socketFactory(url) {
       return hub.createSocket(url);
     },
+    seedMeeting(sessionId) {
+      // §124A — demo meetings start with a rich candidate set so the Meeting
+      // Panel shows every candidate section. Production never runs this.
+      const session = useMeetingStore.getState().currentSession;
+      if (!session || session.id !== sessionId) return;
+
+      const now = new Date().toISOString();
+      const base = {
+        meeting_id: sessionId,
+        group_id: session.group_id,
+        project_id: session.project_id,
+        status: 'PENDING',
+        created_at: now,
+      } satisfies Partial<MeetingCandidate>;
+
+      const seeds: Array<Pick<MeetingCandidate, 'id' | 'candidate_type' | 'content'>> = [
+        {
+          id: `${sessionId}_cand_decision`,
+          candidate_type: 'DECISION',
+          content:
+            'Lock SPI bus at CPOL=0 / CPHA=1 for the ICM-42688P link — matches the bench logic capture.',
+        },
+        {
+          id: `${sessionId}_cand_task`,
+          candidate_type: 'TASK',
+          content:
+            'Marcus wires the 500 Hz control-loop telemetry path behind a compile-time flag before Friday.',
+        },
+        {
+          id: `${sessionId}_cand_contradiction`,
+          candidate_type: 'CONTRADICTION',
+          content:
+            'Priya reported the attitude loop stable at 500 Hz, but Marcus\u2019s bench log shows dropped packets above 350 Hz.',
+        },
+        {
+          id: `${sessionId}_cand_question`,
+          candidate_type: 'OPEN_QUESTION',
+          content:
+            'Can flash logging stay on the same SPI bus without stalling the DMA ring buffer?',
+        },
+        {
+          id: `${sessionId}_cand_research`,
+          candidate_type: 'RESEARCH_NEED',
+          content:
+            'Benchmark DMA vs I2C throughput for sensor bursts on the STM32H7 before choosing the final bus map.',
+        },
+        {
+          id: `${sessionId}_cand_milestone`,
+          candidate_type: 'MILESTONE_CHANGE',
+          content:
+            'Hardware validation milestone slips one week \u2014 IMU breakout boards arrive Thursday instead of Monday.',
+        },
+      ];
+
+      useMeetingStore.setState({
+        currentSession: {
+          ...session,
+          live_notes: [
+            ...session.live_notes,
+            'Priya confirms 500 Hz target is realistic with the new IMU driver.',
+            'Odin flagged DMA contention risk during flash writes \u2014 parked as an open question.',
+          ],
+          candidates: [
+            ...seeds.map((seed) => ({ ...base, ...seed }) as MeetingCandidate),
+            ...session.candidates,
+          ],
+        },
+      });
+    },
   };
   installDemoRuntime(runtime);
 
@@ -89,7 +159,7 @@ export function installDemoMode(): DemoModeHandle {
     onReady: () => {},
     onProtocolRequired: () => {},
     onSequenceGap: () => {},
-  }).connect([ds.groups[0]?.id ?? 'grp_robotics_1']);
+  }).connect([ds.groups[0]?.id].filter((id): id is string => Boolean(id)));
 
   // 4. Hydrate stores (runtime stores ship empty in live mode).
   applyDemoHydration(ds);

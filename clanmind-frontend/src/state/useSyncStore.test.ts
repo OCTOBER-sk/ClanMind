@@ -19,12 +19,12 @@ describe('useSyncStore.resolveConflict — §186A.4 write-back', () => {
     const store = useSyncStore.getState();
     useSyncStore.setState({ conflicts: [conflict()] });
 
-    useSyncStore.getState().resolveConflict('c_x', 'merged', 'user_arun_1');
+    useSyncStore.getState().resolveConflict('c_x', 'merged', 'user_resolver_1');
 
     const updated = useSyncStore.getState().conflicts[0];
     expect(updated).toBeDefined();
     expect(updated!.resolution_strategy).toBe('merged');
-    expect(updated!.resolved_by).toBe('user_arun_1');
+    expect(updated!.resolved_by).toBe('user_resolver_1');
     expect(updated!.resolved_at).toBeDefined();
     // The row is updated, not removed — no new operation is created
     expect(useSyncStore.getState().conflicts).toHaveLength(1);

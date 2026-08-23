@@ -23,6 +23,11 @@ export interface DemoRuntime {
   postProactiveOdinMessage(groupId: string, projectId: string | undefined, aiName: string): void;
   /** Socket factory handed to RealtimeClient in demo mode. */
   socketFactory(url: string): RealtimeSocketLike;
+  /**
+   * §124A — seed a freshly started demo meeting session with a rich set of
+   * candidates + live notes. No-op for unknown sessions; absent in production.
+   */
+  seedMeeting(sessionId: string): void;
 }
 
 let current: DemoRuntime | null = null;
