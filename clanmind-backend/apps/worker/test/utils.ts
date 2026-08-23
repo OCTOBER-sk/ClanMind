@@ -11,6 +11,7 @@ import {
   AiAgentService,
   AttachmentService,
   createHmacSignedUrlCodec,
+  MemoryService,
   ProfileService,
   ProjectService,
   ReactionService,
@@ -52,6 +53,7 @@ import {
   type ProjectInstructionRepository,
   type ProjectRepository,
 } from "@clanmind/domain";
+import { parseLimits } from "@clanmind/shared";
 import type { AppServices } from "../src/services";
 import type { Env } from "../src/env";
 
@@ -76,6 +78,7 @@ export interface TestState {
   projectRows: Project[];
   instructionRows: ProjectInstruction[];
   messageRows: Message[];
+  outboxEvents: import("@clanmind/domain").OutboxEventInput[];
   realtimePublishes: {
     group_id: string;
     event_type: string;
@@ -834,6 +837,8 @@ export function makeTestServices(): TestState {
       { projects_active_per_group_max: 20 },
     ),
     jobs: NOOP_JOB_QUEUE,
+    githubConnections: githubConnections as unknown as AppServices["githubConnections"],
+    webhookEvents: webhookEvents as unknown as AppServices["webhookEvents"],
   };
   return {
     services,
@@ -845,6 +850,7 @@ export function makeTestServices(): TestState {
     projectRows,
     instructionRows,
     messageRows,
+    outboxEvents,
   };
 }
 
