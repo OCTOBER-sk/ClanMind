@@ -78,6 +78,8 @@ export function aiRoutes(): Hono<{ Bindings: Env; Variables: AuthVariables }> {
       userRequest: body.message,
       contextCandidates: { candidates, explicitReferences: [] },
       requestedToolCalls: body.tool_calls ?? [],
+      // §40 claim — validated + authoritative-resolved inside the orchestrator.
+      private_conversation_id: body.private_conversation_id ?? null,
     });
     // truncated=true ⇒ a HIGH-risk action awaits approval (WAITING_APPROVAL).
     return c.json(result, 202);

@@ -10,13 +10,43 @@ import {
   RoomCore,
   gateProtocolVersion,
 } from "@clanmind/domain";
-import { parseLimits } from "@clanmind/shared";
+import { AppError, parseLimits } from "@clanmind/shared";
 import { getServiceClient } from "@clanmind/db";
 import { SupabaseMessageRepository } from "../repositories/message.repo";
 import { SupabaseReactionRepository } from "../repositories/engagement.repo";
 import { SupabaseMeetingRepository } from "../repositories/project-intel.repo";
 import { SupabaseOutbox } from "../repositories/jobs.repo";
 import type { Env } from "../env";
+
+/** §102 error frame: stable machine-readable code + message, top-level fields. */
+export interface WsErrorFrame {
+  type: "error";
+  code: string;
+  message: string;
+  /** §91/§102 — carried verbatim when the server says RATE_LIMITED. */
+  retry_after_seconds?: number;
+}
+
+/**
+ * §102 faithful AppError → error-frame mapping. Domain codes ride through
+ * unchanged (RATE_LIMITED stays RATE_LIMITED, GROUP_PERMISSION_DENIED stays
+ * GROUP_PERMISSION_DENIED, …); only unknown/non-domain errors collapse to
+ * VALIDATION_FAILED, and internals never leak into the message (§102).
+ */
+export function wsErrorFrame(error: unknown): WsErrorFrame {
+  if (error instanceof AppError) {
+    const details = error.details as { retry_after_seconds?: number } | undefined;
+    return {
+      type: "error",
+      code: error.code,
+      message: error.message,
+      ...(error.code === "RATE_LIMITED" && typeof details?.retry_after_seconds === "number"
+        ? { retry_after_seconds: details.retry_after_seconds }
+        : {}),
+    };
+  }
+  return { type: "error", code: "VALIDATION_FAILED", message: "Operation failed." };
+}
 
 /**
  * Group realtime room Durable Object (§15.2, §16, §17).
@@ -284,7 +314,9 @@ export class GroupRoom implements DurableObject {
             },
           });
         } catch (error) {
-          this.sendError(ws, "VALIDATION_FAILED", error instanceof Error ? error.message : "Send failed.");
+          // §102: RATE_LIMITED / GROUP_PERMISSION_DENIED / … ride through
+          // faithfully — never masked as VALIDATION_FAILED.
+          this.sendDomainError(ws, error);
         }
         return;
       }
@@ -527,12 +559,7 @@ export class GroupRoom implements DurableObject {
 
   /** Domain AppErrors keep their §102 code on the wire where one exists. */
   private sendDomainError(ws: WebSocket, error: unknown): void {
-    const err = error as { code?: string; message?: string };
-    this.sendError(
-      ws,
-      typeof err.code === "string" ? err.code : "VALIDATION_FAILED",
-      err.message ?? "Operation failed.",
-    );
+    this.sendTo(ws, wsErrorFrame(error));
   }
 
   /** Room-level presence/typing events are envelopes too (§17/§18). */

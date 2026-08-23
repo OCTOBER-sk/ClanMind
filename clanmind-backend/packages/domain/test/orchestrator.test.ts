@@ -6,7 +6,9 @@ import {
   AiAgentService,
   ContextEngine,
   MembershipService,
-  NOOP_OUTBOX,
+  MessageService,
+  NOOP_REALTIME,
+  PrivateConversationService,
   RunLifecycle,
   ToolRegistry,
   UsageService,
@@ -14,19 +16,26 @@ import {
   type AiAgentRepository,
   type AiRun,
   type AiRunRepository,
+  type EventOutbox,
   type GroupRepository,
   type MembershipRepository,
+  type Message,
+  type MessageRepository,
+  type PrivateConversationRepository,
   type UsageRepository,
 } from "../src/index";
-import { NOOP_REALTIME } from "../src/index";
 
 const U1 = "00000000-0000-4000-8000-000000000001";
+const U2 = "00000000-0000-4000-8000-000000000002";
 const G1 = "00000000-0000-4000-8000-0000000000g1".replace("g1", "001");
 
 function makeHarness(overrides: {
   adapter?: ModelProviderAdapter;
   approval?: import("../src/ai/orchestrator").ApprovalGate["requestApproval"];
   quotaUsed?: number;
+  /** §61 fallback-chain overrides for router tests. */
+  chain?: { id: string; provider_config_id: string; model_id: string }[];
+  adapters?: Record<string, ModelProviderAdapter>;
 }) {
   const runs: AiRun[] = [];
   const runRepo: AiRunRepository = {
@@ -51,6 +60,7 @@ function makeHarness(overrides: {
       const run = runs.find((r) => r.id === id);
       if (run) {
         run.status = status;
+        if (extra?.failure_code !== undefined) run.failure_code = extra.failure_code;
         if (extra?.usage_json) run.usage_json = extra.usage_json;
       }
     },
@@ -164,7 +174,59 @@ function makeHarness(overrides: {
   const ledger: { recorded: unknown[]; completed: unknown[] } = { recorded: [], completed: [] };
   const enqueued: string[] = [];
   const publishedEvents: string[] = [];
-  const persistedMessages: string[] = [];
+  const outboxEvents: import("../src/index").OutboxEventInput[] = [];
+  type PersistAiMessageInput = Parameters<
+    import("../src/ai/orchestrator").AiMessageSink["persistAiMessage"]
+  >[0];
+  const persistedMessages: PersistAiMessageInput[] = [];
+  let persistedSeq = 0;
+
+  // §40 in-memory private-conversation store backing the orchestrator gate.
+  const convRows: import("../src/index").PrivateConversation[] = [];
+  const convMembers = new Map<string, string[]>();
+  const convRepo: PrivateConversationRepository = {
+    async findHumanPair(groupId, userA, userB) {
+      return (
+        convRows.find(
+          (c) =>
+            c.group_id === groupId &&
+            c.type === "HUMAN_PAIR" &&
+            (convMembers.get(c.id) ?? []).includes(userA) &&
+            (convMembers.get(c.id) ?? []).includes(userB),
+        ) ?? null
+      );
+    },
+    async findAi(groupId, userId, aiAgentId) {
+      return (
+        convRows.find(
+          (c) =>
+            c.group_id === groupId &&
+            c.type === "AI" &&
+            c.created_by === userId &&
+            c.ai_agent_id === aiAgentId,
+        ) ?? null
+      );
+    },
+    async insert(input) {
+      const row = {
+        id: crypto.randomUUID(),
+        group_id: input.group_id,
+        type: input.type,
+        created_by: input.created_by,
+        ai_agent_id: input.ai_agent_id,
+        created_at: new Date().toISOString(),
+      };
+      convRows.push(row);
+      convMembers.set(row.id, input.member_user_ids);
+      return row;
+    },
+    async isMember(conversationId, userId) {
+      return (convMembers.get(conversationId) ?? []).includes(userId);
+    },
+    async memberIds(conversationId) {
+      return convMembers.get(conversationId) ?? [];
+    },
+  };
 
   const adapter: ModelProviderAdapter =
     overrides.adapter ??
@@ -192,10 +254,14 @@ function makeHarness(overrides: {
     new RunLifecycle(runRepo),
     new ContextEngine([{ label: "SYSTEM_SAFETY", content: "policy" }], 32_000),
     registry,
-    { async resolveAdapter() { return adapter; } },
+    {
+      async resolveAdapter(route) {
+        return overrides.adapters?.[route.provider_config_id] ?? adapter;
+      },
+    },
     {
       async resolveChain() {
-        return [{ id: "r1", provider_config_id: "pc1", model_id: "m1" }];
+        return overrides.chain ?? [{ id: "r1", provider_config_id: "pc1", model_id: "m1" }];
       },
     },
     new UsageService(usageRepo, { ai_requests_per_period: 10, period_ms: 60_000 }),
@@ -215,10 +281,25 @@ function makeHarness(overrides: {
       },
     },
     new Map(),
+    // §40 gate backed by the REAL PrivateConversationService semantics.
+    {
+      findAi: async (groupId, userId, aiAgentId) =>
+        (
+          await convRepo.findAi(
+            groupId,
+            userId,
+            aiAgentId,
+          )
+        )?.id ?? null,
+      requireMember: async (conversationId, userId) => {
+        await new PrivateConversationService(convRepo).requireMember(conversationId, userId);
+      },
+    },
     {
       async persistAiMessage(input) {
-        persistedMessages.push(input.body);
-        return { id: "msg-ai-1" };
+        persistedSeq += 1;
+        persistedMessages.push(input);
+        return { id: `msg-ai-${persistedSeq}` };
       },
     },
     {
@@ -227,7 +308,11 @@ function makeHarness(overrides: {
         publishedEvents.push(input.event_type);
       },
     },
-    NOOP_OUTBOX,
+    {
+      async publish(event) {
+        outboxEvents.push(event);
+      },
+    } satisfies EventOutbox,
     {
       async enqueue(input) {
         enqueued.push(input.job_type);
@@ -236,7 +321,7 @@ function makeHarness(overrides: {
     { tool_calls_per_run_max: 8, tool_total_time_per_run_seconds: 60, ai_context_token_budget: 32_000 },
   );
 
-  return { orchestrator, runs, ledger, enqueued, publishedEvents, persistedMessages, registry };
+  return { orchestrator, runs, ledger, enqueued, publishedEvents, outboxEvents, persistedMessages, convRepo, convRows, registry };
 }
 
 describe("§115 orchestrator", () => {
@@ -262,7 +347,9 @@ describe("§115 orchestrator", () => {
     expect(result.response).toBe("Hello team");
     expect(h.runs[0]?.status).toBe("COMPLETED");
     expect(h.runs[0]?.usage_json).toEqual({ input_tokens: 10, output_tokens: 5 });
-    expect(h.persistedMessages[0]).toBe("Hello team");
+    expect(h.persistedMessages[0]?.body).toBe("Hello team");
+    // A GROUP reply is never written into a private conversation (§2.4).
+    expect(h.persistedMessages[0]?.private_conversation_id).toBeNull();
     expect(h.enqueued).toContain("memory.extraction");
     // Deltas stream over realtime; run start/completion go through the
     // durable outbox (§122/§124), not the low-latency port.
@@ -371,5 +458,306 @@ describe("§115 orchestrator", () => {
     expect(JSON.stringify(cleaned)).not.toContain("sk-abcdefghijklmnop1234");
     expect(JSON.stringify(cleaned)).not.toContain("ghp_");
     expect(cleaned.count).toBe(5);
+  });
+});
+
+/**
+ * §2.4/§11.2/§40/§55 — a PRIVATE_AI reply must land inside the requester's
+ * owned conversation (resolved server-side), never orphaned under null.
+ */
+describe("§2.4/§40 private AI reply persistence", () => {
+  /** The harness agentRepo provisions Odin with the fixed id "odin-1". */
+  const ODIN_ID = "odin-1";
+
+  async function startPrivateAiRun(
+    h: ReturnType<typeof makeHarness>,
+    claimedConversationId?: string,
+  ): Promise<AiRun> {
+    return h.orchestrator.startRun({
+      group_id: G1,
+      requester_user_id: U1,
+      project_id: null,
+      mode: "ASSIST",
+      visibility: "PRIVATE_AI",
+      input_message_id: null,
+      private_conversation_id: claimedConversationId ?? null,
+      byokConfigured: false,
+    });
+  }
+
+  function execute(h: ReturnType<typeof makeHarness>, run: AiRun) {
+    return h.orchestrator.executeRun({
+      run,
+      requester_role: "OWNER",
+      userRequest: "hi",
+      contextCandidates: { candidates: [], explicitReferences: [] },
+      requestedToolCalls: [],
+    });
+  }
+
+  /** §11.2 read path: MessageService.requireReadable + conversation ACL. */
+  function aclReader(h: ReturnType<typeof makeHarness>) {
+    const rows: Message[] = h.persistedMessages.map((m, i) => ({
+      id: `msg-ai-${i + 1}`,
+      group_id: m.group_id,
+      project_id: m.project_id,
+      sender_type: "AI" as const,
+      sender_user_id: null,
+      sender_ai_id: m.ai_agent_id,
+      visibility: m.visibility,
+      private_conversation_id: m.private_conversation_id,
+      body: m.body,
+      body_format: "markdown",
+      reply_to_id: m.reply_to_id,
+      client_message_id: m.client_message_id,
+      server_sequence: i + 1,
+      created_at: new Date().toISOString(),
+      edited_at: null,
+      deleted_at: null,
+    }));
+    const repo = {
+      async findById(id: string) {
+        return rows.find((r) => r.id === id) ?? null;
+      },
+    } as MessageRepository;
+    const messages = new MessageService(repo, { message_body_max_chars: 8000 });
+    const acl = (conversationId: string, userId: string) =>
+      h.convRepo.isMember(conversationId, userId);
+    return { messages, acl };
+  }
+
+  it("persists the reply into the owner's conversation; owner reads it via the conversation ACL path", async () => {
+    const h = makeHarness({});
+    const conv = await h.convRepo.insert({
+      group_id: G1,
+      type: "AI",
+      created_by: U1,
+      ai_agent_id: ODIN_ID,
+      member_user_ids: [U1],
+    });
+
+    const run = await startPrivateAiRun(h);
+    const result = await execute(h, run);
+
+    expect(result.response).toBe("Hello team");
+    expect(h.runs[0]?.status).toBe("COMPLETED");
+    // The reply carries the SERVER-resolved conversation id (§40).
+    expect(h.persistedMessages[0]?.visibility).toBe("PRIVATE_AI");
+    expect(h.persistedMessages[0]?.private_conversation_id).toBe(conv.id);
+
+    const { messages, acl } = aclReader(h);
+    const readable = await messages.requireReadable("msg-ai-1", U1, acl);
+    expect(readable.body).toBe("Hello team");
+    expect(readable.private_conversation_id).toBe(conv.id);
+  });
+
+  it("a second user who is not a conversation member cannot read the private reply", async () => {
+    const h = makeHarness({});
+    await h.convRepo.insert({
+      group_id: G1,
+      type: "AI",
+      created_by: U1,
+      ai_agent_id: ODIN_ID,
+      member_user_ids: [U1], // only the requester is a participant (§2.4)
+    });
+    const run = await startPrivateAiRun(h);
+    await execute(h, run);
+
+    const { messages, acl } = aclReader(h);
+    await expect(messages.requireReadable("msg-ai-1", U2, acl)).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("a forged conversation id is rejected before any run row is created", async () => {
+    const h = makeHarness({});
+    await h.convRepo.insert({
+      group_id: G1,
+      type: "AI",
+      created_by: U1,
+      ai_agent_id: ODIN_ID,
+      member_user_ids: [U1],
+    });
+
+    await expect(startPrivateAiRun(h, crypto.randomUUID())).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    expect(h.runs).toHaveLength(0);
+  });
+
+  it("rejects claiming a HUMAN_PAIR conversation on a PRIVATE_AI run even when membership passes", async () => {
+    const h = makeHarness({});
+    // U1 owns a HUMAN_PAIR conversation and claims it on a PRIVATE_AI run:
+    // the authoritative resolution (requester + group AI) differs from the
+    // claim, so startRun fails fast before quota spend or a run row.
+    const pairConv = await h.convRepo.insert({
+      group_id: G1,
+      type: "HUMAN_PAIR",
+      created_by: U1,
+      ai_agent_id: null,
+      member_user_ids: [U1, U2],
+    });
+
+    await expect(startPrivateAiRun(h, pairConv.id)).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    expect(h.runs).toHaveLength(0);
+  });
+
+  it("fails a started run cleanly when its conversation becomes unresolvable before persist (§40 re-check)", async () => {
+    const h = makeHarness({});
+    const conv = await h.convRepo.insert({
+      group_id: G1,
+      type: "AI",
+      created_by: U1,
+      ai_agent_id: ODIN_ID,
+      member_user_ids: [U1],
+    });
+
+    const run = await startPrivateAiRun(h);
+    // The conversation disappears between start and execution — the §40
+    // re-check at persist time must fail the run, never write an orphan.
+    const idx = h.convRows.findIndex((c) => c.id === conv.id);
+    h.convRows.splice(idx, 1);
+
+    await expect(execute(h, run)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(h.runs[0]?.status).toBe("FAILED");
+    expect(h.runs[0]?.failure_code).toBe("private_conversation_forbidden");
+    expect(h.outboxEvents.some((e) => e.event_type === "ai.response.failed")).toBe(true);
+    expect(h.persistedMessages).toHaveLength(0);
+  });
+
+  it("a GROUP run may never target a private conversation (§11.2)", async () => {
+    const h = makeHarness({});
+    await expect(
+      h.orchestrator.startRun({
+        group_id: G1,
+        requester_user_id: U1,
+        project_id: null,
+        mode: "ASSIST",
+        visibility: "GROUP",
+        input_message_id: null,
+        private_conversation_id: crypto.randomUUID(),
+        byokConfigured: false,
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+});
+
+/** §61 — classify-then-gate: only transient classes may fall back. */
+describe("§61 model router fallback gating", () => {
+  function failingAdapter(code: string): ModelProviderAdapter {
+    return {
+      provider: `failing-${code}`,
+      async validateCredentials() {
+        return { valid: true, models: [], error_code: null };
+      },
+      async listModels() {
+        return [];
+      },
+      async *generate(): AsyncGenerator<ModelEvent> {
+        yield { type: "error", code, message: `provider says ${code}` };
+      },
+    };
+  }
+
+  function spyAdapter(text: string) {
+    let calls = 0;
+    const adapter: ModelProviderAdapter = {
+      provider: "fallback",
+      async validateCredentials() {
+        return { valid: true, models: [], error_code: null };
+      },
+      async listModels() {
+        return [];
+      },
+      async *generate(): AsyncGenerator<ModelEvent> {
+        calls += 1;
+        yield { type: "text_delta", text };
+        yield { type: "usage", input_tokens: 3, output_tokens: 2 };
+        yield { type: "completed", finish_reason: "stop" };
+      },
+    };
+    return { adapter, calls: () => calls };
+  }
+
+  const TWO_ROUTES = [
+    { id: "r1", provider_config_id: "pc1", model_id: "m1" },
+    { id: "r2", provider_config_id: "pc2", model_id: "m2" },
+  ];
+
+  async function runGroup(h: ReturnType<typeof makeHarness>): Promise<void> {
+    const run = await h.orchestrator.startRun({
+      group_id: G1,
+      requester_user_id: U1,
+      project_id: null,
+      mode: "ASSIST",
+      visibility: "GROUP",
+      input_message_id: null,
+      private_conversation_id: null,
+      byokConfigured: false,
+    });
+    await h.orchestrator.executeRun({
+      run,
+      requester_role: "OWNER",
+      userRequest: "hi",
+      contextCandidates: { candidates: [], explicitReferences: [] },
+      requestedToolCalls: [],
+    });
+  }
+
+  it("an invalid API key aborts the chain — the fallback provider is never called", async () => {
+    const fallback = spyAdapter("should never stream");
+    const h = makeHarness({
+      chain: TWO_ROUTES,
+      adapters: { pc1: failingAdapter("invalid_api_key"), pc2: fallback.adapter },
+    });
+
+    await expect(runGroup(h)).rejects.toMatchObject({ code: "INTERNAL" });
+
+    expect(fallback.calls()).toBe(0);
+    expect(h.runs[0]?.status).toBe("FAILED");
+    expect(h.runs[0]?.failure_code).toBe("invalid_api_key");
+    expect(h.outboxEvents.some((e) => e.event_type === "ai.response.failed")).toBe(true);
+    expect(h.publishedEvents.every((e) => e !== "ai.response.delta")).toBe(true);
+  });
+
+  it("a safety refusal aborts the chain (non-retryable class)", async () => {
+    const fallback = spyAdapter("should never stream");
+    const h = makeHarness({
+      chain: TWO_ROUTES,
+      adapters: { pc1: failingAdapter("safety_refusal"), pc2: fallback.adapter },
+    });
+
+    await expect(runGroup(h)).rejects.toBeInstanceOf(AppError);
+    expect(fallback.calls()).toBe(0);
+    expect(h.runs[0]?.failure_code).toBe("safety_refusal");
+  });
+
+  it("a transient 5xx proceeds to the next route and completes there", async () => {
+    const fallback = spyAdapter("Recovered");
+    const h = makeHarness({
+      chain: TWO_ROUTES,
+      adapters: { pc1: failingAdapter("5xx"), pc2: fallback.adapter },
+    });
+
+    await expect(runGroup(h)).resolves.toBeUndefined();
+
+    expect(fallback.calls()).toBe(1);
+    expect(h.runs[0]?.status).toBe("COMPLETED");
+    expect(h.publishedEvents.some((e) => e === "ai.response.delta")).toBe(true);
+  });
+
+  it("a rate-limited provider falls through to the next route (§61 configured rate limit condition)", async () => {
+    const fallback = spyAdapter("After throttle");
+    const h = makeHarness({
+      chain: TWO_ROUTES,
+      adapters: { pc1: failingAdapter("rate_limited"), pc2: fallback.adapter },
+    });
+
+    await expect(runGroup(h)).resolves.toBeUndefined();
+
+    expect(fallback.calls()).toBe(1);
+    expect(h.runs[0]?.status).toBe("COMPLETED");
   });
 });

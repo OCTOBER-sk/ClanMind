@@ -8,6 +8,7 @@ import type { ContextEngine } from "./context-engine";
 import { ToolLoopGuard, ToolRegistry, type ToolDefinition } from "./context-engine";
 import type { RunLifecycle, AiRunRepository, AiRun } from "./run-lifecycle";
 import type { UsageService } from "./run-lifecycle";
+import { classifyProviderError } from "./provider-config.service";
 
 /** §57A tool-call ledger port (Supabase-backed in the worker). */
 export interface ToolCallLedger {
@@ -52,6 +53,19 @@ export interface AiMessageSink {
     client_message_id: string;
     reply_to_id: string | null;
   }): Promise<{ id: string }>;
+}
+
+/**
+ * §2.4/§40 server-side private-conversation resolution + membership gate.
+ * The orchestrator never trusts a client-supplied conversation id alone:
+ * the write target derives from the run context, and §40 membership is
+ * verified before any private message is persisted.
+ */
+export interface PrivateConversationGate {
+  /** The requester's type-AI conversation in this Group (§2.4), or null. */
+  findAi(groupId: string, userId: string, aiAgentId: string): Promise<string | null>;
+  /** §40 membership check — rejects when `userId` is not a participant. */
+  requireMember(conversationId: string, userId: string): Promise<void>;
 }
 
 /** §88 secret patterns applied to every string, at any depth. */
@@ -100,6 +114,7 @@ export class AiOrchestrator {
     private readonly ledger: ToolCallLedger,
     private readonly approvals: ApprovalGate,
     private readonly executors: Map<string, ToolExecutor>,
+    private readonly conversations: PrivateConversationGate,
     private readonly messageSink: AiMessageSink,
     private readonly realtime: RealtimePort,
     private readonly outbox: EventOutbox,
@@ -127,6 +142,19 @@ export class AiOrchestrator {
   }): Promise<AiRun> {
     await this.membership.requireMember(input.group_id, input.requester_user_id);
     const agent = await this.agents.getCurrentAgent(input.group_id);
+
+    // §11.2/§40: a claimed conversation id is accepted only when the run
+    // context owns it — GROUP runs may never target a private conversation.
+    // Fail fast here, before quota spend or a durable run row.
+    await this.resolvePrivateTarget(
+      {
+        group_id: input.group_id,
+        requester_user_id: input.requester_user_id,
+        ai_agent_id: agent.id,
+        visibility: input.visibility,
+      },
+      input.private_conversation_id ?? null,
+    );
 
     const chain = await this.routes.resolveChain(input.group_id);
     const primary = chain[0];
@@ -178,9 +206,37 @@ export class AiOrchestrator {
     userRequest: string;
     contextCandidates: Parameters<ContextEngine["assemble"]>[0];
     requestedToolCalls: { tool_name: string; input: Record<string, unknown> }[];
+    /** Client-claimed conversation id (§40). Honored only when it IS the
+     * server-resolved conversation for this run — never trusted alone. */
+    private_conversation_id?: string | null;
   }): Promise<{ run_id: string; response: string; tool_calls: number; truncated: boolean }> {
     const { run } = input;
     await this.lifecycle.transition(run.id, "RUNNING");
+
+    // §2.4/§55: resolve WHERE a private reply is persisted before any
+    // provider spend. A private reply that cannot land in its owned
+    // conversation fails cleanly here — it must never stream content that
+    // cannot be persisted, nor orphan a row with a null conversation id.
+    let privateConversationId: string | null;
+    try {
+      privateConversationId = await this.resolvePrivateTarget(
+        run,
+        input.private_conversation_id ?? null,
+      );
+    } catch (error) {
+      await this.lifecycle.transition(run.id, "FAILED", {
+        failure_code: "private_conversation_forbidden",
+      });
+      await this.outbox.publish({
+        event_type: "ai.response.failed",
+        aggregate_type: "ai_run",
+        aggregate_id: run.id,
+        group_id: run.group_id,
+        actor_id: run.requester_user_id,
+        payload: { run_id: run.id, failure_code: "private_conversation_forbidden" },
+      });
+      throw error;
+    }
 
     // Step 10–13: context + tools resolved through the engine/registry.
     const assembled = this.contextEngine.assemble(input.contextCandidates);
@@ -306,16 +362,10 @@ export class AiOrchestrator {
             inputTokens = event.input_tokens;
             outputTokens = event.output_tokens;
           } else if (event.type === "error") {
+            // Stop consuming THIS provider's stream only; §61 classification
+            // below decides whether the chain may proceed to the next route.
             failed = true;
             failureCode = event.code || "provider_unavailable";
-            // §61: non-retryable errors never fall back (Correction 16).
-            if (
-              ["invalid_api_key", "invalid_request", "permission_denied", "safety_refusal"].includes(
-                failureCode,
-              )
-            ) {
-              break;
-            }
             break;
           }
         }
@@ -344,6 +394,25 @@ export class AiOrchestrator {
           });
           throw new AppError("INTERNAL", `Provider stream failed mid-response (${failureCode}).`);
         }
+        // §61 classify-then-gate: AUTH / INVALID_REQUEST / PERMISSION /
+        // SAFETY — and any unlabeled failure (fail closed) — abort the whole
+        // chain. Only TRANSIENT / RATE_LIMITED / PROVIDER_UNAVAILABLE classes
+        // proceed to the next route.
+        if (classifyProviderError(failureCode) === "NON_RETRYABLE") {
+          await this.lifecycle.transition(run.id, "FAILED", { failure_code: failureCode });
+          await this.outbox.publish({
+            event_type: "ai.response.failed",
+            aggregate_type: "ai_run",
+            aggregate_id: run.id,
+            group_id: run.group_id,
+            actor_id: run.requester_user_id,
+            payload: { run_id: run.id, failure_code: failureCode },
+          });
+          throw new AppError(
+            "INTERNAL",
+            `Provider rejected this run; no fallback is permitted for this error class (${failureCode}).`,
+          );
+        }
         // Nothing streamed yet: clean fallback to the next route.
         response = "";
       }
@@ -362,13 +431,15 @@ export class AiOrchestrator {
       throw new AppError("INTERNAL", "No provider could complete this run.");
     }
 
-    // Steps 18–21: persist the AI message + completed event.
+    // Steps 18–21: persist the AI message + completed event. Private runs
+    // land inside the requester's owned conversation (§2.4/§40) so the
+    // §11.2 ACL / RLS read path resolves for exactly its members.
     const message = await this.messageSink.persistAiMessage({
       group_id: run.group_id,
       project_id: run.project_id,
       ai_agent_id: run.ai_agent_id,
       visibility: run.visibility,
-      private_conversation_id: null,
+      private_conversation_id: privateConversationId,
       body: response,
       client_message_id: `ai_run_${run.id}`,
       reply_to_id: run.input_message_id,
@@ -407,6 +478,59 @@ export class AiOrchestrator {
     });
 
     return { run_id: run.id, response, tool_calls: guard.callCount, truncated: false };
+  }
+
+  /**
+   * §2.4/§11.2/§40/§55: decide where a run's reply is persisted. The target
+   * derives server-side from the run context — never from a client-supplied
+   * id alone:
+   *
+   *   GROUP        → null (a claimed id is a protocol violation);
+   *   PRIVATE_AI   → the requester's type-AI conversation for this Group AI;
+   *   PRIVATE_PAIR → only a claimed conversation whose §40 membership the
+   *                  requester holds.
+   *
+   * Any forged, unresolvable, or non-owned claim rejects the run instead of
+   * writing an orphaned (unreadable-under-RLS) row.
+   */
+  private async resolvePrivateTarget(
+    ctx: Pick<AiRun, "group_id" | "requester_user_id" | "ai_agent_id" | "visibility">,
+    claimedConversationId: string | null,
+  ): Promise<string | null> {
+    if (ctx.visibility === "GROUP") {
+      if (claimedConversationId) {
+        throw new AppError(
+          "VALIDATION_FAILED",
+          "A GROUP run cannot target a private conversation.",
+        );
+      }
+      return null;
+    }
+    if (ctx.visibility === "PRIVATE_AI") {
+      const resolved = await this.conversations.findAi(
+        ctx.group_id,
+        ctx.requester_user_id,
+        ctx.ai_agent_id,
+      );
+      if (!resolved || (claimedConversationId !== null && claimedConversationId !== resolved)) {
+        throw new AppError(
+          "FORBIDDEN",
+          "This run has no private AI conversation owned by its requester.",
+        );
+      }
+      // §40: membership is verified before every private write.
+      await this.conversations.requireMember(resolved, ctx.requester_user_id);
+      return resolved;
+    }
+    // PRIVATE_PAIR: only into a conversation the requester belongs to (§40).
+    if (!claimedConversationId) {
+      throw new AppError(
+        "VALIDATION_FAILED",
+        "A PRIVATE_PAIR run requires the id of its private conversation.",
+      );
+    }
+    await this.conversations.requireMember(claimedConversationId, ctx.requester_user_id);
+    return claimedConversationId;
   }
 
   /** §120 cancellation. */

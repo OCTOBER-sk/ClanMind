@@ -7,6 +7,7 @@ import {
   ContextEngine,
   DecisionService,
   ModelRouterService,
+  PrivateConversationService,
   ProviderConfigService,
   RunLifecycle,
   TaskService,
@@ -24,6 +25,7 @@ import {
   type MemoryService,
   type MembershipService,
   type ModelRouteRepository,
+  type PrivateConversationGate,
   type ProviderConfigRepository,
   type RealtimePort,
   type SecretStore,
@@ -49,6 +51,7 @@ import {
   SupabaseTaskRepository,
 } from "../repositories/project-intel.repo";
 import { SupabaseMessageRepository } from "../repositories/message.repo";
+import { SupabasePrivateConversationRepository } from "../repositories/private-conversation.repo";
 
 /**
  * §62 provider → OpenAI-compatible endpoint mapping. Every supported vendor
@@ -384,6 +387,18 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
     },
   };
 
+  // §2.4/§40 server-side resolver + membership gate behind the orchestrator's
+  // private-write path (never a client-supplied conversation id alone).
+  const privateConversationRepo = new SupabasePrivateConversationRepository(db);
+  const privateConversationService = new PrivateConversationService(privateConversationRepo);
+  const conversationGate: PrivateConversationGate = {
+    findAi: async (groupId, userId, aiAgentId) =>
+      (await privateConversationRepo.findAi(groupId, userId, aiAgentId))?.id ?? null,
+    requireMember: async (conversationId, userId) => {
+      await privateConversationService.requireMember(conversationId, userId);
+    },
+  };
+
   // §115 lifecycle steps 1–24 in one composed unit.
   const orchestrator = new AiOrchestrator(
     deps.membership,
@@ -413,6 +428,7 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
     ledger,
     approvals,
     executors,
+    conversationGate,
     messageSink,
     deps.realtime,
     deps.outbox,
