@@ -25,7 +25,19 @@ function dbNameFor(userId: string): string {
   return `cm_${userId}`;
 }
 
+/**
+ * Environments without IndexedDB (some webviews, test DOMs) must not crash
+ * the account lifecycle — local persistence is a progressive enhancement;
+ * drafts/cache simply stay memory-only there.
+ */
+function hasIndexedDb(): boolean {
+  return typeof globalThis.indexedDB !== 'undefined';
+}
+
 export function openAccountDb(userId: string): Promise<IDBPDatabase> {
+  if (!hasIndexedDb()) {
+    return Promise.reject(new Error('[local] IndexedDB unavailable in this environment'));
+  }
   const existing = dbCache.get(userId);
   if (existing) return existing;
 
@@ -63,6 +75,7 @@ export async function closeAccountDb(userId: string): Promise<void> {
 /** FE §284 — full local wipe when an account signs out. */
 export async function wipeAccountDb(userId: string): Promise<void> {
   await closeAccountDb(userId);
+  if (!hasIndexedDb()) return;
   await deleteDB(dbNameFor(userId));
 }
 

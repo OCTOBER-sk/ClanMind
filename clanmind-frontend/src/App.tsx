@@ -7,6 +7,8 @@ import { ErrorBoundary } from '@/app/ErrorBoundary';
 import { useUiStore } from '@/state/useUiStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import { initConnectivity, shutdownConnectivity } from '@/sync/connectivity';
+import { SessionExpiredGate } from '@/features/auth/SessionExpiredGate';
+import { setUnauthorizedHandler } from '@/api/client';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,11 +24,22 @@ const queryClient = new QueryClient({
 export function App() {
   const theme = useUiStore((s) => s.theme);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isSessionExpired = useAuthStore((s) => s.isSessionExpired);
 
   // Apply theme class to document root
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
+
+  // FE §197 — any authenticated domain call answered 401 flips the session
+  // gate. Local work is never cleared here; the same account signing back in
+  // resumes seamlessly (account-switch wiping happens only in establishSession).
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      useAuthStore.getState().setSessionExpired(true);
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   // Real connectivity → SyncBanner truth (FE §185). Realtime is initialised
   // at boot (demo hub or live socket); connectivity derives banner state.
@@ -54,6 +67,7 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <ErrorBoundary variant="global">
+          {isSessionExpired && <SessionExpiredGate />}
           <RouterProvider router={router} />
         </ErrorBoundary>
       </ToastProvider>

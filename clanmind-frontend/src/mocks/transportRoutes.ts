@@ -38,11 +38,38 @@ function matchPath(pattern: string, path: string): Record<string, string> | null
 
 let serverSequence = 1421;
 
+/**
+ * Demo session-expiry injection (FE §197 testing). Once tripped, every
+ * authenticated domain call answers 401 AUTH_SESSION_EXPIRED until the next
+ * successful login "refreshes" the demo session. Auth routes are exempt —
+ * signing in must stay possible while expired.
+ */
+let sessionExpired = false;
+
+export function expireDemoSession(): void {
+  sessionExpired = true;
+}
+
+function requireSession(req: TransportRequest): TransportResponse | null {
+  if (!sessionExpired) return null;
+  const path = req.path.split('?')[0]!.replace(/^\/api\/v1/, '');
+  if (path.startsWith('/auth/')) return null;
+  return fail(401, 'AUTH_SESSION_EXPIRED', 'Your session has expired.');
+}
+
 export function createDemoTransport(ds: DemoDataset): Transport {
   let cursorBase = [...ds.messages];
 
   const routes: Array<[string, string, Handler]> = [
-    ['GET', '/me', () => ok({ id: ds.currentUser.id, email: ds.currentUser.email, display_name: ds.currentUser.name })],
+    ['GET', '/me', () =>
+      // BE §6.2/§104 — profile shape validated by ProfileSchema client-side.
+      ok({
+        id: ds.currentUser.id,
+        email: ds.currentUser.email,
+        display_name: ds.currentUser.name,
+        created_at: ds.currentUser.created_at ?? new Date(Date.now() - 30 * 86_400_000).toISOString(),
+        last_seen_at: new Date().toISOString(),
+      })],
 
     ['POST', '/auth/login', (_p, req) => {
       const body = (req.body ?? {}) as { email?: string; password?: string };
@@ -67,6 +94,15 @@ export function createDemoTransport(ds: DemoDataset): Transport {
           name: body.name ?? ds.currentUser.name,
         },
       });
+    }],
+
+    ['POST', '/auth/request-password-reset', () =>
+      // FE §68 — always 200; response never reveals account existence.
+      ok({ sent: true })],
+
+    ['POST', '/auth/logout', () => {
+      sessionExpired = false;
+      return ok({ signed_out: true });
     }],
 
     ['GET', '/groups', () => ok(ds.groups)],
@@ -177,6 +213,9 @@ export function createDemoTransport(ds: DemoDataset): Transport {
       await sleep(90 + Math.random() * 160);
 
       const pathOnly = req.path.split('?')[0]!;
+      const sessionGate = requireSession(req);
+      if (sessionGate) return sessionGate;
+
       for (const [method, pattern, handler] of routes) {
         if (method !== req.method) continue;
         const params = matchPath(pattern, pathOnly.replace(/^\/api\/v1/, ''));

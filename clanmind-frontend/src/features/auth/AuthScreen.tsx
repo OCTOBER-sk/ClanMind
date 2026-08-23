@@ -2,23 +2,18 @@
 import { ClanMindLogo } from '@/design-system/components/ClanMindLogo';
 import { Button } from '@/design-system/components/Button';
 import { Input } from '@/design-system/components/Input';
-import { api } from '@/api/client';
 import { ApiError } from '@/api/errors';
-import { useAuthStore } from '@/state/useAuthStore';
 import { useGroupStore } from '@/state/useGroupStore';
-import type { User } from '@/types';
+import {
+  establishSession,
+  getSessionGateway,
+} from '@/features/auth/session';
 
 type AuthView = 'first_launch' | 'login' | 'signup' | 'forgot_password';
-
-interface AuthSessionResponse {
-  access_token: string;
-  user: { id: string; email: string; name: string };
-}
 
 /** §67-69: Authentication screens and first launch experience */
 export function AuthScreen() {
   const [view, setView] = useState<AuthView>('first_launch');
-  const { setUser } = useAuthStore();
   const { groups } = useGroupStore();
 
   // §196: returners go straight to login (derived — no state-in-effect)
@@ -37,15 +32,9 @@ export function AuthScreen() {
           <LoginView
             onSignup={() => setView('signup')}
             onForgotPassword={() => setView('forgot_password')}
-            onSuccess={(user) => setUser(user)}
           />
         )}
-        {effectiveView === 'signup' && (
-          <SignupView
-            onLogin={() => setView('login')}
-            onSuccess={(user) => setUser(user)}
-          />
-        )}
+        {effectiveView === 'signup' && <SignupView onLogin={() => setView('login')} />}
         {effectiveView === 'forgot_password' && (
           <ForgotPasswordView onBack={() => setView('login')} />
         )}
@@ -109,11 +98,9 @@ interface AuthFormState {
 function LoginView({
   onSignup,
   onForgotPassword,
-  onSuccess,
 }: {
   onSignup: () => void;
   onForgotPassword: () => void;
-  onSuccess: (user: User) => void;
 }) {
   const [form, setForm] = useState<AuthFormState>({
     email: '',
@@ -130,18 +117,8 @@ function LoginView({
     }
     setForm((f) => ({ ...f, loading: true, error: null }));
     try {
-      // BE §104 — session establishment; demo transport implements the same
-      // contract, including the AUTH_INVALID_CREDENTIALS failure path.
-      const res = await api.post<AuthSessionResponse>('/auth/login', {
-        email: form.email,
-        password: form.password,
-      });
-      onSuccess({
-        id: res.user.id,
-        email: res.user.email,
-        name: res.user.name,
-        created_at: new Date().toISOString(),
-      });
+      const identity = await getSessionGateway().signIn(form.email, form.password);
+      await establishSession(identity);
     } catch (err) {
       setForm((f) => ({
         ...f,
@@ -151,7 +128,9 @@ function LoginView({
             ? "Couldn't sign in. Check your email and password."
             : "Couldn't sign in right now. Try again.",
       }));
+      return;
     }
+    setForm((f) => ({ ...f, loading: false }));
   };
 
   return (
@@ -242,13 +221,7 @@ function LoginView({
 
 // ─── Signup — §67 ───
 
-function SignupView({
-  onLogin,
-  onSuccess,
-}: {
-  onLogin: () => void;
-  onSuccess: (user: User) => void;
-}) {
+function SignupView({ onLogin }: { onLogin: () => void }) {
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -274,24 +247,21 @@ function SignupView({
     }
     setForm((f) => ({ ...f, loading: true, error: null }));
     try {
-      const res = await api.post<AuthSessionResponse>('/auth/signup', {
+      const identity = await getSessionGateway().signUp({
         name: form.name,
         email: form.email,
         password: form.password,
       });
-      onSuccess({
-        id: res.user.id,
-        email: res.user.email,
-        name: res.user.name,
-        created_at: new Date().toISOString(),
-      });
+      await establishSession(identity);
     } catch {
       setForm((f) => ({
         ...f,
         loading: false,
         error: "Couldn't create account. Try again.",
       }));
+      return;
     }
+    setForm((f) => ({ ...f, loading: false }));
   };
 
   return (
@@ -367,16 +337,20 @@ function ForgotPasswordView({ onBack }: { onBack: () => void }) {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sendFailed, setSendFailed] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
     setLoading(true);
+    setSendFailed(false);
     try {
-      // TODO: POST /api/v1/auth/forgot-password { email }
-      // IMPORTANT: §68 — never reveal whether email exists
-      await new Promise((r) => setTimeout(r, 600));
+      // §68 — success/failure never reveals whether the email exists.
+      await getSessionGateway().requestPasswordReset(email);
       setSent(true);
+    } catch {
+      // Transport-level failure only — makes no account-existence claim.
+      setSendFailed(true);
     } finally {
       setLoading(false);
     }
@@ -425,6 +399,14 @@ function ForgotPasswordView({ onBack }: { onBack: () => void }) {
               disabled={loading}
             />
           </div>
+          {sendFailed && (
+            <p
+              role="alert"
+              className="text-xs text-[var(--color-danger)] bg-[var(--color-danger-bg)] px-3 py-2 rounded-lg"
+            >
+              Couldn't send the reset link right now. Try again.
+            </p>
+          )}
           <Button
             type="submit"
             variant="primary"

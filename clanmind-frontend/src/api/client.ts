@@ -18,6 +18,19 @@ import { ErrorEnvelopeSchema } from './schemas';
 let transport: Transport | null = null;
 let tokenProvider: () => Promise<string | null> = async () => null;
 
+/**
+ * FE §197 — invoked when an authenticated domain call comes back 401.
+ * Registered by the app shell at boot; flips the auth store into the
+ * "session expired" gate WITHOUT clearing local work. Auth endpoints
+ * themselves (/auth/*) are excluded — a failed LOGIN is not an expired
+ * SESSION.
+ */
+let unauthorizedHandler: ((error: ApiError) => void) | null = null;
+
+export function setUnauthorizedHandler(handler: ((error: ApiError) => void) | null): void {
+  unauthorizedHandler = handler;
+}
+
 export function configureApiClient(opts: {
   baseUrl?: string;
   getToken: () => Promise<string | null>;
@@ -97,6 +110,9 @@ export async function request<T = unknown>(
 
       if (!res.ok) {
         const apiErr = extractApiError(res.status, res.json);
+        if (apiErr.status === 401 && !path.startsWith('/auth/')) {
+          unauthorizedHandler?.(apiErr);
+        }
         if (isTransientFailure(apiErr) && attempt < maxRetries) {
           attempt += 1;
           await sleep(backoffDelay(attempt));

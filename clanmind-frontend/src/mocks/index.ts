@@ -13,7 +13,10 @@ import type { Message, MeetingCandidate } from '@/types';
 import { useChatStore } from '@/state/useChatStore';
 import { useMeetingStore } from '@/state/useMeetingStore';
 import { createDemoDataset } from './dataset';
-import { createDemoTransport } from './transportRoutes';
+import {
+  createDemoTransport,
+  expireDemoSession,
+} from './transportRoutes';
 import { applyDemoHydration } from './hydrate';
 import { getDemoHub } from './wsHub';
 import { handleDemoEvent } from './demoDispatch';
@@ -77,6 +80,9 @@ export function installDemoMode(): DemoModeHandle {
     },
     socketFactory(url) {
       return hub.createSocket(url);
+    },
+    expireSession() {
+      expireDemoSession();
     },
     seedMeeting(sessionId) {
       // §124A — demo meetings start with a rich candidate set so the Meeting

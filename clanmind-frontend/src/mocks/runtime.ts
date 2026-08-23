@@ -28,6 +28,11 @@ export interface DemoRuntime {
    * candidates + live notes. No-op for unknown sessions; absent in production.
    */
   seedMeeting(sessionId: string): void;
+  /**
+   * FE §197 — make every subsequent authenticated domain call answer
+   * 401 AUTH_SESSION_EXPIRED until the next successful login.
+   */
+  expireSession(): void;
 }
 
 let current: DemoRuntime | null = null;

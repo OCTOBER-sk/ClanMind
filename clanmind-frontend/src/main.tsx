@@ -21,10 +21,16 @@ async function prepare(): Promise<void> {
   configureApiClient({
     baseUrl: env.apiBaseUrl,
     getToken: async () => {
-      // P1 wires the Supabase session provider; demo uses a fixed token.
-      return __DEMO_MODE__ ? 'demo-token' : null;
+      // P1: live mode resolves the Supabase access token; demo uses a fixed one.
+      if (__DEMO_MODE__) return 'demo-token';
+      const { getSupabase } = await import('@/api/supabase');
+      const { data } = await getSupabase().auth.getSession();
+      return data.session?.access_token ?? null;
     },
   });
+
+  const { initSessionGateway } = await import('@/features/auth/session');
+  await initSessionGateway();
 }
 
 async function start(): Promise<void> {

@@ -31,7 +31,7 @@ export interface GroupState {
 
 // §165A — server-controlled flags: never assume enabled until the server says
 // so; refetchFeatureFlags() replaces these on every Group switch.
-const DEFAULT_FLAGS: ServerFeatureFlags = {
+export const DEFAULT_FLAGS: ServerFeatureFlags = {
   meeting_mode: false,
   proactive_ai: false,
   github_write: false,

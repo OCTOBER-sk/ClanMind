@@ -36,6 +36,8 @@ import { ErrorBoundary } from '@/app/ErrorBoundary';
 import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useGroupStore } from '@/state/useGroupStore';
+import { useMyProfile } from '@/features/auth/useMyProfile';
+import { signOutSession } from '@/features/auth/session';
 import { useChatStore } from '@/state/useChatStore';
 import { useArtifactStore } from '@/state/useArtifactStore';
 import { useMeetingStore } from '@/state/useMeetingStore';
@@ -94,7 +96,8 @@ function PanelResizer({ width, onResize }: { width: number; onResize: (w: number
 
 export function AppShell() {
   const { user } = useAuthStore();
-  const { logout } = useAuthStore();
+  // P1 — GET /me is the post-boot profile authority (TopBar identity).
+  useMyProfile();
   const {
     groups,
     activeGroup,
@@ -598,8 +601,9 @@ export function AppShell() {
         onOpenNotifications={() => navigateToSection('activity')}
         onOpenProfile={() => navigateToSection('settings')}
         onSignOut={() => {
-          logout();
-          toast({ title: 'Signed out' });
+          // P1 — end the session; this account's device-local state is kept
+          // for a same-account return (FE §284 clears only on account SWITCH).
+          void signOutSession().then(() => toast({ title: 'Signed out' }));
         }}
         onCreateGroup={() => setCreateGroupDialogOpen(true)}
         onJoinGroup={() => setJoinGroupDialogOpen(true)}
