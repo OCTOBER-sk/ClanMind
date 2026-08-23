@@ -12,6 +12,7 @@ import {
   Plus,
   Link2,
   Archive,
+  Menu,
 } from 'lucide-react';
 import { Avatar } from '@/design-system/components/Avatar';
 import { Tooltip } from '@/design-system/components/Tooltip';
@@ -40,6 +41,12 @@ export interface TopBarProps {
   onSelectProject: (project: Project) => void;
   groups: Group[];
   projects: Project[];
+  /**
+   * §13 — when the viewport is below the rail band (<900px) the shell passes
+   * this trigger; the top bar then renders the off-canvas navigation button.
+   * Undefined in docked bands, so no control is ever dead.
+   */
+  onToggleNav?: () => void;
 }
 
 export function TopBar({
@@ -62,6 +69,7 @@ export function TopBar({
   onSelectProject,
   groups,
   projects,
+  onToggleNav,
 }: TopBarProps) {
   // §15 Group switcher: current + recent groups, unread state, Create Group, Join Group
   const groupMenuItems = [
@@ -140,6 +148,19 @@ export function TopBar({
     >
       {/* Left: Location Breadcrumbs (§14) */}
       <div className="flex items-center gap-2 text-xs font-semibold min-w-0" style={{ color: 'var(--color-text)' }}>
+        {/* §13 — off-canvas navigation trigger, only rendered below 900px */}
+        {onToggleNav && (
+          <Tooltip content="Open navigation" side="bottom">
+            <button
+              onClick={onToggleNav}
+              aria-label="Open navigation menu"
+              className="p-2 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface-hover)] focus-visible:shadow-[var(--focus-ring)] outline-none"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              <Menu className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </Tooltip>
+        )}
         <ClanMindLogo size="sm" showWordmark={true} variant={isMeetingActive ? 'spectral' : 'calm'} />
         <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
 

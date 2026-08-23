@@ -24,6 +24,15 @@ export interface UiState {
   isKeyboardHelpOpen: boolean;
   /** §69/§70: first-run onboarding finished for this account */
   onboardingComplete: boolean;
+  /** §195 — last visited Group (restored on boot). */
+  lastGroupId?: string;
+  /**
+   * §195/§305 — last active Project per Group. On a Group switch the Group's
+   * own last Project is restored instead of resetting to none.
+   */
+  lastProjectIdByGroup: Record<string, string>;
+  /** §15 — most-recently-visited Groups first in the switcher. */
+  recentGroupIds: string[];
   isCreateGroupDialogOpen: boolean;
   isCreateProjectDialogOpen: boolean;
   isInviteDialogOpen: boolean;
@@ -40,6 +49,10 @@ export interface UiState {
   setCommandPaletteOpen: (open: boolean) => void;
   setKeyboardHelpOpen: (open: boolean) => void;
   setOnboardingComplete: (complete: boolean) => void;
+  /** §305 record the last Project seen inside a Group. */
+  recordLastProject: (groupId: string, projectId: string) => void;
+  /** §195 remember the Group currently being viewed. */
+  recordLastGroup: (groupId: string) => void;
   setCreateGroupDialogOpen: (open: boolean) => void;
   setCreateProjectDialogOpen: (open: boolean) => void;
   setInviteDialogOpen: (open: boolean) => void;
@@ -61,6 +74,9 @@ export const useUiStore = create<UiState>()(
       isCommandPaletteOpen: false,
       isKeyboardHelpOpen: false,
       onboardingComplete: false,
+      lastGroupId: undefined,
+      lastProjectIdByGroup: {},
+      recentGroupIds: [],
       isCreateGroupDialogOpen: false,
       isCreateProjectDialogOpen: false,
       isInviteDialogOpen: false,
@@ -78,6 +94,29 @@ export const useUiStore = create<UiState>()(
       setCommandPaletteOpen: (isCommandPaletteOpen) => set({ isCommandPaletteOpen }),
       setKeyboardHelpOpen: (isKeyboardHelpOpen) => set({ isKeyboardHelpOpen }),
       setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
+      recordLastProject: (groupId, projectId) =>
+        set((state) => ({
+          lastGroupId: groupId,
+          lastProjectIdByGroup: { ...state.lastProjectIdByGroup, [groupId]: projectId },
+          // §15 recents: most-recent first, deduplicated, capped at 12.
+          recentGroupIds: [
+            groupId,
+            ...state.recentGroupIds.filter((id) => id !== groupId),
+          ].slice(0, 12),
+        })),
+      recordLastGroup: (groupId) =>
+        set((state) => {
+          if (state.lastGroupId === groupId && state.recentGroupIds[0] === groupId) {
+            return state;
+          }
+          return {
+            lastGroupId: groupId,
+            recentGroupIds: [
+              groupId,
+              ...state.recentGroupIds.filter((id) => id !== groupId),
+            ].slice(0, 12),
+          };
+        }),
       setCreateGroupDialogOpen: (isCreateGroupDialogOpen) =>
         set({ isCreateGroupDialogOpen }),
       setCreateProjectDialogOpen: (isCreateProjectDialogOpen) =>
@@ -92,13 +131,17 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: 'cm_ui',
-      // §284: only UI preferences persist — never session/user data here
+      // §284: only UI preferences persist — never session/user data here.
+      // §195: window-adjacent prefs include last Group / per-Group last Project.
       partialize: (state) => ({
         theme: state.theme,
         sidebarWidth: state.sidebarWidth,
         rightPanelWidth: state.rightPanelWidth,
         isSidebarCollapsed: state.isSidebarCollapsed,
         onboardingComplete: state.onboardingComplete,
+        lastGroupId: state.lastGroupId,
+        lastProjectIdByGroup: state.lastProjectIdByGroup,
+        recentGroupIds: state.recentGroupIds,
       }),
     },
   ),

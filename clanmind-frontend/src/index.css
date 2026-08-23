@@ -283,6 +283,52 @@
   to   { opacity: 0; transform: translateX(16px); }
 }
 
+/* Sheet slide-over — §6 Slide vocabulary, §13 narrow-mode surfaces.
+   Radix sets data-state=open/closed; animations run via the sheet-* classes. */
+@keyframes sheet-slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes sheet-slide-out-right {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+@keyframes sheet-slide-in-left {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes sheet-slide-out-left {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+@keyframes sheet-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes sheet-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.sheet-panel-right[data-state="open"] {
+  animation: sheet-slide-in-right var(--duration-standard) var(--ease-decelerate);
+}
+.sheet-panel-right[data-state="closed"] {
+  animation: sheet-slide-out-right var(--duration-small) var(--ease-accelerate);
+}
+.sheet-panel-left[data-state="open"] {
+  animation: sheet-slide-in-left var(--duration-standard) var(--ease-decelerate);
+}
+.sheet-panel-left[data-state="closed"] {
+  animation: sheet-slide-out-left var(--duration-small) var(--ease-accelerate);
+}
+.sheet-overlay[data-state="open"] {
+  animation: sheet-overlay-in var(--duration-small) var(--ease-decelerate);
+}
+.sheet-overlay[data-state="closed"] {
+  animation: sheet-overlay-out var(--duration-small) var(--ease-accelerate);
+}
+
 /* Fade in — generic */
 @keyframes fade-in {
   from { opacity: 0; }
@@ -394,7 +440,11 @@
   .node-arrive,
   .reaction-pop,
   .completion-glow,
-  .streaming-cursor::after {
+  .streaming-cursor::after,
+  /* Sheets appear/disappear instantly — §6 replace large panel motion */
+  .sheet-panel-right,
+  .sheet-panel-left,
+  .sheet-overlay {
     animation: none !important;
   }
 

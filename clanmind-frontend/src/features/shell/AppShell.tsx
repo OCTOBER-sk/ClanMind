@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { sectionFromPathname } from '@/app/nav';
 import { TopBar } from './TopBar';
 import { LeftNav } from './LeftNav';
+import { PanelResizer } from './PanelResizer';
 import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog';
 import { MessageList } from '@/features/chat/MessageList';
 import { Composer } from '@/features/chat/Composer';
@@ -31,9 +32,11 @@ import { JoinGroupDialog } from '@/features/groups/JoinGroupDialog';
 import { CommandPalette } from '@/design-system/components/CommandPalette';
 import { Dialog } from '@/design-system/components/Dialog';
 import { Button } from '@/design-system/components/Button';
+import { Sheet } from '@/design-system/components/Sheet';
 import { useToast } from '@/design-system/components/Toast';
 import { ErrorBoundary } from '@/app/ErrorBoundary';
 import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
+import { useLayoutMode } from '@/hooks/useLayoutMode';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useGroupStore } from '@/state/useGroupStore';
 import { useMyProfile } from '@/features/auth/useMyProfile';
@@ -45,54 +48,8 @@ import { useSyncStore } from '@/state/useSyncStore';
 import { useProjectDataStore } from '@/state/useProjectDataStore';
 import { useUiStore } from '@/state/useUiStore';
 import { AlertOctagon, X } from 'lucide-react';
-import type { Message, Task, Decision, MainNavSection, MeetingCandidate } from '@/types';
+import type { GroupRole, Message, Task, Decision, MainNavSection, MeetingCandidate } from '@/types';
 import { applyWindowState, captureWindowState, checkForUpdate, installUpdate, restoreWindowState, saveWindowState } from '@/tauri/bridge';
-
-/** §249/§220: right panel resize with keyboard alternative */
-function PanelResizer({ width, onResize }: { width: number; onResize: (w: number) => void }) {
-  const MIN = 320;
-  const MAX = 640;
-  const draggingRef = useRef(false);
-
-  const clamp = (w: number) => Math.min(Math.max(w, MIN), MAX);
-
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    draggingRef.current = true;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    onResize(clamp(width - e.movementX));
-  };
-
-  const onPointerUp = () => {
-    draggingRef.current = false;
-  };
-
-  return (
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      aria-valuenow={width}
-      aria-valuemin={MIN}
-      aria-valuemax={MAX}
-      aria-label="Resize work surface panel"
-      tabIndex={0}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onKeyDown={(e) => {
-        if (e.key === 'ArrowLeft') onResize(clamp(width - 16));
-        if (e.key === 'ArrowRight') onResize(clamp(width + 16));
-        if (e.key === 'Home') onResize(MIN);
-        if (e.key === 'End') onResize(MAX);
-      }}
-      className="w-1 shrink-0 cursor-col-resize select-none touch-none outline-none focus-visible:shadow-[var(--focus-ring)]"
-      style={{ background: 'var(--color-border)' }}
-    />
-  );
-}
 
 export function AppShell() {
   const { user } = useAuthStore();
@@ -201,12 +158,25 @@ export function AppShell() {
     isCommandPaletteOpen,
     isKeyboardHelpOpen,
     rightPanelWidth,
+    sidebarWidth,
+    isSidebarCollapsed,
     isCreateGroupDialogOpen,
     setCommandPaletteOpen,
     setKeyboardHelpOpen,
     setRightPanelWidth,
+    setSidebarWidth,
+    setSidebarCollapsed,
     setCreateGroupDialogOpen,
+    recordLastGroup,
+    recordLastProject,
+    recentGroupIds,
   } = useUiStore();
+
+  // ─── §13 — responsive layout mode drives docked panes vs sheets ───────────
+  //   ≥1440 three-pane · 1200–1439 compressed (icon rail) ·
+  //   900–1199 two-pane · <900 single pane, both work surfaces become sheets.
+  const layout = useLayoutMode();
+  const [isNavSheetOpen, setNavSheetOpen] = useState(false);
 
   // ─── §193 — the URL is authoritative for Group/Project/section context ────
   const navigate = useNavigate();
@@ -242,8 +212,23 @@ export function AppShell() {
       setActiveProject(projectForRoute);
       setProjectFilterId(projectForRoute.id);
     }
+    // §195 — remember the visited Group (and its Project) so boot restore and
+    // the §15 recents switcher have data; §305 restores per-Group last Project.
+    if (groupForRoute) {
+      if (projectForRoute) recordLastProject(groupForRoute.id, projectForRoute.id);
+      else recordLastGroup(groupForRoute.id);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeGroupId, routeProjectId]);
+
+  // §13 off-canvas nav: close after navigating, and whenever the viewport
+  // grows back into a band where the rail docks inline again.
+  useEffect(() => {
+    setNavSheetOpen(false);
+  }, [location.pathname]);
+  useEffect(() => {
+    if (layout.leftRailDocked) setNavSheetOpen(false);
+  }, [layout.leftRailDocked]);
 
   const { toast } = useToast();
   useGlobalShortcuts();
@@ -259,6 +244,15 @@ export function AppShell() {
   const [isDecisionModalOpen, setIsDecisionModalOpen] = useState(false);
   const [decisionTitle, setDecisionTitle] = useState('');
   const [decisionReason, setDecisionReason] = useState('');
+
+  // §15 — switcher lists the current Group first, then recently visited ones
+  // (§195 recents); unvisited Groups keep their original order at the end.
+  const orderedGroups = useMemo(() => {
+    const rank = new Map(recentGroupIds.map((id, index) => [id, index]));
+    return [...groups].sort(
+      (a, b) => (rank.get(a.id) ?? Number.POSITIVE_INFINITY) - (rank.get(b.id) ?? Number.POSITIVE_INFINITY),
+    );
+  }, [groups, recentGroupIds]);
 
   // ─── Chat pipeline (refactor R1) — send/retry/AI-trigger live in the
   // chat controller; the shell only wires UI events to it. ───────────────────
@@ -541,6 +535,187 @@ export function AppShell() {
 
   const currentUserId = user.id;
   const unreadActivityCount = notifications.filter((n) => !n.is_read).length;
+  // §20 — the signed-in member's role in this Group (drives LeftNav affordances)
+  const myRole: GroupRole =
+    members.find((m) => m.user_id === currentUserId)?.role ?? 'MEMBER';
+
+  // ─── Right work surface (§12 contextual surface; §94/§95/§124/§146) ────────
+  // The identical content renders either docked (≥1200, §13) with the
+  // §220/§249 resizer, or inside a sheet below that. Built once here so the
+  // two presentations can never drift apart (§250 single primary surface).
+  const rightSurfaceTitle = isMeetingActive
+    ? 'Live meeting'
+    : rightPanelMode === 'thread'
+      ? 'Thread'
+      : rightPanelMode === 'research'
+        ? 'Research'
+        : rightPanelMode === 'context'
+          ? 'Context inspector'
+          : rightPanelMode === 'diff'
+            ? 'GitHub diff'
+            : rightPanelMode === 'approval'
+              ? 'Approvals'
+              : activeArtifact
+                ? `Artifact — ${activeArtifact.title}`
+                : 'Work surface';
+
+  /** True only when the current mode actually has something to show. */
+  const hasRightSurfaceContent =
+    isMeetingActive ||
+    (rightPanelMode === 'thread' && activeThreadMessage != null) ||
+    rightPanelMode === 'research' ||
+    rightPanelMode === 'context' ||
+    rightPanelMode === 'diff' ||
+    rightPanelMode === 'approval' ||
+    (rightPanelMode === 'artifact' && activeArtifact != null);
+  const showRightSheet =
+    rightPanelMode !== 'closed' && !layout.rightSurfaceDocked && hasRightSurfaceContent;
+
+  const renderRightSurface = () => (
+    <>
+      {isMeetingActive ? (
+        <MeetingPanel
+          candidates={currentSession?.candidates || []}
+          liveNotes={currentSession?.live_notes || []}
+          aiName={activeGroup?.ai_name || 'Odin'}
+          onAcceptCandidate={handleAcceptMeetingCandidate}
+          onDismissCandidate={(id) => updateCandidateStatus(id, 'REJECTED')}
+          onRestoreCandidate={restoreCandidate}
+          onAddNote={addLiveNote}
+          onResearchShortcut={(topic) => {
+            setComposerText(`/research ${topic}`);
+            navigateToSection('chat');
+          }}
+          onOpenPromoted={(type) => {
+            if (type === 'DECISION') navigateToSection('decisions');
+            else navigateToSection('tasks');
+          }}
+          onClose={closeRightPanel}
+        />
+      ) : rightPanelMode === 'thread' && activeThreadMessage ? (
+        <ThreadPanel
+          rootMessage={activeThreadMessage}
+          currentUserId={currentUserId}
+          currentUserName={user?.name}
+          onClose={closeRightPanel}
+          onSendReply={(rootId, text) => {
+            const replyMsg: Message = {
+              id: `msg_${Date.now()}`,
+              group_id: groupForRoute?.id ?? '',
+              project_id: activeProject?.id,
+              sender_type: 'USER',
+              sender_id: currentUserId,
+              sender_name: user?.name || 'Arun Kumar',
+              body: text,
+              visibility: 'GROUP',
+              reply_to_message_id: rootId,
+              pinned: false,
+              edited: false,
+              deleted: false,
+              attachments: [],
+              reactions: [],
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            addMessage(replyMsg);
+          }}
+        />
+      ) : rightPanelMode === 'research' ? (
+        <ResearchDrawer
+          topic="STM32H743 DMA SPI vs I2C Sensor Fusion Latency"
+          summary="Hardware datasheet analysis verifies SPI full-duplex DMA operates at 24 MHz without CPU interrupt locks."
+          findings={[
+            'SPI DMA reduces sensor packet transfer latency from 160 µs to 6.5 µs at 1 kHz ODR.',
+            'I2C bus congestion locks the microcontroller bus for ~16% of the real-time attitude loop.',
+            'DMA1 Stream 0 circular ring buffers in SRAM1 eliminate double-copy memory overhead.',
+          ]}
+          projectImpact="Adopting SPI DMA allows the quadcopter flight controller to execute attitude PID calculations at a rock-solid 1 kHz rate without jitter or dropped frames."
+          sources={[
+            {
+              id: 's1',
+              title: 'ICM-42688P Motion Tracking Datasheet',
+              domain: 'invensense.tdk.com',
+              url: 'https://invensense.tdk.com',
+              snippet: 'High performance 6-axis MEMS IMU with 24 MHz SPI master interface.',
+              retrieved_at: new Date().toISOString(),
+            },
+            {
+              id: 's2',
+              title: 'STM32H7 DMA Architecture Reference',
+              domain: 'st.com',
+              url: 'https://st.com',
+              snippet: 'Master Direct Memory Access (MDMA) and peripheral DMA streams configuration.',
+              retrieved_at: new Date().toISOString(),
+            },
+          ]}
+          onClose={closeRightPanel}
+        />
+      ) : rightPanelMode === 'context' ? (
+        <ContextInspector onClose={closeRightPanel} />
+      ) : rightPanelMode === 'diff' ? (
+        <GitHubDiffViewer
+          action={aiActions.find((a) => a.action_kind.includes('GITHUB'))}
+          onClose={closeRightPanel}
+          onApproveAndMerge={handleApproveAndMerge}
+        />
+      ) : rightPanelMode === 'approval' ? (
+        <div
+          className="flex flex-col h-full border-l text-xs"
+          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+        >
+          <div
+            className="flex items-center justify-between px-4 py-3 border-b"
+            style={{ borderColor: 'var(--color-border)' }}
+          >
+            <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
+              Approvals
+            </h3>
+            <button
+              onClick={closeRightPanel}
+              aria-label="Close approvals panel"
+              className="p-1 cursor-pointer hover:opacity-80"
+              style={{ color: 'var(--color-text-tertiary)' }}
+            >
+              <X className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {aiActions
+              .filter((a) => a.status !== 'SUCCEEDED' && a.status !== 'REJECTED')
+              .map((a) => (
+                <ApprovalCard
+                  key={a.id}
+                  action={a}
+                  onApprove={handleApproveAction}
+                  onReject={handleRejectAction}
+                  onReviewLatest={refreshAiAction}
+                  onViewDiff={
+                    a.action_kind.includes('GITHUB')
+                      ? () => setRightPanelMode('diff')
+                      : undefined
+                  }
+                />
+              ))}
+          </div>
+        </div>
+      ) : activeArtifact ? (
+        <ArtifactPanel
+          artifact={activeArtifact}
+          activeVersionNumber={activeVersionNumber || activeArtifact.current_version}
+          compareVersionNumber={compareVersionNumber}
+          onClose={closeRightPanel}
+          onSelectVersion={setActiveVersionNumber}
+          onSetCompareVersion={setCompareVersionNumber}
+          onTogglePin={toggleArtifactPin}
+          onToggleContext={toggleArtifactContext}
+          onAskOdinAboutNode={(nodeLabel) => {
+            setComposerText(`@Odin Explain details for component: "${nodeLabel}"`);
+            navigateToSection('chat');
+          }}
+        />
+      ) : null}
+    </>
+  );
 
   return (
     <div
@@ -612,8 +787,10 @@ export function AppShell() {
           const base = `/group/${p.group_id}`;
           navigate(`${base}/project/${p.id}/chat`);
         }}
-        groups={groups}
+        groups={orderedGroups}
         projects={projects}
+        // §13 — the rail goes off-canvas below 900px; the top bar carries its trigger.
+        onToggleNav={layout.leftRailDocked ? undefined : () => setNavSheetOpen(true)}
       />
 
       {/* §185 Sync Banner — standalone strip, separate from TopBar */}
@@ -643,21 +820,76 @@ export function AppShell() {
         </div>
       )}
 
-      {/* Main 3-Pane Body (§12) */}
+      {/* Main 3-Pane Body (§12) — pane count collapses with viewport width (§13) */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
-        {/* Left Rail */}
-        <LeftNav
-          projects={projects}
-          activeProject={activeProject}
-          activeSection={activeNavSection}
-          onSelectSection={navigateToSection}
-          onSelectProject={(proj) => {
-            navigate(`/group/${proj.group_id}/project/${proj.id}/chat`);
-            setProjectFilterId(proj.id);
-          }}
-          onCreateProject={() => toast({ title: 'Project creation', description: 'Create a project from the Overview.' })}
-          unreadCounts={{ activity: unreadActivityCount }}
-        />
+        {layout.leftRailDocked ? (
+          <>
+            {/* Left Rail — inline; icon-only in the compressed band or when
+                the user collapsed it (§13, §195 persisted preference) */}
+            <LeftNav
+              projects={projects}
+              activeProject={activeProject}
+              activeSection={activeNavSection}
+              myRole={myRole}
+              aiName={activeGroup?.ai_name}
+              onSelectSection={navigateToSection}
+              onSelectProject={(proj) => {
+                navigate(`/group/${proj.group_id}/project/${proj.id}/chat`);
+                setProjectFilterId(proj.id);
+              }}
+              onCreateProject={() => toast({ title: 'Project creation', description: 'Create a project from the Overview.' })}
+              unreadCounts={{ activity: unreadActivityCount }}
+              collapsed={layout.railCompressed || isSidebarCollapsed}
+              onToggleCollapsed={
+                layout.railCompressed
+                  ? undefined
+                  : () => setSidebarCollapsed(!isSidebarCollapsed)
+              }
+              width={sidebarWidth}
+            />
+            {/* §195/§249 sidebar width is a persisted, keyboard-resizable pref */}
+            {!layout.railCompressed && !isSidebarCollapsed && (
+              <PanelResizer
+                side="left"
+                width={sidebarWidth}
+                min={200}
+                max={320}
+                label="Resize navigation sidebar"
+                onResize={setSidebarWidth}
+              />
+            )}
+          </>
+        ) : (
+          /* §13 <900 — navigation becomes an off-canvas sheet */
+          <Sheet
+            open={isNavSheetOpen}
+            onOpenChange={setNavSheetOpen}
+            side="left"
+            title="Navigation"
+          >
+            <LeftNav
+              projects={projects}
+              activeProject={activeProject}
+              activeSection={activeNavSection}
+              myRole={myRole}
+              aiName={activeGroup?.ai_name}
+              onSelectSection={(section) => {
+                // Close even when the section is already active (no route
+                // change would otherwise dismiss the sheet).
+                setNavSheetOpen(false);
+                navigateToSection(section);
+              }}
+              onSelectProject={(proj) => {
+                setNavSheetOpen(false);
+                navigate(`/group/${proj.group_id}/project/${proj.id}/chat`);
+                setProjectFilterId(proj.id);
+              }}
+              onCreateProject={() => toast({ title: 'Project creation', description: 'Create a project from the Overview.' })}
+              unreadCounts={{ activity: unreadActivityCount }}
+              width="fill"
+            />
+          </Sheet>
+        )}
 
         {/* Center Main Work Surface */}
         <main
@@ -860,159 +1092,47 @@ export function AppShell() {
           )}
         </main>
 
-        {/* Right Work Surface (Contextual Collapsible Panel, §94, §95, §124, §146) */}
-        {rightPanelMode !== 'closed' && (
+        {/* Right Work Surface (§12 contextual surface; §94/§95/§124/§146).
+            Docks beside chat where the viewport affords three panes (§13,
+            ≥1200) with the §220/§249 keyboard-accessible resizer; below that
+            it opens as a sheet so the conversation keeps its full width.
+            Single primary surface either way (§250). */}
+        {rightPanelMode !== 'closed' &&
+          layout.rightSurfaceDocked &&
+          hasRightSurfaceContent && (
           <>
-            <PanelResizer width={rightPanelWidth} onResize={setRightPanelWidth} />
+            <PanelResizer
+              side="right"
+              width={rightPanelWidth}
+              min={320}
+              max={640}
+              label="Resize work surface panel"
+              onResize={setRightPanelWidth}
+            />
             <aside
               className="h-full flex flex-col shrink-0 panel-open"
               style={{ width: rightPanelWidth, background: 'var(--color-surface)' }}
+              aria-label={rightSurfaceTitle}
             >
-              {isMeetingActive ? (
-                <MeetingPanel
-                  candidates={currentSession?.candidates || []}
-                  liveNotes={currentSession?.live_notes || []}
-                  aiName={activeGroup?.ai_name || 'Odin'}
-                  onAcceptCandidate={handleAcceptMeetingCandidate}
-                  onDismissCandidate={(id) => updateCandidateStatus(id, 'REJECTED')}
-                  onRestoreCandidate={restoreCandidate}
-                  onAddNote={addLiveNote}
-                  onResearchShortcut={(topic) => {
-                    setComposerText(`/research ${topic}`);
-                    navigateToSection('chat');
-                  }}
-                  onOpenPromoted={(type) => {
-                    if (type === 'DECISION') navigateToSection('decisions');
-                    else navigateToSection('tasks');
-                  }}
-                  onClose={closeRightPanel}
-                />
-              ) : rightPanelMode === 'thread' && activeThreadMessage ? (
-                <ThreadPanel
-                  rootMessage={activeThreadMessage}
-                  currentUserId={currentUserId}
-                  currentUserName={user?.name}
-                  onClose={closeRightPanel}
-                  onSendReply={(rootId, text) => {
-                    const replyMsg: Message = {
-                      id: `msg_${Date.now()}`,
-                      group_id: groupForRoute?.id ?? '',
-                      project_id: activeProject?.id,
-                      sender_type: 'USER',
-                      sender_id: currentUserId,
-                      sender_name: user?.name || 'Arun Kumar',
-                      body: text,
-                      visibility: 'GROUP',
-                      reply_to_message_id: rootId,
-                      pinned: false,
-                      edited: false,
-                      deleted: false,
-                      attachments: [],
-                      reactions: [],
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString(),
-                    };
-                    addMessage(replyMsg);
-                  }}
-                />
-              ) : rightPanelMode === 'research' ? (
-                <ResearchDrawer
-                  topic="STM32H743 DMA SPI vs I2C Sensor Fusion Latency"
-                  summary="Hardware datasheet analysis verifies SPI full-duplex DMA operates at 24 MHz without CPU interrupt locks."
-                  findings={[
-                    'SPI DMA reduces sensor packet transfer latency from 160 µs to 6.5 µs at 1 kHz ODR.',
-                    'I2C bus congestion locks the microcontroller bus for ~16% of the real-time attitude loop.',
-                    'DMA1 Stream 0 circular ring buffers in SRAM1 eliminate double-copy memory overhead.',
-                  ]}
-                  projectImpact="Adopting SPI DMA allows the quadcopter flight controller to execute attitude PID calculations at a rock-solid 1 kHz rate without jitter or dropped frames."
-                  sources={[
-                    {
-                      id: 's1',
-                      title: 'ICM-42688P Motion Tracking Datasheet',
-                      domain: 'invensense.tdk.com',
-                      url: 'https://invensense.tdk.com',
-                      snippet: 'High performance 6-axis MEMS IMU with 24 MHz SPI master interface.',
-                      retrieved_at: new Date().toISOString(),
-                    },
-                    {
-                      id: 's2',
-                      title: 'STM32H7 DMA Architecture Reference',
-                      domain: 'st.com',
-                      url: 'https://st.com',
-                      snippet: 'Master Direct Memory Access (MDMA) and peripheral DMA streams configuration.',
-                      retrieved_at: new Date().toISOString(),
-                    },
-                  ]}
-                  onClose={closeRightPanel}
-                />
-              ) : rightPanelMode === 'context' ? (
-                <ContextInspector onClose={closeRightPanel} />
-              ) : rightPanelMode === 'diff' ? (
-                <GitHubDiffViewer
-                  action={aiActions.find((a) => a.action_kind.includes('GITHUB'))}
-                  onClose={closeRightPanel}
-                  onApproveAndMerge={handleApproveAndMerge}
-                />
-              ) : rightPanelMode === 'approval' ? (
-                <div
-                  className="flex flex-col h-full border-l text-xs"
-                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-                >
-                  <div
-                    className="flex items-center justify-between px-4 py-3 border-b"
-                    style={{ borderColor: 'var(--color-border)' }}
-                  >
-                    <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
-                      Approvals
-                    </h3>
-                    <button
-                      onClick={closeRightPanel}
-                      aria-label="Close approvals panel"
-                      className="p-1 cursor-pointer hover:opacity-80"
-                      style={{ color: 'var(--color-text-tertiary)' }}
-                    >
-                      <X className="w-4 h-4" aria-hidden="true" />
-                    </button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {aiActions
-                      .filter((a) => a.status !== 'SUCCEEDED' && a.status !== 'REJECTED')
-                      .map((a) => (
-                        <ApprovalCard
-                          key={a.id}
-                          action={a}
-                          onApprove={handleApproveAction}
-                          onReject={handleRejectAction}
-                          onReviewLatest={refreshAiAction}
-                          onViewDiff={
-                            a.action_kind.includes('GITHUB')
-                              ? () => setRightPanelMode('diff')
-                              : undefined
-                          }
-                        />
-                      ))}
-                  </div>
-                </div>
-              ) : activeArtifact ? (
-                <ArtifactPanel
-                  artifact={activeArtifact}
-                  activeVersionNumber={activeVersionNumber || activeArtifact.current_version}
-                  compareVersionNumber={compareVersionNumber}
-                  onClose={closeRightPanel}
-                  onSelectVersion={setActiveVersionNumber}
-                  onSetCompareVersion={setCompareVersionNumber}
-                  onTogglePin={toggleArtifactPin}
-                  onToggleContext={toggleArtifactContext}
-                  onAskOdinAboutNode={(nodeLabel) => {
-                    setComposerText(`@Odin Explain details for component: "${nodeLabel}"`);
-                    navigateToSection('chat');
-                  }}
-                />
-              ) : null}
+              {renderRightSurface()}
             </aside>
           </>
         )}
       </div>
+
+      {/* §13 — narrow bands (<1200): the same work surface opens as a sheet.
+          Escape closes and focus returns to the trigger (Radix Dialog, §8). */}
+      <Sheet
+        open={showRightSheet}
+        onOpenChange={(open) => {
+          if (!open) closeRightPanel();
+        }}
+        side="right"
+        title={rightSurfaceTitle}
+        showCloseButton={false}
+      >
+        {showRightSheet ? renderRightSurface() : null}
+      </Sheet>
 
       {/* Global Command Palette (§61) */}
       <CommandPalette
