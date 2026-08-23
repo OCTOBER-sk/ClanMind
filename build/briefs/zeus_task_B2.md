@@ -1,0 +1,13 @@
+Agent: zeus - Backend remediation Task B2 of H (handoff HANDOFF_BACKEND.md section 3.B items 3-4)
+Repo workdir: clanmind-backend/. Sources: HANDOFF_BACKEND.md sections 3.B.3 and 3.B.4; spec sections 108 (memory endpoints), 109-112 (artifacts, decisions, tasks, meetings).
+
+CONTEXT: Tasks A and B1 done; typecheck green. Handlers/ai.ts and ai-config.ts already exist - match their conventions. Repos exist: project-intel.repo.ts (Artifact immutable versions+links, Decision CAS version+status+supersedeOthers, Task CAS, Meeting, Memory+Candidates scoped search), services.projects.get(projectId, userId) 403s outsiders, signedUrls.sign/codec.verify available, SupabaseMeetingRepository pattern referenced in handoff.
+
+DELIVERABLES:
+1. apps/worker/src/handlers/memory.ts - exactly per HANDOFF 3.B.3: GET /groups/:g/memory, GET /projects/:p/memory, GET /groups/:g/memory/candidates, POST /memory/:candidateId/accept (member of candidate.group_id; USER_PRIVATE owner rule enforced in service), POST .../reject, PATCH /memory/:memoryId and DELETE allowing OWNER/ADMIN or owner when scope USER_PRIVATE.
+2. apps/worker/src/handlers/intel.ts - exactly per HANDOFF 3.B.4: authorize every project via services.projects.get. Artifacts: list/create/get (+versions list)/POST versions/POST restore {version_number}/POST pin {pinned}/DELETE/POST share producing signed token URL + GET content route verifying token returning current version text content_ref. Decisions: GET/POST per project, GET one, approve|reject {expected_version} triggering supersede + memory promotion inside DecisionService. Tasks: GET/POST/PATCH {expected_version, patch}/POST complete {expected_version}/POST dependencies {depends_on_task_id} cycle-checked. Meetings: POST /projects/:projectId/meetings, GET /meetings/:id (+list candidates), POST end {summary_text}, extras: POST candidates detect + POST candidates/:cid/accept {promote: task|decision} using MeetingService.acceptCandidate promote callback into runtime tasks.create / decisions.propose. Instantiate SupabaseMeetingRepository inline from services.db if not in AiRuntime.
+3. Tests in apps/worker/test/: memory endpoints round-trip incl USER_PRIVATE negative (user B cannot read/patch user A private memory), decisions/tasks/artifacts/meetings happy paths incl CAS 409 on stale expected_version.
+
+RULES: same as before - zod validation, thin handlers, no new deps, do not touch github.ts/app.ts (task B3). pnpm --filter @clanmind/worker typecheck && pnpm -r test until green.
+
+FINAL SELF-REVIEW: git diff review, scope check, both commands green, report files changed + test count + deviations.
