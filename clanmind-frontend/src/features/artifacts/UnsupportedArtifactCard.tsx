@@ -35,7 +35,7 @@ export function UnsupportedArtifactCard({ onExportRaw }: UnsupportedArtifactCard
           size="sm"
           variant="primary"
           leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
-          onClick={() => alert('Checking for desktop updatesâ€¦')}
+          onClick={() => alert('Checking for desktop updates…')}
         >
           Check for Update
         </Button>

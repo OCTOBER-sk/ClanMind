@@ -32,14 +32,20 @@ export function App() {
   // at boot (demo hub or live socket); connectivity derives banner state.
   useEffect(() => {
     if (!isAuthenticated) return;
-    try {
-      void import('@/realtime/connection').then(({ getRealtime }) => {
-        initConnectivity(getRealtime());
+    let cancelled = false;
+    void import('@/realtime/connection')
+      .then(({ getRealtime }) => {
+        // The dynamic import can resolve AFTER this effect's cleanup ran
+        // (StrictMode double-mount) — never wire into a torn-down lifecycle.
+        if (!cancelled) initConnectivity(getRealtime());
+      })
+      .catch(() => {
+        // Realtime not initialised yet (live mode pre-P1) — banner stays neutral.
       });
-    } catch {
-      // Realtime not initialised yet (live mode pre-P1) — banner stays neutral.
-    }
-    return () => shutdownConnectivity();
+    return () => {
+      cancelled = true;
+      shutdownConnectivity();
+    };
   }, [isAuthenticated]);
 
   const router = useMemo(() => createAppRouter(), []);

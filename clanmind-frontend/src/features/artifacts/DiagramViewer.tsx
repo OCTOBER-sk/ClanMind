@@ -55,7 +55,7 @@ export function DiagramViewer({
 
   return (
     <div className="relative flex flex-col h-full bg-gray-50/50 dark:bg-gray-950 overflow-hidden select-none">
-      {/* Zoom / Controls Toolbar (Â§105) */}
+      {/* Zoom / Controls Toolbar (§105) */}
       <div className="absolute top-3 right-3 z-20 flex items-center gap-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xs p-1 rounded-lg border border-[var(--color-border)] shadow-sm">
         <Tooltip content="Zoom In (+)">
           <IconButton aria-label="Zoom in" size="xs" onClick={handleZoomIn}>
@@ -112,7 +112,7 @@ export function DiagramViewer({
                   </p>
                 </div>
 
-                {/* Connecting Edge (Â§98, Â§99 animated spectral edge on insertion) */}
+                {/* Connecting Edge (§98, §99 animated spectral edge on insertion) */}
                 {!isLast && (
                   <div className="flex flex-col items-center">
                     <div
@@ -144,7 +144,7 @@ export function DiagramViewer({
         </div>
       </div>
 
-      {/* Selected Node Details & "Ask Odin About This" Follow-up Bar (Â§106, Â§107) */}
+      {/* Selected Node Details & "Ask Odin About This" Follow-up Bar (§106, §107) */}
       {selectedNode && (
         <div className="p-3 bg-[var(--color-surface-raised)] border-t border-[var(--color-border)] flex items-center justify-between shadow-lg">
           <div>

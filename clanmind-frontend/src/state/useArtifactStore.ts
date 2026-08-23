@@ -43,7 +43,7 @@ export interface ArtifactState {
   setAiRunByMessage: (messageId: string, run: AiRun) => void;
 }
 
-// �11 � no runtime fixtures; demo hydration (src/mocks/dataset.ts) or live
+// §12 — no runtime fixtures; demo hydration (src/mocks/dataset.ts) or live
 // artifact queries populate the store.
 export const useArtifactStore = create<ArtifactState>((set) => ({
   artifacts: [],

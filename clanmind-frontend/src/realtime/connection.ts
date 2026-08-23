@@ -154,8 +154,24 @@ export class RealtimeClient {
     this.boundNetwork = false;
   }
 
+  /**
+   * App-level send — allowed only on a fully established connection.
+   * Feature code (typing, presence, message.send from P3+) goes through here.
+   */
   send(frameData: ClientEventFrame): boolean {
     if (!this.ws || this.statusValue !== 'connected') return false;
+    return this.sendRaw(frameData);
+  }
+
+  /**
+   * Protocol-level send for the handshake/control plane itself (hello,
+   * ping, post-ready room.subscribe). These MUST be legal before
+   * `connection.ready` flips status to connected — gating them on
+   * 'connected' deadlocks the handshake (hello dropped → no ready →
+   * forever 'connecting'), which is exactly the smoke-T4 WS stall.
+   */
+  private sendRaw(frameData: ClientEventFrame): boolean {
+    if (!this.ws) return false;
     try {
       this.ws.send(JSON.stringify(frameData));
       return true;
@@ -196,7 +212,7 @@ export class RealtimeClient {
     socket.onopen = () => {
       this.attempts = 0;
       this.lastIncomingAt = Date.now();
-      this.send(clientEvents.hello());
+      this.sendRaw(clientEvents.hello());
       this.startHeartbeat();
     };
 
@@ -233,13 +249,7 @@ export class RealtimeClient {
       const ctrl = parsedJson as { type: string; payload?: unknown };
       if (ctrl.type === 'pong') return;
       if (ctrl.type === 'connection.ready') {
-        const ready = ConnectionReadyPayloadSchema.catch({}).parse(ctrl.payload ?? {});
-        this.setStatus('connected');
-        for (const g of this.desiredGroups) {
-          this.send(clientEvents.roomSubscribe(g));
-          this.subscribedGroups.add(g);
-        }
-        this.opts.onReady(ready);
+        this.completeHandshake(ConnectionReadyPayloadSchema.catch({}).parse(ctrl.payload ?? {}));
         return;
       }
       return;
@@ -249,12 +259,24 @@ export class RealtimeClient {
     if (!env.success) return;
     const event = env.data as RealtimeEvent;
 
+    // BE §17/§114 — servers may deliver `connection.ready` as a normal
+    // enveloped event (the demo hub does). Accept either framing so a
+    // conforming server can never leave us stuck pre-ready.
+    if (event.event_type === 'connection.ready') {
+      this.completeHandshake(ConnectionReadyPayloadSchema.catch({}).parse(event.payload ?? {}));
+      return;
+    }
+
     if (event.event_type === 'error') {
       const errPayload = ServerErrorPayloadSchema.catch({}).parse(event.payload ?? {});
       if (errPayload.code === 'CLIENT_UPDATE_REQUIRED') {
-        // FE §309A.2 — blocking state; stop retrying against an incompatible protocol.
+        // FE §309A.2 — blocking state; stop retrying against an incompatible
+        // protocol. Status MUST land on a terminal value here: leaving it as
+        // 'connecting' made the connectivity layer report "Reconnecting…"
+        // forever while nothing was actually retrying.
         this.userClosed = true;
         this.clearTimers();
+        this.setStatus('idle');
         this.ws?.close(1000, 'protocol mismatch');
         this.ws = null;
         this.opts.onProtocolRequired({
@@ -267,6 +289,18 @@ export class RealtimeClient {
 
     this.trackSequence(event);
     this.opts.onEvent(event);
+  }
+
+  /** Shared ready transition for both ready framings (plain + enveloped). */
+  private completeHandshake(ready: ConnectionReadyPayload): void {
+    this.setStatus('connected');
+    for (const g of this.desiredGroups) {
+      if (!this.subscribedGroups.has(g)) {
+        this.sendRaw(clientEvents.roomSubscribe(g));
+        this.subscribedGroups.add(g);
+      }
+    }
+    this.opts.onReady(ready);
   }
 
   /** BE §17.1 — detect missing sequence numbers and request a backfill. */
@@ -288,7 +322,7 @@ export class RealtimeClient {
   private startHeartbeat(): void {
     const interval = this.opts.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_MS;
     this.heartbeatTimer = setInterval(() => {
-      this.send({ type: 'ping', request_id: `req_${crypto.randomUUID()}` });
+      this.sendRaw({ type: 'ping', request_id: `req_${crypto.randomUUID()}` });
       if (Date.now() - this.lastIncomingAt > interval * 2.5 + 5_000) {
         // Watchdog: connection is silently dead — force a reconnect cycle.
         this.ws?.close(4000, 'heartbeat timeout');

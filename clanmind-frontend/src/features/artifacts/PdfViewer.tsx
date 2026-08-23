@@ -13,7 +13,7 @@ export function PdfViewer({ fileName, totalPages = 48 }: PdfViewerProps) {
 
   return (
     <div className="flex flex-col h-full bg-gray-100 dark:bg-gray-950 text-xs overflow-hidden select-none">
-      {/* PDF Toolbar (Â§92) */}
+      {/* PDF Toolbar (§92) */}
       <div className="flex items-center justify-between px-4 py-2 bg-[var(--color-surface-raised)] border-b border-[var(--color-border)] shadow-2xs">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-red-500" />
@@ -76,12 +76,12 @@ export function PdfViewer({ fileName, totalPages = 48 }: PdfViewerProps) {
           <div className="border-b pb-3 text-center">
             <h1 className="text-base font-bold font-sans">ICM-42688-P High-Performance IMU</h1>
             <p className="text-[10px] text-gray-500 font-sans">
-              Preliminary Datasheet Â· Revision 1.2 Â· Page {currentPage}
+              Preliminary Datasheet · Revision 1.2 · Page {currentPage}
             </p>
           </div>
 
           <p>
-            The ICM-42688-P is a 6-axis MotionTracking device that combines a 3-axis gyroscope and a 3-axis accelerometer in a small 2.5 mm Ã— 3 mm Ã— 0.91 mm package.
+            The ICM-42688-P is a 6-axis MotionTracking device that combines a 3-axis gyroscope and a 3-axis accelerometer in a small 2.5 mm × 3 mm × 0.91 mm package.
           </p>
 
           <h2 className="text-xs font-bold font-sans mt-4">1.1 SPI Interface Characteristics</h2>

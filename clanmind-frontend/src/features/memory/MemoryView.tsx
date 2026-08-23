@@ -47,7 +47,7 @@ export function MemoryView({
         </Button>
       </div>
 
-      {/* Odin Memory Candidates Notice (Â§117) */}
+      {/* Odin Memory Candidates Notice (§117) */}
       {memoryCandidates.length > 0 && (
         <div className="p-4 bg-amber-50/70 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800/60 text-xs">
           <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300 mb-2">
@@ -62,7 +62,7 @@ export function MemoryView({
                 className="flex items-center justify-between p-2.5 rounded-lg bg-[var(--color-surface-raised)] border border-amber-200 dark:border-amber-800 shadow-2xs"
               >
                 <p className="font-medium text-[var(--color-text)] pr-2">
-                  â€œ{cand.content}â€
+                  “{cand.content}”
                 </p>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <Button

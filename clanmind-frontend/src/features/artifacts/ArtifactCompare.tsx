@@ -34,7 +34,7 @@ export function ArtifactCompare({
         {/* Version A */}
         <div className="p-4 overflow-x-auto text-xs font-mono select-text bg-red-50/20 dark:bg-red-950/10">
           <div className="pb-2 mb-3 border-b border-[var(--color-border)] text-[11px] font-sans font-semibold text-gray-500">
-            Version {versionA.version_number} Â· By {versionA.created_by_name}
+            Version {versionA.version_number} · By {versionA.created_by_name}
           </div>
           <pre className="whitespace-pre-wrap leading-relaxed text-[var(--color-text)]">
             {versionA.content}
@@ -44,7 +44,7 @@ export function ArtifactCompare({
         {/* Version B */}
         <div className="p-4 overflow-x-auto text-xs font-mono select-text bg-emerald-50/20 dark:bg-emerald-950/10">
           <div className="pb-2 mb-3 border-b border-[var(--color-border)] text-[11px] font-sans font-semibold text-gray-500">
-            Version {versionB.version_number} Â· By {versionB.created_by_name}
+            Version {versionB.version_number} · By {versionB.created_by_name}
           </div>
           <pre className="whitespace-pre-wrap leading-relaxed text-[var(--color-text)]">
             {versionB.content}

@@ -7,6 +7,7 @@
 
 import { setTransportOverride } from '@/api/transport';
 import { initRealtime } from '@/realtime/connection';
+import { markProtocolUpdateRequired } from '@/sync/connectivity';
 import { useArtifactStore } from '@/state/useArtifactStore';
 import type { Message, MeetingCandidate } from '@/types';
 import { useChatStore } from '@/state/useChatStore';
@@ -157,7 +158,7 @@ export function installDemoMode(): DemoModeHandle {
     onStatus: () => {},
     onEvent: (event) => handleDemoEvent(event),
     onReady: () => {},
-    onProtocolRequired: () => {},
+    onProtocolRequired: markProtocolUpdateRequired,
     onSequenceGap: () => {},
   }).connect([ds.groups[0]?.id].filter((id): id is string => Boolean(id)));
 

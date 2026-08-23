@@ -87,7 +87,7 @@ export function AiToolTimeline({
                 </div>
               </div>
 
-              {/* Approval Gating for HIGH-risk tools (Â§134A.1, Â§164A) */}
+              {/* Approval Gating for HIGH-risk tools (§134A.1, §164A) */}
               {call.status === 'PENDING' && (
                 <div className="flex items-center gap-1.5 shrink-0 ml-2 font-sans">
                   <button

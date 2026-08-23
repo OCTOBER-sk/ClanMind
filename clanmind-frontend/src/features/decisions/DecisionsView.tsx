@@ -76,7 +76,7 @@ export function DecisionsView({ decisions, onAddDecision }: DecisionsViewProps) 
 
             {dec.sources && dec.sources.length > 0 && (
               <div className="pt-2 border-t border-[var(--color-border)] text-[10px] text-gray-400">
-                <span>Sources: {dec.sources.join(' â€¢ ')}</span>
+                <span>Sources: {dec.sources.join(' • ')}</span>
               </div>
             )}
 

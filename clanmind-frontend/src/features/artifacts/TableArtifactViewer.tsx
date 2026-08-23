@@ -45,7 +45,7 @@ export function TableArtifactViewer({ content }: TableArtifactViewerProps) {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search rowsâ€¦"
+            placeholder="Search rows…"
             className="w-full pl-8 pr-3 py-1 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-[var(--color-surface-raised)] outline-none"
           />
         </div>

@@ -31,7 +31,7 @@ export function ProjectPulse({ project, onNavigateToDecisions }: ProjectPulsePro
         </span>
       </div>
 
-      {/* Progress Line with Single Spectral Sweep Animation (Â§85) */}
+      {/* Progress Line with Single Spectral Sweep Animation (§85) */}
       <div className="relative overflow-hidden rounded-full">
         <Progress value={project.pulse_progress} size="md" variant="neutral" />
         {animatePulse && (
@@ -69,7 +69,7 @@ export function ProjectPulse({ project, onNavigateToDecisions }: ProjectPulsePro
         </div>
       </div>
 
-      {/* Odin Notice (Â§84) */}
+      {/* Odin Notice (§84) */}
       <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--color-surface-hover)] text-xs">
         <div className="flex items-center gap-2 text-[var(--color-text-secondary)]">
           <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />

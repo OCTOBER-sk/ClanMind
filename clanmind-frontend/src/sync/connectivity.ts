@@ -41,6 +41,10 @@ function recompute(realtimeStatus: RealtimeStatus): void {
 
 /** Wire realtime status + browser connectivity into the sync store. */
 export function initConnectivity(realtime: RealtimeClient): void {
+  // Idempotent by design: StrictMode double-invokes effects and the async
+  // module import in App.tsx can resolve out of order with cleanup.
+  shutdownConnectivity();
+
   recompute(realtime.status);
 
   const unsubscribe = realtime.onStatusChange((status) => {
@@ -63,4 +67,24 @@ export function initConnectivity(realtime: RealtimeClient): void {
 export function shutdownConnectivity(): void {
   detach?.();
   detach = null;
+}
+
+/**
+ * FE §309A.2 — the server refused our protocol/version (CLIENT_UPDATE_REQUIRED).
+ * RealtimeClient has already hard-stopped; surface the blocking update state
+ * instead of a lying "Reconnecting…" banner. Wired as onProtocolRequired at
+ * boot (demo hub today, live socket from P1 onward — same contract).
+ */
+export function markProtocolUpdateRequired(info: {
+  code: string;
+  message?: string;
+  recommendedVersion?: string;
+  minimumVersion?: string;
+}): void {
+  useSyncStore.getState().setProtocolMismatch({
+    isOutdated: true,
+    isRequired: info.code === 'CLIENT_UPDATE_REQUIRED',
+    recommendedVersion: info.recommendedVersion,
+    minimumVersion: info.minimumVersion,
+  });
 }

@@ -37,7 +37,7 @@ export function ContextInspector({ onClose }: ContextInspectorProps) {
             <span>Decision #1: Use SPI with DMA</span>
           </div>
           <p className="text-[11px] text-[var(--color-text-secondary)]">
-            Approved by Arun Kumar Â· Scoped under Flight Controller
+            Approved by Arun Kumar · Scoped under Flight Controller
           </p>
         </div>
 
@@ -48,7 +48,7 @@ export function ContextInspector({ onClose }: ContextInspectorProps) {
             <span>ICM-42688P Hardware Datasheet Rev 1.2</span>
           </div>
           <p className="text-[11px] text-[var(--color-text-secondary)]">
-            Indexed PDF Â· 48 pages Â· 24 MHz max clock constraint
+            Indexed PDF · 48 pages · 24 MHz max clock constraint
           </p>
         </div>
 

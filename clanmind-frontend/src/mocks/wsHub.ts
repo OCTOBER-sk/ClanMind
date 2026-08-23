@@ -70,13 +70,34 @@ interface ActiveRun {
 
 type TimerHandle = ReturnType<typeof setTimeout>;
 
+/**
+ * BE §165 — numeric semver comparison. A lexicographic string compare is
+ * wrong here ('0.10.0' < '0.9.0' lexically) and would let the demo hub
+ * reject compatible clients (or worse, accept incompatible ones).
+ */
+export function compareSemver(a: string, b: string): number {
+  const pa = a.split('.').map((n) => Number.parseInt(n, 10) || 0);
+  const pb = b.split('.').map((n) => Number.parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const da = pa[i] ?? 0;
+    const db = pb[i] ?? 0;
+    if (da !== db) return da < db ? -1 : 1;
+  }
+  return 0;
+}
+
 export class DemoRealtimeHub {
   private clients = new Map<string, HubConnection>();
   private clientCounter = 0;
   private sequenceByGroup = new Map<string, number>();
   /** BE §165 version metadata served during handshake. */
   versionMeta = {
-    minimum_client_version: '0.9.0',
+    // The oldest client build this demo "server" accepts. Must be a version
+    // the shipped client satisfies — a demo hub advertising an impossible
+    // floor would CLIENT_UPDATE_REQUIRED-stop every session at hello
+    // (this exact bug stalled the WS on "Reconnecting…" in smoke T4).
+    minimum_client_version: '0.0.0',
     recommended_client_version: env.appVersion,
     protocol_version: 1,
   };
@@ -132,7 +153,7 @@ export class DemoRealtimeHub {
         if (!Number.isFinite(requestedProtocol)) return;
         if (
           typeof this.versionMeta.minimum_client_version === 'string' &&
-          env.appVersion < this.versionMeta.minimum_client_version
+          compareSemver(env.appVersion, this.versionMeta.minimum_client_version) < 0
         ) {
           this.deliver(conn, {
             event_type: 'error',

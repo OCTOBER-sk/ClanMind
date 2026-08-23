@@ -125,7 +125,7 @@ export function ProjectOverview({
         </div>
       </div>
 
-      {/* Recent Artifacts Section (Â§83) */}
+      {/* Recent Artifacts Section (§83) */}
       {artifacts.length > 0 && (
         <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm space-y-3">
           <div className="flex items-center justify-between">

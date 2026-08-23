@@ -15,13 +15,13 @@ interface AuthSessionResponse {
   user: { id: string; email: string; name: string };
 }
 
-/** Â§67-69: Authentication screens and first launch experience */
+/** §67-69: Authentication screens and first launch experience */
 export function AuthScreen() {
   const [view, setView] = useState<AuthView>('first_launch');
   const { setUser } = useAuthStore();
   const { groups } = useGroupStore();
 
-  // Â§196: returners go straight to login (derived â€” no state-in-effect)
+  // §196: returners go straight to login (derived — no state-in-effect)
   const effectiveView: AuthView = view === 'first_launch' && groups.length > 0 ? 'login' : view;
 
   return (
@@ -54,7 +54,7 @@ export function AuthScreen() {
   );
 }
 
-// â”€â”€â”€ First Launch â€” Â§69 â”€â”€â”€
+// ─── First Launch — §69 ───
 
 function FirstLaunchView({
   onLogin,
@@ -68,11 +68,11 @@ function FirstLaunchView({
       {/* Logo */}
       <div className="flex flex-col items-center gap-3">
         <ClanMindLogo size="lg" variant="calm" showWordmark />
-        {/* Spectral accent line â€” Â§69 */}
+        {/* Spectral accent line — §69 */}
         <div className="h-px w-32 spectral-active rounded-full opacity-60" />
       </div>
 
-      {/* Hero â€” Â§69 */}
+      {/* Hero — §69 */}
       <div className="space-y-2">
         <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)]">
           A shared project room
@@ -97,7 +97,7 @@ function FirstLaunchView({
   );
 }
 
-// â”€â”€â”€ Login â€” Â§67 â”€â”€â”€
+// ─── Login — §67 ───
 
 interface AuthFormState {
   email: string;
@@ -191,7 +191,7 @@ function LoginView({
             id="login-password"
             type="password"
             autoComplete="current-password"
-            placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+            placeholder="••••••••"
             value={form.password}
             onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
             disabled={form.loading}
@@ -216,7 +216,7 @@ function LoginView({
           loading={form.loading}
           disabled={form.loading}
         >
-          {form.loading ? 'Signing inâ€¦' : 'Sign in'}
+          {form.loading ? 'Signing in…' : 'Sign in'}
         </Button>
       </form>
 
@@ -233,14 +233,14 @@ function LoginView({
           onClick={onSignup}
           className="hover:text-[var(--color-text)] transition-colors cursor-pointer focus-ring rounded"
         >
-          Create account â†’
+          Create account →
         </button>
       </div>
     </div>
   );
 }
 
-// â”€â”€â”€ Signup â€” Â§67 â”€â”€â”€
+// ─── Signup — §67 ───
 
 function SignupView({
   onLogin,
@@ -307,7 +307,7 @@ function SignupView({
             { id: 'signup-name', label: 'Name', type: 'text', field: 'name', autoComplete: 'name', placeholder: 'Your name' },
             { id: 'signup-email', label: 'Email', type: 'email', field: 'email', autoComplete: 'email', placeholder: 'you@team.com' },
             { id: 'signup-password', label: 'Password', type: 'password', field: 'password', autoComplete: 'new-password', placeholder: '8+ characters' },
-            { id: 'signup-confirm', label: 'Confirm password', type: 'password', field: 'confirm', autoComplete: 'new-password', placeholder: 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢' },
+            { id: 'signup-confirm', label: 'Confirm password', type: 'password', field: 'confirm', autoComplete: 'new-password', placeholder: '••••••••' },
           ] as const
         ).map(({ id, label, type, field, autoComplete, placeholder }) => (
           <div key={id} className="space-y-1">
@@ -343,7 +343,7 @@ function SignupView({
           loading={form.loading}
           disabled={form.loading}
         >
-          {form.loading ? 'Creating accountâ€¦' : 'Create account'}
+          {form.loading ? 'Creating account…' : 'Create account'}
         </Button>
       </form>
 
@@ -361,7 +361,7 @@ function SignupView({
   );
 }
 
-// â”€â”€â”€ Forgot Password â€” Â§68 â”€â”€â”€
+// ─── Forgot Password — §68 ───
 
 function ForgotPasswordView({ onBack }: { onBack: () => void }) {
   const [email, setEmail] = useState('');
@@ -374,7 +374,7 @@ function ForgotPasswordView({ onBack }: { onBack: () => void }) {
     setLoading(true);
     try {
       // TODO: POST /api/v1/auth/forgot-password { email }
-      // IMPORTANT: Â§68 â€” never reveal whether email exists
+      // IMPORTANT: §68 — never reveal whether email exists
       await new Promise((r) => setTimeout(r, 600));
       setSent(true);
     } finally {
@@ -390,14 +390,14 @@ function ForgotPasswordView({ onBack }: { onBack: () => void }) {
 
       {sent ? (
         <div className="text-center space-y-4">
-          <div className="text-3xl">ðŸ“¬</div>
+          <div className="text-3xl">📬</div>
           <h2 className="font-semibold text-[var(--color-text)]">Check your email</h2>
-          {/* Â§68: Do not reveal whether the email exists */}
+          {/* §68: Do not reveal whether the email exists */}
           <p className="text-sm text-[var(--color-text-secondary)]">
             If an account exists for that address, you'll receive a reset link shortly.
           </p>
           <Button variant="ghost" size="sm" onClick={onBack}>
-            â† Back to sign in
+            ← Back to sign in
           </Button>
         </div>
       ) : (
@@ -433,7 +433,7 @@ function ForgotPasswordView({ onBack }: { onBack: () => void }) {
             loading={loading}
             disabled={!email || loading}
           >
-            {loading ? 'Sendingâ€¦' : 'Send reset link'}
+            {loading ? 'Sending…' : 'Send reset link'}
           </Button>
           <Button
             type="button"
@@ -442,7 +442,7 @@ function ForgotPasswordView({ onBack }: { onBack: () => void }) {
             className="w-full"
             onClick={onBack}
           >
-            â† Back to sign in
+            ← Back to sign in
           </Button>
         </form>
       )}

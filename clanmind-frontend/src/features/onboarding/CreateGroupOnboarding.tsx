@@ -21,14 +21,14 @@ import { useToast } from '@/design-system/components/Toast';
 import { copyToClipboard } from '@/tauri/bridge';
 
 /**
- * Â§70 Create Group Onboarding â€” 7 steps, everything non-essential skippable:
- *   1. Group name (+ optional description, Â§71)
- *   2. Invite teammates (skippable, Â§72)
- *   3. Meet Odin (Â§73)
- *   4. Optional AI setup â€” rename Odin / avatar (Â§73, product rule 12)
- *   5. First-run demo animation â€” all 10 steps (Â§74, Â§75)
- *   6. Optional first Project (Â§77)
- *   7. Enter ClanMind (Â§70) â€” never "Workspace" (Â§2 rule 1)
+ * §70 Create Group Onboarding — 7 steps, everything non-essential skippable:
+ *   1. Group name (+ optional description, §71)
+ *   2. Invite teammates (skippable, §72)
+ *   3. Meet Odin (§73)
+ *   4. Optional AI setup — rename Odin / avatar (§73, product rule 12)
+ *   5. First-run demo animation — all 10 steps (§74, §75)
+ *   6. Optional first Project (§77)
+ *   7. Enter ClanMind (§70) — never "Workspace" (§2 rule 1)
  */
 
 export interface OnboardingWizardProps {
@@ -71,11 +71,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [inviteEmails, setInviteEmails] = useState<string[]>(['']);
   const [inviteCopied, setInviteCopied] = useState(false);
 
-  // â”€â”€â”€ Demo animation (Â§75) â€” timers cleaned up on unmount/step change â”€â”€â”€
+  // ─── Demo animation (§75) — timers cleaned up on unmount/step change ───
   const [demoStep, setDemoStep] = useState(0);
 
   useEffect(() => {
-    // Â§6 reduced motion: no animation timers at all
+    // §6 reduced motion: no animation timers at all
     if (prefersReducedMotion()) return;
     if (step !== 5 || demoStep >= 10) return;
     const t = setTimeout(() => setDemoStep(demoStep + 1), demoStep === 0 ? 600 : 780);
@@ -89,7 +89,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   // Render state: reduced motion shows the completed story immediately
   const displayStep = prefersReducedMotion() ? 10 : demoStep;
 
-  // â”€â”€â”€ Invite (Â§72) â”€â”€â”€
+  // ─── Invite (§72) ───
   const handleSendInvites = () => {
     const valid = inviteEmails.map((e) => e.trim()).filter(Boolean);
     if (valid.length === 0) {
@@ -146,7 +146,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               className="text-xs font-bold uppercase tracking-widest"
               style={{ color: 'var(--color-text-tertiary)' }}
             >
-              Onboarding Â· Step {step} of {STEP_LABELS.length}
+              Onboarding · Step {step} of {STEP_LABELS.length}
             </span>
           </div>
           <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
@@ -154,7 +154,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           </span>
         </div>
 
-        {/* â”€â”€ STEP 1: GROUP NAME (Â§71) â”€â”€ */}
+        {/* ── STEP 1: GROUP NAME (§71) ── */}
         {step === 1 && (
           <div className="space-y-4">
             <h1 className="text-2xl font-bold">What&rsquo;s your team called?</h1>
@@ -210,12 +210,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           </div>
         )}
 
-        {/* â”€â”€ STEP 2: INVITE (Â§72) â”€â”€ */}
+        {/* ── STEP 2: INVITE (§72) ── */}
         {step === 2 && (
           <div className="space-y-4">
             <h1 className="text-2xl font-bold">Bring your team in</h1>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
-              You can invite teammates now or later â€” Owners and Admins can always invite.
+              You can invite teammates now or later — Owners and Admins can always invite.
             </p>
             <div className="space-y-2 pt-1">
               {inviteEmails.map((email, i) => (
@@ -277,7 +277,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           </div>
         )}
 
-        {/* â”€â”€ STEP 3: MEET ODIN (Â§73) â”€â”€ */}
+        {/* ── STEP 3: MEET ODIN (§73) ── */}
         {step === 3 && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -335,7 +335,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           </div>
         )}
 
-        {/* â”€â”€ STEP 4: OPTIONAL AI SETUP (Â§73, product rule 12) â”€â”€ */}
+        {/* ── STEP 4: OPTIONAL AI SETUP (§73, product rule 12) ── */}
         {step === 4 && (
           <div className="space-y-4">
             <h1 className="text-2xl font-bold">Make {aiName} yours</h1>
@@ -406,7 +406,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           </div>
         )}
 
-        {/* â”€â”€ STEP 5: CORE LOOP DEMO (Â§74, Â§75) â”€â”€ */}
+        {/* ── STEP 5: CORE LOOP DEMO (§74, §75) ── */}
         {step === 5 && (
           <div className="space-y-4">
             <h1 className="text-xl font-bold">The ClanMind core loop</h1>
@@ -419,7 +419,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               className="p-4 rounded-xl border text-xs space-y-2.5 min-h-[260px]"
               style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
             >
-              {/* 1 â€” chat bubble */}
+              {/* 1 — chat bubble */}
               {displayStep >= 1 && (
                 <div
                   className="p-2.5 rounded-lg border node-arrive"
@@ -432,7 +432,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
               )}
 
-              {/* 2 â€” @Odin token activates */}
+              {/* 2 — @Odin token activates */}
               {displayStep >= 2 && (
                 <div className="node-arrive">
                   <Badge variant="spectral" size="sm">
@@ -442,15 +442,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
               )}
 
-              {/* 3 â€” Odin status starts */}
+              {/* 3 — Odin status starts */}
               {displayStep >= 3 && (
                 <div className="flex items-center gap-2 node-arrive" style={{ color: 'var(--color-warning)' }}>
                   <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>{aiName} is researchingâ€¦</span>
+                  <span>{aiName} is researching…</span>
                 </div>
               )}
 
-              {/* 4 â€” source cards arrive */}
+              {/* 4 — source cards arrive */}
               {displayStep >= 4 && (
                 <div className="grid grid-cols-2 gap-2 node-arrive">
                   <div className="p-2 rounded-lg border" style={{ borderColor: 'var(--color-border)' }}>
@@ -470,19 +470,19 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
               )}
 
-              {/* 5 â€” research summary appears */}
+              {/* 5 — research summary appears */}
               {displayStep >= 5 && (
                 <div
                   className="p-2.5 rounded-lg border node-arrive"
                   style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
                 >
                   <span style={{ color: 'var(--color-text-secondary)' }}>
-                    SPI with DMA cuts sensor latency from 160&nbsp;Âµs to 6.5&nbsp;Âµs.
+                    SPI with DMA cuts sensor latency from 160&nbsp;µs to 6.5&nbsp;µs.
                   </span>
                 </div>
               )}
 
-              {/* 6 â€” right panel expands */}
+              {/* 6 — right panel expands */}
               {displayStep >= 6 && (
                 <div className="flex items-center gap-2 node-arrive" style={{ color: 'var(--color-text-secondary)' }}>
                   <LayoutPanelTop className="w-3.5 h-3.5" aria-hidden="true" />
@@ -490,7 +490,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
               )}
 
-              {/* 7 â€” diagram nodes form */}
+              {/* 7 — diagram nodes form */}
               {displayStep >= 7 && (
                 <div className="flex items-center gap-1.5 node-arrive">
                   {['Sensor', 'SPI DMA', 'Attitude Loop'].map((n, i) => (
@@ -513,7 +513,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
               )}
 
-              {/* 8 â€” decision card appears */}
+              {/* 8 — decision card appears */}
               {displayStep >= 8 && (
                 <div
                   className="p-2.5 rounded-lg border flex items-center gap-2 node-arrive"
@@ -526,7 +526,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
               )}
 
-              {/* 9 â€” task cards appear */}
+              {/* 9 — task cards appear */}
               {displayStep >= 9 && (
                 <div className="flex gap-2 node-arrive">
                   {['DMA ring buffer', 'Telemetry bench test'].map((t) => (
@@ -542,7 +542,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
               )}
 
-              {/* 10 â€” GitHub approval card appears */}
+              {/* 10 — GitHub approval card appears */}
               {displayStep >= 10 && (
                 <div
                   className="p-2.5 rounded-lg border flex items-center gap-2 node-arrive"
@@ -560,7 +560,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
               {displayStep === 0 && (
                 <p className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
-                  {prefersReducedMotion() ? 'Loading the storyâ€¦' : 'Startingâ€¦'}
+                  {prefersReducedMotion() ? 'Loading the story…' : 'Starting…'}
                 </p>
               )}
             </div>
@@ -587,7 +587,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           </div>
         )}
 
-        {/* â”€â”€ STEP 6: OPTIONAL FIRST PROJECT (Â§77) â”€â”€ */}
+        {/* ── STEP 6: OPTIONAL FIRST PROJECT (§77) ── */}
         {step === 6 && (
           <div className="space-y-4">
             <h1 className="text-2xl font-bold">Create your first Project</h1>
@@ -677,7 +677,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           </div>
         )}
 
-        {/* â”€â”€ STEP 7: ENTER (Â§70) â”€â”€ */}
+        {/* ── STEP 7: ENTER (§70) ── */}
         {step === 7 && (
           <div className="space-y-5 text-center">
             <div className="flex flex-col items-center gap-3 pt-2">

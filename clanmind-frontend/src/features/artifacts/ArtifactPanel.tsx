@@ -133,7 +133,7 @@ export function ArtifactPanel({
         isFullscreen && 'fixed inset-0 z-50 border-none'
       )}
     >
-      {/* Top Header Bar (Â§96) */}
+      {/* Top Header Bar (§96) */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--color-border)] bg-gray-50/50 dark:bg-gray-800/30">
         <div className="flex items-center gap-2 min-w-0">
           <FileCode className="w-4 h-4 text-gray-500 shrink-0" />
@@ -143,8 +143,8 @@ export function ArtifactPanel({
             </h2>
             <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
               <span>{artifact.artifact_type}</span>
-              <span>â€¢</span>
-              {/* Version Selector Dropdown (Â§102) */}
+              <span>•</span>
+              {/* Version Selector Dropdown (§102) */}
               <Dropdown
                 trigger={
                   <button className="font-semibold text-[var(--color-text-secondary)] hover:underline cursor-pointer">
@@ -153,7 +153,7 @@ export function ArtifactPanel({
                 }
                 items={versionMenuItems}
               />
-              <span>â€¢</span>
+              <span>•</span>
               <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                 <Users className="w-2.5 h-2.5" /> 2 viewing
               </span>
@@ -163,7 +163,7 @@ export function ArtifactPanel({
 
         {/* Action icons */}
         <div className="flex items-center gap-1 shrink-0">
-          {/* Fullscreen Toggle (Â§104) */}
+          {/* Fullscreen Toggle (§104) */}
           <Tooltip content={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>
             <IconButton
               aria-label="Toggle Fullscreen"
@@ -178,7 +178,7 @@ export function ArtifactPanel({
             </IconButton>
           </Tooltip>
 
-          {/* Compare Version Trigger (Â§103) */}
+          {/* Compare Version Trigger (§103) */}
           {artifact.versions.length > 1 && (
             <Tooltip content="Compare with previous version">
               <IconButton
@@ -205,7 +205,7 @@ export function ArtifactPanel({
             </Tooltip>
           )}
 
-          {/* Use as Context Toggle (Â§113, Â§114) */}
+          {/* Use as Context Toggle (§113, §114) */}
           <Tooltip content={artifact.used_as_context ? 'Approved Odin Context' : 'Enable for Odin Context'}>
             <IconButton
               aria-label="Toggle Odin Context"
@@ -239,7 +239,7 @@ export function ArtifactPanel({
             </IconButton>
           </Tooltip>
 
-          {/* Export Dropdown (Â§254) */}
+          {/* Export Dropdown (§254) */}
           <Dropdown
             trigger={
               <IconButton aria-label="Export artifact" size="xs">

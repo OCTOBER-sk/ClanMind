@@ -70,7 +70,7 @@ export function ResearchDrawer({
           <p className="text-[var(--color-text)]">{summary}</p>
         </div>
 
-        {/* PROJECT IMPACT (Â§147) - ClanMind Signature Experience */}
+        {/* PROJECT IMPACT (§147) - ClanMind Signature Experience */}
         <div className="p-4 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/20 space-y-2">
           <div className="flex items-center gap-1.5 font-bold text-purple-900 dark:text-purple-300">
             <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
@@ -99,7 +99,7 @@ export function ResearchDrawer({
           </div>
         </div>
 
-        {/* Sources Cards Grid (Â§144) */}
+        {/* Sources Cards Grid (§144) */}
         <div className="space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
             Verified External Sources ({sources.length})
