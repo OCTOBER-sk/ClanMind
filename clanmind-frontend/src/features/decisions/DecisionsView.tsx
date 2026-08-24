@@ -81,7 +81,7 @@ export function DecisionsView({
       {/* Decisions List */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4" aria-busy={isLoading}>
         {isLoading && ordered.length === 0 ? (
-          <p className="text-center py-12 text-gray-400 text-xs">Loading decisions…</p>
+          <p className="text-center py-12 text-[var(--color-text-tertiary)] text-xs">Loading decisions…</p>
         ) : ordered.length === 0 ? (
           <div className="text-center py-12 space-y-1" data-testid="decisions-empty">
             <p className="text-sm font-semibold text-[var(--color-text)]">No decisions recorded yet.</p>

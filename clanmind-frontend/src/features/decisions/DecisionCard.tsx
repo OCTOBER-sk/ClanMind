@@ -72,7 +72,7 @@ export function DecisionCard({
 
       {decision.context && (
         <div>
-          <span className="text-[10px] font-bold uppercase text-gray-400 block mb-0.5">
+          <span className="text-[10px] font-bold uppercase text-[var(--color-text-tertiary)] block mb-0.5">
             Context &amp; Problem
           </span>
           <p className="text-[var(--color-text-secondary)] leading-relaxed">{decision.context}</p>
@@ -82,7 +82,7 @@ export function DecisionCard({
       {/* §120 "Reason" — the §47 rationale column */}
       {decision.rationale && (
         <div>
-          <span className="text-[10px] font-bold uppercase text-gray-400 block mb-0.5">Reason</span>
+          <span className="text-[10px] font-bold uppercase text-[var(--color-text-tertiary)] block mb-0.5">Reason</span>
           <p className="text-[var(--color-text-secondary)] leading-relaxed font-medium">
             {decision.rationale}
           </p>
@@ -91,7 +91,7 @@ export function DecisionCard({
 
       {decision.options != null && Array.isArray(decision.options) && decision.options.length > 0 && (
         <div>
-          <span className="text-[10px] font-bold uppercase text-gray-400 block mb-0.5">Options</span>
+          <span className="text-[10px] font-bold uppercase text-[var(--color-text-tertiary)] block mb-0.5">Options</span>
           <ul className="space-y-0.5">
             {(decision.options as Array<Record<string, unknown>>).map((opt, i) => {
               const label = typeof opt === 'string' ? opt : String(opt.label ?? `Option ${i + 1}`);
@@ -116,13 +116,13 @@ export function DecisionCard({
       {/* §120 "Sources" — rendered only when data provides them (no §47
           column yet; live rows show an honest absence instead of fake cites) */}
       {decision.sources && decision.sources.length > 0 && (
-        <div className="pt-2 border-t border-[var(--color-border)] text-[10px] text-gray-400">
+        <div className="pt-2 border-t border-[var(--color-border)] text-[10px] text-[var(--color-text-tertiary)]">
           <span>Sources: {decision.sources.join(' • ')}</span>
         </div>
       )}
 
       <div className="flex items-center justify-between gap-3 pt-1">
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-[var(--color-text-tertiary)]">
           {decision.status === 'APPROVED'
             ? `Approved by ${approvedByName ?? 'the team'}${decision.approved_at ? ` · ${new Date(decision.approved_at).toLocaleDateString()}` : ''}`
             : proposedByName

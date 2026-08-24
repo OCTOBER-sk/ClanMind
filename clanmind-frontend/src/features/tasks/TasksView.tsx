@@ -114,7 +114,7 @@ export function TasksView({
       {/* Task List */}
       <div className="flex-1 overflow-y-auto p-6 space-y-3" aria-busy={isLoading}>
         {isLoading && filteredTasks.length === 0 ? (
-          <p className="text-center py-12 text-gray-400 text-xs">Loading tasks…</p>
+          <p className="text-center py-12 text-[var(--color-text-tertiary)] text-xs">Loading tasks…</p>
         ) : filteredTasks.length === 0 ? (
           <EmptyTasks filterStatus={filterStatus} onAddTask={onAddTask} />
         ) : (

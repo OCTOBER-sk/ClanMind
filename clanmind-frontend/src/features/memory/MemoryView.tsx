@@ -147,7 +147,7 @@ export function MemoryView({
               className={`pb-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer ${
                 activeSection === s.key
                   ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white'
-                  : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+                  : 'border-transparent text-[var(--color-text-secondary)] hover:text-gray-900 dark:hover:text-gray-100'
               }`}
             >
               {s.label}
@@ -168,7 +168,7 @@ export function MemoryView({
       {/* Memories list */}
       <div className="flex-1 overflow-y-auto p-6 space-y-3" aria-busy={isLoading}>
         {isLoading && sectionRows.length === 0 ? (
-          <p className="text-center py-12 text-gray-400 text-xs">Loading memories…</p>
+          <p className="text-center py-12 text-[var(--color-text-tertiary)] text-xs">Loading memories…</p>
         ) : sectionRows.length === 0 ? (
           <div className="text-center py-12 space-y-1" data-testid="memory-empty">
             <p className="text-sm font-semibold text-[var(--color-text)]">
@@ -321,10 +321,10 @@ function MemoryCardRow({ memory }: { memory: MemoryEntry }) {
         <Badge variant="neutral" size="sm">
           {isTypedVocabulary ? memory.memory_type : memory.memory_type || 'FACT'}
         </Badge>
-        <span className="text-[10px] uppercase tracking-wide text-gray-400">{memory.scope_type}</span>
+        <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-tertiary)]">{memory.scope_type}</span>
       </div>
       <p className="text-[var(--color-text)] leading-relaxed">{memory.content}</p>
-      <ul className="pt-1 border-t border-[var(--color-border)] text-[10px] text-gray-400 flex flex-wrap gap-x-3 gap-y-0.5">
+      <ul className="pt-1 border-t border-[var(--color-border)] text-[10px] text-[var(--color-text-tertiary)] flex flex-wrap gap-x-3 gap-y-0.5">
         {provenance.map((line) => (
           <li key={line}>{line}</li>
         ))}

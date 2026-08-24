@@ -285,6 +285,19 @@ export function AppShell() {
     if (layout.leftRailDocked) setNavSheetOpen(false);
   }, [layout.leftRailDocked]);
 
+  // §7 route-change focus — keyboard/AT users must land on the work surface
+  // when the view changes, not be left at the top of the document. The main
+  // region is the target (tabIndex=-1, never in the tab order itself); the
+  // initial mount does NOT steal focus (§253 — never move focus uninvited).
+  const isFirstRouteRenderRef = useRef(true);
+  useEffect(() => {
+    if (isFirstRouteRenderRef.current) {
+      isFirstRouteRenderRef.current = false;
+      return;
+    }
+    document.getElementById('cm-main-content')?.focus({ preventScroll: true });
+  }, [location.pathname]);
+
   const { toast } = useToast();
   useGlobalShortcuts();
 
@@ -1086,6 +1099,14 @@ export function AppShell() {
         color: 'var(--color-text)',
       }}
     >
+      {/* §7 — skip link: first tabbable element; visually hidden until focused */}
+      <a
+        href="#cm-main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[300] focus:rounded-lg focus:bg-[var(--color-primary)] focus:px-3 focus:py-2 focus:text-xs focus:font-semibold focus:text-[var(--color-primary-fg)] focus:shadow-[var(--shadow-lg)] focus:outline-none"
+      >
+        Skip to main content
+      </a>
+
       {/* §309A.2 CLIENT_UPDATE_REQUIRED — blocking, full-screen state */}
       {protocolMismatch?.isRequired && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6 text-white text-center">
@@ -1274,9 +1295,12 @@ export function AppShell() {
           </Sheet>
         )}
 
-        {/* Center Main Work Surface */}
+        {/* Center Main Work Surface — §7 focus target for skip link and
+            route changes (tabIndex=-1 keeps it out of the tab order) */}
         <main
-          className="flex-1 flex flex-col min-w-0 overflow-hidden"
+          id="cm-main-content"
+          tabIndex={-1}
+          className="flex-1 flex flex-col min-w-0 overflow-hidden outline-none"
           style={{ background: 'var(--color-background)' }}
         >
           {activeNavSection === 'chat' && (

@@ -65,6 +65,62 @@ export function CommandPalette({
     return labels;
   }, [decisions]);
 
+  // §66/§8 — this palette is a modal dialog: focus must be TRAPPED inside it
+  // while open and RESTORED to the trigger when it closes. cmdk handles
+  // arrow-key navigation internally; Tab cycling is ours.
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  const restoreFocusRef = React.useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    // Capture BEFORE moving focus anywhere — the element that held focus
+    // when the palette opened is the restore target (§66).
+    restoreFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const focusables = () =>
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => !el.hasAttribute('disabled'));
+
+    // Initial focus goes to the search input (set here, not via autoFocus,
+    // so the capture above always sees the true pre-open focus owner).
+    const firstInput = dialog.querySelector<HTMLElement>('input');
+    firstInput?.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const items = focusables();
+      if (items.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = items[0]!;
+      const last = items[items.length - 1]!;
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !dialog.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !dialog.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      // §66 safe focus restoration on close/unmount.
+      restoreFocusRef.current?.focus({ preventScroll: true });
+      restoreFocusRef.current = null;
+    };
+  }, [open]);
+
   // §63: Ctrl/Cmd + K — search/commands entry
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -95,6 +151,7 @@ export function CommandPalette({
       onClick={() => onOpenChange(false)}
     >
       <div
+        ref={dialogRef}
         className="w-full max-w-xl bg-[var(--color-surface-raised)] rounded-2xl shadow-[var(--shadow-xl)] border border-[var(--color-border)] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -107,7 +164,6 @@ export function CommandPalette({
             <Command.Input
               placeholder="Search ClanMind projects, artifacts, tasks, decisions..."
               className="w-full text-sm bg-transparent outline-none text-[var(--color-text)] placeholder:text-[var(--color-text-tertiary)]"
-              autoFocus
             />
           </div>
 

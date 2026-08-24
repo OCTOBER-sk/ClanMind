@@ -43,7 +43,7 @@ export function AiToolTimeline({
   const renderStatusIcon = (status: AiToolCallStatus) => {
     switch (status) {
       case 'PENDING':
-        return <Clock className="w-3.5 h-3.5 text-gray-400" />;
+        return <Clock className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" />;
       case 'APPROVED':
         return <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />;
       case 'EXECUTING':
@@ -53,7 +53,7 @@ export function AiToolTimeline({
       case 'FAILED':
         return <AlertCircle className="w-3.5 h-3.5 text-red-500" />;
       case 'DENIED':
-        return <XCircle className="w-3.5 h-3.5 text-gray-400" />;
+        return <XCircle className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" />;
     }
   };
 
@@ -68,13 +68,13 @@ export function AiToolTimeline({
         className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-gray-100/60 dark:hover:bg-gray-800/40 transition-colors cursor-pointer select-none"
       >
         <div className="flex items-center gap-2 font-semibold text-[var(--color-text-secondary)] text-[11px]">
-          {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
+          {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" /> : <ChevronRight className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" />}
           <span>Odin Tool Activity</span>
           <Badge variant={isAllDone ? 'neutral' : 'warning'} size="sm">
             {completedCount}/{toolCalls.length} Complete
           </Badge>
         </div>
-        <span className="text-[10px] text-gray-400">
+        <span className="text-[10px] text-[var(--color-text-tertiary)]">
           {isExpanded ? 'Hide activity' : 'Show details'}
         </span>
       </button>
@@ -94,7 +94,7 @@ export function AiToolTimeline({
                     {call.tool_name}
                   </p>
                   {call.input && (
-                    <p className="text-[10px] text-gray-500 font-sans truncate max-w-sm">
+                    <p className="text-[10px] text-[var(--color-text-secondary)] font-sans truncate max-w-sm">
                       {JSON.stringify(call.input)}
                     </p>
                   )}
@@ -106,7 +106,7 @@ export function AiToolTimeline({
                 <div className="flex items-center gap-1.5 shrink-0 ml-2 font-sans">
                   <button
                     onClick={() => onDenyTool?.(call.id)}
-                    className="px-2 py-0.5 rounded text-[10px] font-medium text-gray-500 hover:bg-[var(--color-surface-hover)] cursor-pointer"
+                    className="px-2 py-0.5 rounded text-[10px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] cursor-pointer"
                   >
                     Deny
                   </button>

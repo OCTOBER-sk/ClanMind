@@ -108,6 +108,10 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
     <RadixToast.Root
       duration={duration === 0 ? Infinity : duration}
       onOpenChange={(open) => { if (!open) onDismiss(); }}
+      // §7 status announcements — errors announce assertively (role="alert");
+      // everything else is an explicit polite live region. Radix does not set
+      // a role on Toast.Root by default, so both are declared here.
+      role={variant === 'error' ? 'alert' : 'status'}
       className={cn(
         'flex items-start gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)]',
         'px-4 py-3 shadow-[var(--shadow-lg)]',

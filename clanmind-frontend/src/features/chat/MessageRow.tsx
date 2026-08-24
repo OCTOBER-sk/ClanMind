@@ -128,6 +128,10 @@ function MessageRowInner({
         !isConsecutive ? 'mt-2.5 pt-2' : 'mt-0.5',
         message.pinned && 'bg-[var(--color-warning-bg)]/60'
       )}
+      // §7 keyboard access — the row is the focus entry point that reveals
+      // its §25 action toolbar via group-focus-within; without a stop here
+      // the toolbar (display:none until hover) was unreachable by keyboard.
+      tabIndex={0}
       // §218 — NO aria-live here: streamed tokens must never be announced.
       // Lifecycle announcements come from AiStreamAnnouncer only.
       data-streaming={isStreaming || undefined}

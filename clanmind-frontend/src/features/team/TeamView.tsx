@@ -100,7 +100,7 @@ export function TeamView({
                         </button>
                       </div>
                     )}
-                    <p className="text-[11px] text-gray-400">{member.user.email}</p>
+                    <p className="text-[11px] text-[var(--color-text-tertiary)]">{member.user.email}</p>
                   </div>
                 </div>
 

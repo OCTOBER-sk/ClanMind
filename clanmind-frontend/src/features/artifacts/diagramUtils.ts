@@ -229,7 +229,9 @@ export function diagramToSvg(content: DiagramContent, title?: string): string {
     );
     if (edge.label) {
       parts.push(
-        `<text x="${midX}" y="${(y1 + y2) / 2 - 6}" font-size="10" fill="#6b7280" text-anchor="middle">${escapeXml(edge.label)}</text>`,
+        // §222 — edge labels are 10px text on white: gray-500 (#6b7280)
+        // measures 4.09:1; gray-600 clears AA at 7.56:1.
+        `<text x="${midX}" y="${(y1 + y2) / 2 - 6}" font-size="10" fill="#4b5563" text-anchor="middle">${escapeXml(edge.label)}</text>`,
       );
     }
   }

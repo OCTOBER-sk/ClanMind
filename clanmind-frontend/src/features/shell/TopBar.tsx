@@ -181,7 +181,7 @@ export function TopBar({
           align="start"
           trigger={
             <button
-              className="font-semibold truncate max-w-[140px] cursor-pointer hover:opacity-80"
+              className="font-semibold truncate max-w-[140px] cursor-pointer hover:opacity-80 rounded-md outline-none focus-visible:shadow-[var(--focus-ring)]"
               style={{ color: 'var(--color-text-secondary)' }}
             >
               {activeGroup?.name || 'Select Group'}
@@ -198,7 +198,7 @@ export function TopBar({
               align="start"
               trigger={
                 <button
-                  className="font-semibold truncate max-w-[140px] cursor-pointer hover:underline"
+                  className="font-semibold truncate max-w-[140px] cursor-pointer hover:underline rounded-md outline-none focus-visible:shadow-[var(--focus-ring)]"
                   style={{ color: 'var(--color-info)' }}
                 >
                   {activeProject.name}
@@ -214,7 +214,8 @@ export function TopBar({
       <div className="hidden md:flex items-center justify-center flex-1 max-w-sm px-4">
         <button
           onClick={onOpenSearch}
-          className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer"
+          aria-label="Search or jump to"
+          className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer outline-none focus-visible:shadow-[var(--focus-ring)]"
           style={{
             borderColor: 'var(--color-border)',
             background: 'var(--color-surface)',
@@ -240,7 +241,7 @@ export function TopBar({
         {meetingEnabled && !isMeetingActive && (
           <button
             onClick={onStartMeeting}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors outline-none focus-visible:shadow-[var(--focus-ring)]"
             style={{
               color: 'var(--color-danger)',
               background: 'var(--color-danger-bg)',

@@ -117,7 +117,7 @@ export function ProjectOverview({
                   <p className="font-medium text-[var(--color-text)] truncate">
                     {task.title}
                   </p>
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-[10px] text-[var(--color-text-tertiary)]">
                     Owner: {ownerName(task, members)}
                   </span>
                 </div>
@@ -167,7 +167,7 @@ export function ProjectOverview({
                   </Badge>
                 </div>
                 {dec.rationale && (
-                  <p className="text-[11px] text-gray-500 line-clamp-1">{dec.rationale}</p>
+                  <p className="text-[11px] text-[var(--color-text-secondary)] line-clamp-1">{dec.rationale}</p>
                 )}
               </div>
             ))}
@@ -201,19 +201,22 @@ export function ProjectOverview({
               .filter((a) => a.project_id === project.id)
               .slice(0, 3)
               .map((art) => (
-                <div
+                // §7 keyboard access — navigates on click, so it must be a
+                // real button operable by Enter/Space, not a bare click-div.
+                <button
                   key={art.id}
+                  type="button"
                   onClick={() => onNavigateToSection('garage')}
-                  className="p-3 rounded-lg bg-[var(--color-surface-hover)] border border-[var(--color-border)] text-xs cursor-pointer hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+                  className="p-3 rounded-lg bg-[var(--color-surface-hover)] border border-[var(--color-border)] text-xs cursor-pointer hover:border-gray-300 dark:hover:border-gray-700 transition-colors text-left w-full focus-visible:shadow-[var(--focus-ring)] outline-none"
                 >
-                  <div className="font-semibold text-[var(--color-text)] truncate mb-1">
+                  <span className="block font-semibold text-[var(--color-text)] truncate mb-1">
                     {art.title}
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] text-gray-400">
+                  </span>
+                  <span className="flex items-center justify-between text-[10px] text-[var(--color-text-tertiary)]">
                     <Badge variant="neutral" size="sm">{art.artifact_type}</Badge>
                     <span>v{art.current_version}</span>
-                  </div>
-                </div>
+                  </span>
+                </button>
               ))}
           </div>
         </div>
@@ -236,7 +239,7 @@ export function ProjectOverview({
           )}
           {recentActivity.length > 0 && (
             <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm text-xs space-y-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] block">
                 Recent Activity
               </span>
               {recentActivity.map((n) => (

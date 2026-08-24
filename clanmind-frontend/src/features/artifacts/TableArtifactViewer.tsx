@@ -41,7 +41,7 @@ export function TableArtifactViewer({ content }: TableArtifactViewerProps) {
       {/* Top Toolbar */}
       <div className="flex items-center justify-between p-3 border-b border-[var(--color-border)] bg-gray-50/50 dark:bg-gray-800/40">
         <div className="relative w-60">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-gray-400" />
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-[var(--color-text-tertiary)]" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}

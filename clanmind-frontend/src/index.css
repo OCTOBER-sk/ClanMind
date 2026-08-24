@@ -74,22 +74,27 @@
     --color-border: #e5e7eb;
     --color-border-strong: #d1d5db;
 
-    /* Text */
+    /* Text — §222 WCAG 2.2 AA: every text token ≥4.5:1 on its surfaces.
+       tertiary was #9ca3af (2.54:1) — raised to gray-500 (4.83:1 on white). */
     --color-text: #111827;
     --color-text-secondary: #4b5563;
-    --color-text-tertiary: #9ca3af;
+    --color-text-tertiary: #6b7280;
     --color-text-disabled: #d1d5db;
 
-    /* Semantic */
+    /* Semantic — §222 AA when rendered as text (4.5:1 on white and on the
+       matching -bg tint). Values keep their hue identity; dark mode already
+       passed and is unchanged. */
     --color-primary: #111827;
     --color-primary-foreground: #ffffff;
-    --color-success: #10b981;
+    --color-success: #047857;
     --color-success-bg: #ecfdf5;
-    --color-warning: #f59e0b;
+    --color-warning: #b45309;
     --color-warning-bg: #fffbeb;
-    --color-danger: #ef4444;
+    /* red-700 — red-600 (#dc2626) measured 4.41:1 on the danger-bg tint,
+       just under AA; 700 clears it on white, tint and every surface. */
+    --color-danger: #b91c1c;
     --color-danger-bg: #fef2f2;
-    --color-info: #3b82f6;
+    --color-info: #2563eb;
     --color-info-bg: #eff6ff;
 
     /* Focus ring */
@@ -121,7 +126,10 @@
 
     --color-text: #f9fafb;
     --color-text-secondary: #9ca3af;
-    --color-text-tertiary: #6b7280;
+    /* §222 — #6b7280 measured 3.56–4.09:1 on dark surfaces; slate-tone
+       lifted to ≥5.6:1 on every dark surface while staying dimmer than
+       secondary (#9ca3af) so the three-step hierarchy survives. */
+    --color-text-tertiary: #8b95a4;
     --color-text-disabled: #4b5563;
 
     --color-primary: #f9fafb;
@@ -439,6 +447,16 @@
   .spectral-text {
     animation: none !important;
     background-size: 100% 100% !important;
+  }
+
+  /* §222 — a FROZEN rainbow gradient still renders low-contrast segments
+     (e.g. #80ff72 on white ≈1.8:1). When motion is reduced, animated status
+     text collapses to solid readable text; the label itself (§6 "never
+     remove critical information") stays, now AA-contrast. */
+  .spectral-text {
+    background: none !important;
+    -webkit-text-fill-color: currentColor !important;
+    color: var(--color-text) !important;
   }
 
   /* Disable large motion */

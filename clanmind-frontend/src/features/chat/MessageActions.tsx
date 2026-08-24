@@ -114,7 +114,10 @@ export function MessageActions({
 
   return (
     <div
-      className="absolute right-3 -top-3.5 hidden group-hover:flex items-center rounded-lg shadow-[var(--shadow-md)] px-1 py-0.5 z-10 gap-0.5 border"
+      // §25 "Hover/Focus Actions" — the toolbar must surface for keyboard
+      // users too: `hidden group-hover:flex` alone left Reply/React/Copy/More
+      // unreachable (display:none removes them from the tab order).
+      className="absolute right-3 -top-3.5 hidden group-hover:flex group-focus-within:flex items-center rounded-lg shadow-[var(--shadow-md)] px-1 py-0.5 z-10 gap-0.5 border"
       style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}
     >
       {/* Quick Reaction Popover (§28) */}

@@ -31,7 +31,7 @@ export function ProjectPulse({
   return (
     <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm space-y-4">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-tertiary)]">
           PROJECT PULSE
         </span>
         <span className="text-xs font-mono font-bold text-[var(--color-text)]">
@@ -50,7 +50,7 @@ export function ProjectPulse({
       {/* Status Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
         <div className="p-3 rounded-lg bg-[var(--color-surface-hover)] border border-[var(--color-border)]">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] block mb-1">
             Current Focus
           </span>
           <p className="font-semibold text-[var(--color-text)]">

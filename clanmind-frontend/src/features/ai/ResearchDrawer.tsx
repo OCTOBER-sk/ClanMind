@@ -37,7 +37,7 @@ export function ResearchDrawer({
             <h3 className="font-bold text-[var(--color-text)]">
               Web Research Report
             </h3>
-            <span className="text-[10px] text-gray-400">{sources.length} sources verified</span>
+            <span className="text-[10px] text-[var(--color-text-tertiary)]">{sources.length} sources verified</span>
           </div>
         </div>
         <button
@@ -54,7 +54,7 @@ export function ResearchDrawer({
       <div className="flex-1 overflow-y-auto p-5 space-y-5 leading-relaxed">
         {/* Research Topic */}
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] block mb-1">
             Research Scope
           </span>
           <h2 className="text-sm font-bold text-[var(--color-text)]">
@@ -64,7 +64,7 @@ export function ResearchDrawer({
 
         {/* Executive Summary */}
         <div className="p-3.5 rounded-xl border border-[var(--color-border)] bg-gray-50/60 dark:bg-gray-800/40 space-y-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] block">
             Summary
           </span>
           <p className="text-[var(--color-text)]">{summary}</p>
@@ -83,7 +83,7 @@ export function ResearchDrawer({
 
         {/* Key Findings List */}
         <div className="space-y-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] block">
             Key Technical Findings
           </span>
           <div className="space-y-1.5">
@@ -101,7 +101,7 @@ export function ResearchDrawer({
 
         {/* Sources Cards Grid (§144) */}
         <div className="space-y-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] block">
             Verified External Sources ({sources.length})
           </span>
           <div className="space-y-2">
@@ -117,7 +117,7 @@ export function ResearchDrawer({
                   <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 font-semibold">
                     {src.domain}
                   </span>
-                  <ExternalLink className="w-3 h-3 text-gray-400 group-hover:text-purple-500 transition-colors" />
+                  <ExternalLink className="w-3 h-3 text-[var(--color-text-tertiary)] group-hover:text-purple-500 transition-colors" />
                 </div>
                 <h4 className="font-semibold text-[var(--color-text)] group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors truncate">
                   {src.title}
@@ -134,7 +134,7 @@ export function ResearchDrawer({
 
         {/* Uncertainty & Limitations */}
         {uncertainty && (
-          <div className="p-3 rounded-lg border border-[var(--color-border)] text-[11px] text-gray-500 flex items-start gap-2">
+          <div className="p-3 rounded-lg border border-[var(--color-border)] text-[11px] text-[var(--color-text-secondary)] flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
             <p>{uncertainty}</p>
           </div>

@@ -563,3 +563,87 @@ vitest 44 files / 367 tests green (P10 adds p10Routes parity ×12, dispatch
 projections ×6 incl. per-recipient gate, controller/panel/pipeline/diagnostics
 flows ×19); production build passes with purity greps clean (`demo-token`,
 `installDemoMode`, dataset ids absent from dist/assets).
+
+---
+
+## 2026-08-24 — P13 accessibility pass (FE §7, §6, §25, §63–§66, §217–§222)
+
+### LEDGER GAP — D25/D26 were never written to this file
+The P11 (sync engine) and P12 (settings) commits reference ledger entries that
+do not exist here: `src/api/endpoints/sync.ts` and `src/mocks/p11Routes.test.ts`
+cite "INTEGRATION_NOTES D25" for the missing backend sync endpoints, and the
+P11/P12 commit messages carry their summaries, but no D25/D26 section was ever
+appended to this ledger. Recorded here so the gap is visible; the authoritative
+sources for those phases remain the commit messages and code comments. P13's
+own entry follows as D27.
+
+### D27 — Accessibility audit-and-fix across the whole app
+
+Audit against FE §7 baseline, §8 primitives, §25, §44/§46, §63–§66,
+§217–§222 and §6. Findings fixed per category:
+
+**Keyboard navigation (§7/§25):**
+1. MessageRow action toolbar was `hidden group-hover:flex` — Reply/React/
+   Copy/More were display:none for keyboard users entirely. Rows are now
+   focus entry points (`tabIndex={0}`) and the toolbar also surfaces via
+   `group-focus-within` (MessageRow.tsx / MessageActions.tsx).
+2. ProjectOverview "Recent Artifacts" cards were click-divs; now real
+   `<button type="button">` with focus ring.
+3. CommandPalette Tab is trapped inside the dialog (Tab/Shift+Tab cycle);
+   verified Escape still closes (§63).
+
+**Focus management (§66/§7):**
+4. CommandPalette: focus moves into the search input on open (autoFocus
+   removed — it raced the restore-target capture) and returns to the
+   pre-open trigger on close.
+5. AppShell: skip link ("Skip to main content", first tabbable element)
+   targets `<main id="cm-main-content" tabindex="-1">`; route changes move
+   focus to the main target while initial mount never steals focus (§253).
+
+**ARIA (§64/§65/§217/§218):**
+6. Toasts: Radix sets NO default role on Toast.Root — non-error toasts now
+   declare explicit `role="status"`; error variant announces `role="alert"`.
+7. TopBar group/project switchers, global search and Start Meeting gained
+   visible `focus-visible` rings (§7 visible focus); switcher ARIA state
+   was already injected by Radix DropdownMenu.Trigger.
+
+**Contrast (§222) — token-level fixes in index.css (both themes verified by
+computed WCAG ratios in src/design-system/tokens.a11y.test.ts):**
+8. Light `--color-text-tertiary` #9ca3af → #6b7280 (was 2.54:1).
+9. Dark `--color-text-tertiary` #6b7280 → #8b95a4 (was 3.56–4.09:1; stays
+   dimmer than secondary #9ca3af so the three-step hierarchy survives).
+10. Light semantics re-tuned to AA-as-text on white AND their -bg tints:
+    success #10b981 → #047857, warning #f59e0b → #b45309, danger
+    #ef4444 → #b91c1c (#dc2626 first tried, 4.41:1 on danger-bg — under),
+    info #3b82f6 → #2563eb. Dark semantics already passed, untouched.
+11. 33 hard-coded Tailwind gray text classes (text-gray-400/500) across 10
+    feature files swapped to the tertiary/secondary tokens — they bypassed
+    §4 and failed §222 in at least one theme each.
+12. Diagram SVG edge labels #6b7280 → #4b5563 (4.09 → 7.56:1 at 10px).
+
+**Reduced motion (§6):**
+13. `.spectral-text` collapsed to a STATIC rainbow under reduced motion —
+    segments ≈1.8:1. Now falls back to solid `var(--color-text)` (label
+    information kept, contrast restored).
+14. MessageList "Jump to latest" gates JS smooth scrolling on
+    prefers-reduced-motion (the CSS scroll-behavior override cannot reach
+    the scrollTo option). Sweep confirmed no decorative rAF/interval loops;
+    remaining rAF uses are functional scroll anchoring.
+
+**SPEC-SILENT (recorded honestly):**
+- Chart series palette (ChartViewer SERIES_COLORS) and onboarding avatar
+  gradients left untouched: categorical data encodings / decorative picks
+  with named labels elsewhere — not §222 text, restyle risk outweighs.
+- Diagram edge STROKES stay #9ca3af (graphical objects, not text; WCAG
+  1.4.11 is arguably implicated but §222 scopes this spec to text).
+- No axe/playwright runtime was added — bible lists it for exit tooling but
+  the repo has no playwright harness yet (P2 note); coverage is delivered
+  as vitest behavioral + computed-ratio assertions instead.
+
+Verification: `pnpm exec tsc -b` clean (exit 0); oxlint exit 0 with 16
+warnings = exactly the pre-P13 baseline (no new); vitest 52 files / 448
+tests green (400 prior + 48 new a11y assertions covering skip link, main
+target, route-change focus, dialog trap/restore/Escape, §25 toolbar reach,
+toast roles, computed AA ratios both themes, reduced-motion contract, and
+smooth-scroll gating); production build passes; dist purity greps clean
+(`demo-token` / `installDemoMode` / dataset ids absent from dist/assets).

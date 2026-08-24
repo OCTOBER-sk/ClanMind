@@ -147,7 +147,15 @@ export function MessageList({
     (smooth = true) => {
       const el = containerRef.current;
       if (!el) return;
-      el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+      // §6 — JS smooth scrolling is motion too; the stylesheet's
+      // `scroll-behavior: auto` override cannot reach the JS option.
+      const reduceMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: smooth && !reduceMotion ? 'smooth' : 'auto',
+      });
       setUnreadNewCount(0);
       setIsNearBottom(true);
       const last = messages[messages.length - 1];
