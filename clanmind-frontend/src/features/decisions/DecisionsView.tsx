@@ -1,91 +1,106 @@
-﻿import React from 'react';
-import { Bookmark, Plus } from 'lucide-react';
+﻿/**
+ * Decisions view (FE §82 project section + §120). Numbered decision cards —
+ *
+ *   Decision #N · title · Status · Reason · Sources · Approved by
+ *
+ * with propose/approve/reject per the server's outcomes (the UI never
+ * gates on client-side permission assumptions — FE rule 25; errors surface
+ * verbatim from the §102 envelope).
+ */
+
+import React, { useMemo } from 'react';
+import { Plus } from 'lucide-react';
+import { DecisionCard } from './DecisionCard';
 import { Button } from '@/design-system/components/Button';
-import { Badge } from '@/design-system/components/Badge';
-import type { Decision } from '@/types';
+import type { Decision, GroupMember } from '@/types';
 
 export interface DecisionsViewProps {
   decisions: Decision[];
-  onAddDecision: () => void;
+  members: GroupMember[];
+  isLoading?: boolean;
+  error?: string | null;
+  onPropose: () => void;
+  onApprove: (decision: Decision) => void;
+  onReject: (decision: Decision) => void;
 }
 
-export function DecisionsView({ decisions, onAddDecision }: DecisionsViewProps) {
+export function DecisionsView({
+  decisions,
+  members,
+  isLoading,
+  error,
+  onPropose,
+  onApprove,
+  onReject,
+}: DecisionsViewProps) {
+  // §120 numbering — chronological position in this Project's log.
+  const ordered = useMemo(
+    () =>
+      [...decisions].sort((a, b) =>
+        a.created_at === b.created_at
+          ? a.id.localeCompare(b.id)
+          : a.created_at.localeCompare(b.created_at),
+      ),
+    [decisions],
+  );
+  const ordinals = useMemo(() => {
+    const map = new Map<string, number>();
+    ordered.forEach((d, i) => map.set(d.id, i + 1));
+    return map;
+  }, [ordered]);
+
   return (
     <div className="flex flex-col h-full bg-[var(--color-surface-raised)] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between p-6 border-b border-[var(--color-border)]">
         <div>
-          <h1 className="text-xl font-bold text-[var(--color-text)]">Project Decisions</h1>
+          <h1 className="text-xl font-bold text-[var(--color-text)]">Decisions</h1>
           <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Immutable architectural and engineering decisions recorded by the team and Odin.
+            The project&apos;s decision log — approved choices and open proposals.
           </p>
         </div>
         <Button
           size="sm"
           variant="primary"
           leftIcon={<Plus className="w-3.5 h-3.5" />}
-          onClick={onAddDecision}
+          onClick={onPropose}
         >
           Propose Decision
         </Button>
       </div>
 
+      {error && (
+        <div
+          role="alert"
+          className="px-6 py-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-b border-red-100 dark:border-red-900"
+        >
+          {error}
+        </div>
+      )}
+
       {/* Decisions List */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {decisions.map((dec) => (
-          <div
-            key={dec.id}
-            className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-xs space-y-3 text-xs"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bookmark className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span className="font-bold text-sm text-[var(--color-text)]">
-                  Decision #{dec.decision_number}: {dec.title}
-                </span>
-              </div>
-              <Badge
-                variant={dec.status === 'APPROVED' ? 'success' : 'warning'}
-                size="sm"
-              >
-                {dec.status}
-              </Badge>
-            </div>
-
-            {dec.context && (
-              <div>
-                <span className="text-[10px] font-bold uppercase text-gray-400 block mb-0.5">
-                  Context & Problem
-                </span>
-                <p className="text-[var(--color-text-secondary)] leading-relaxed">
-                  {dec.context}
-                </p>
-              </div>
-            )}
-
-            {dec.reason && (
-              <div>
-                <span className="text-[10px] font-bold uppercase text-gray-400 block mb-0.5">
-                  Rationale
-                </span>
-                <p className="text-[var(--color-text-secondary)] leading-relaxed font-medium">
-                  {dec.reason}
-                </p>
-              </div>
-            )}
-
-            {dec.sources && dec.sources.length > 0 && (
-              <div className="pt-2 border-t border-[var(--color-border)] text-[10px] text-gray-400">
-                <span>Sources: {dec.sources.join(' • ')}</span>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between text-[10px] text-gray-400 pt-1">
-              <span>Approved by {dec.approved_by_name || 'Admin'}</span>
-              <span>{new Date(dec.created_at).toLocaleDateString()}</span>
-            </div>
+      <div className="flex-1 overflow-y-auto p-6 space-y-4" aria-busy={isLoading}>
+        {isLoading && ordered.length === 0 ? (
+          <p className="text-center py-12 text-gray-400 text-xs">Loading decisions…</p>
+        ) : ordered.length === 0 ? (
+          <div className="text-center py-12 space-y-1" data-testid="decisions-empty">
+            <p className="text-sm font-semibold text-[var(--color-text)]">No decisions recorded yet.</p>
+            <p className="text-xs text-[var(--color-text-secondary)] max-w-sm mx-auto leading-relaxed">
+              Recording what the team chose — and why — keeps future work honest. Propose one or ask Odin to.
+            </p>
           </div>
-        ))}
+        ) : (
+          ordered.map((dec) => (
+            <DecisionCard
+              key={dec.id}
+              decision={dec}
+              ordinal={ordinals.get(dec.id) ?? 0}
+              members={members}
+              onApprove={onApprove}
+              onReject={onReject}
+            />
+          ))
+        )}
       </div>
     </div>
   );

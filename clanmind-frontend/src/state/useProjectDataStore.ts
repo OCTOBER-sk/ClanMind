@@ -1,24 +1,41 @@
 import { create } from 'zustand';
-import type { Task, Decision, MemoryEntry, Notification, AiAction, GithubActionItem } from '@/types';
+import type {
+  Task,
+  Decision,
+  MemoryEntry,
+  MemoryCandidate,
+  Notification,
+  AiAction,
+  GithubActionItem,
+} from '@/types';
 
+/**
+ * Project-intelligence data (§47/§48/§35/§36 contract rows + notifications
+ * + §164A approvals). Runtime starts EMPTY; demo hydration (src/mocks) or
+ * the P8 controllers/dispatch projections fill these — never fixtures from
+ * live code paths.
+ */
 export interface ProjectDataState {
   tasks: Task[];
   decisions: Decision[];
   memories: MemoryEntry[];
-  memoryCandidates: Array<{ id: string; content: string; scope: string }>;
+  memoryCandidates: MemoryCandidate[];
   notifications: Notification[];
   /** §164A — generalized approval engine: any HIGH/CRITICAL AI action */
   aiActions: AiAction[];
 
-  addTask: (task: Task) => void;
-  updateTask: (taskId: string, updates: Partial<Task>) => void;
-  deleteTask: (taskId: string) => void;
+  setTasks: (tasks: Task[]) => void;
+  upsertTask: (task: Task) => void;
+  removeTask: (taskId: string) => void;
 
-  addDecision: (decision: Decision) => void;
-  updateDecision: (decisionId: string, updates: Partial<Decision>) => void;
+  setDecisions: (decisions: Decision[]) => void;
+  upsertDecision: (decision: Decision) => void;
 
-  addMemory: (memory: MemoryEntry) => void;
+  setMemories: (memories: MemoryEntry[]) => void;
+  upsertMemory: (memory: MemoryEntry) => void;
   deleteMemory: (memoryId: string) => void;
+  setMemoryCandidates: (candidates: MemoryCandidate[]) => void;
+  upsertMemoryCandidate: (candidate: MemoryCandidate) => void;
   removeMemoryCandidate: (candidateId: string) => void;
 
   markNotificationAsRead: (notificationId: string) => void;
@@ -38,7 +55,6 @@ export interface ProjectDataState {
 }
 
 export const useProjectDataStore = create<ProjectDataState>((set) => ({
-  // §11 — runtime starts empty; demo hydration (src/mocks) or live queries fill these.
   tasks: [],
   decisions: [],
   memories: [],
@@ -46,32 +62,39 @@ export const useProjectDataStore = create<ProjectDataState>((set) => ({
   notifications: [],
   aiActions: [],
 
-  addTask: (task) => set((state) => ({ tasks: [task, ...state.tasks] })),
-  updateTask: (taskId, updates) =>
+  setTasks: (tasks) => set({ tasks }),
+  upsertTask: (task) =>
     set((state) => ({
-      tasks: state.tasks.map((t) =>
-        t.id === taskId ? { ...t, ...updates, updated_at: new Date().toISOString() } : t
-      ),
+      tasks: state.tasks.some((t) => t.id === task.id)
+        ? state.tasks.map((t) => (t.id === task.id ? task : t))
+        : [task, ...state.tasks],
     })),
-  deleteTask: (taskId) =>
+  removeTask: (taskId) =>
+    set((state) => ({ tasks: state.tasks.filter((t) => t.id !== taskId) })),
+
+  setDecisions: (decisions) => set({ decisions }),
+  upsertDecision: (decision) =>
     set((state) => ({
-      tasks: state.tasks.filter((t) => t.id !== taskId),
+      decisions: state.decisions.some((d) => d.id === decision.id)
+        ? state.decisions.map((d) => (d.id === decision.id ? decision : d))
+        : [decision, ...state.decisions],
     })),
 
-  addDecision: (decision) =>
-    set((state) => ({ decisions: [decision, ...state.decisions] })),
-  updateDecision: (decisionId, updates) =>
+  setMemories: (memories) => set({ memories }),
+  upsertMemory: (memory) =>
     set((state) => ({
-      decisions: state.decisions.map((d) =>
-        d.id === decisionId ? { ...d, ...updates, updated_at: new Date().toISOString() } : d
-      ),
+      memories: state.memories.some((m) => m.id === memory.id)
+        ? state.memories.map((m) => (m.id === memory.id ? memory : m))
+        : [memory, ...state.memories],
     })),
-
-  addMemory: (memory) =>
-    set((state) => ({ memories: [memory, ...state.memories] })),
   deleteMemory: (memoryId) =>
+    set((state) => ({ memories: state.memories.filter((m) => m.id !== memoryId) })),
+  setMemoryCandidates: (memoryCandidates) => set({ memoryCandidates }),
+  upsertMemoryCandidate: (candidate) =>
     set((state) => ({
-      memories: state.memories.filter((m) => m.id !== memoryId),
+      memoryCandidates: state.memoryCandidates.some((c) => c.id === candidate.id)
+        ? state.memoryCandidates.map((c) => (c.id === candidate.id ? candidate : c))
+        : [candidate, ...state.memoryCandidates],
     })),
   removeMemoryCandidate: (candidateId) =>
     set((state) => ({

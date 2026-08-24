@@ -36,6 +36,7 @@ import {
   rejectGithubAction,
   fetchGithubActions,
 } from '@/api/endpoints/github';
+import { GITHUB_STATUS_LABEL } from '@/features/github/useGithubConnection';
 import { ApiError } from '@/api/errors';
 import { ContextInspector } from '@/features/artifacts/ContextInspector';
 import { ResearchDrawer } from '@/features/ai/ResearchDrawer';
@@ -44,8 +45,12 @@ import { SyncBanner } from '@/features/sync/SyncBanner';
 import { GarageView } from '@/features/garage/GarageView';
 import { ProjectOverview } from '@/features/projects/ProjectOverview';
 import { TasksView } from '@/features/tasks/TasksView';
+import { useTasksController } from '@/features/tasks/useTasksController';
 import { DecisionsView } from '@/features/decisions/DecisionsView';
+import { useDecisionsController } from '@/features/decisions/useDecisionsController';
+import { decisionOrdinals } from '@/features/decisions/decisionOrdinal';
 import { MemoryView } from '@/features/memory/MemoryView';
+import { useMemoryController } from '@/features/memory/useMemoryController';
 import { TeamView } from '@/features/team/TeamView';
 import { SettingsView } from '@/features/settings/SettingsView';
 import { ActivityView } from '@/features/notifications/ActivityView';
@@ -71,7 +76,7 @@ import { useProjectDataStore } from '@/state/useProjectDataStore';
 import { useUiStore } from '@/state/useUiStore';
 import { cn } from '@/design-system/utils';
 import { AlertOctagon, X } from 'lucide-react';
-import type { GroupRole, Message, Task, Decision, MainNavSection, MeetingCandidate } from '@/types';
+import type { GroupRole, Message, Task, MainNavSection, MeetingCandidate } from '@/types';
 import { applyWindowState, captureWindowState, checkForUpdate, installUpdate, restoreWindowState, saveWindowState } from '@/tauri/bridge';
 
 export function AppShell() {
@@ -163,11 +168,7 @@ export function AppShell() {
     memoryCandidates,
     notifications,
     aiActions,
-    addTask,
-    updateTask,
-    addDecision,
-    addMemory,
-    removeMemoryCandidate,
+    upsertMemory,
     updateAiAction,
   } = useProjectDataStore();
 
@@ -221,6 +222,31 @@ export function AppShell() {
     },
     [navigate, routeGroupId, projectForRoute],
   );
+
+  // ─── P8 — project-intelligence controllers: tasks (§111), decisions
+  // (§110) and memory (§108) all load through the real endpoint modules;
+  // optimistic mutations reconcile on §21.2 conflicts. ─────────────────────
+  const activeProjectId = projectForRoute?.id ?? null;
+  const tasksCtl = useTasksController(activeProjectId);
+  const decisionsCtl = useDecisionsController(activeProjectId);
+  const memoryCtl = useMemoryController(groupForRoute?.id, activeProjectId);
+
+  /** §120 — one ordinal derivation shared by views and the command palette. */
+  const decisionLabels = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const [id, n] of decisionOrdinals(decisions)) labels.set(id, `Decision #${n}`);
+    return labels;
+  }, [decisions]);
+
+  /** Deep-link navigation into a log section within the current context. */
+  const navigateToObject = useCallback(
+    (_kind: 'tasks' | 'decisions', objectId: string) => {
+      void objectId;
+      navigateToSection(_kind === 'tasks' ? 'tasks' : 'decisions');
+    },
+    [navigateToSection],
+  );
+
 
   // Keep store selection aligned with the route (single source of truth = URL).
   useEffect(() => {
@@ -311,14 +337,25 @@ export function AppShell() {
   const [threadRootId, setThreadRootId] = useState<string | null>(null);
   const [isJoinGroupDialogOpen, setJoinGroupDialogOpen] = useState(false);
 
-  // Quick Action Dialog States
+  // ─── §121/§122 quick-create dialogs. State mirrors the real form fields;
+  // source-message links stay visible in the dialog (the §48/§47 tables have
+  // no source column yet — recorded gap, D22). ──────────────────────────────
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDesc, setTaskDesc] = useState('');
+  const [taskOwnerId, setTaskOwnerId] = useState<string>('');
+  const [taskPriority, setTaskPriority] = useState<Task['priority']>('MEDIUM');
+  const [taskDue, setTaskDue] = useState<string>('');
+  const [taskProjectId, setTaskProjectId] = useState<string>('');
+  /** §121 — the message this dialog was opened from (kept as a link). */
+  const [taskSourcePreview, setTaskSourcePreview] = useState<string | null>(null);
 
   const [isDecisionModalOpen, setIsDecisionModalOpen] = useState(false);
   const [decisionTitle, setDecisionTitle] = useState('');
-  const [decisionReason, setDecisionReason] = useState('');
+  const [decisionContext, setDecisionContext] = useState('');
+  /** §122 Options — one per line; rides the POST body (D22 backend gap). */
+  const [decisionOptionsText, setDecisionOptionsText] = useState('');
+  const [decisionSourcePreview, setDecisionSourcePreview] = useState<string | null>(null);
 
   // §15 — switcher lists the current Group first, then recently visited ones
   // (§195 recents); unvisited Groups keep their original order at the end.
@@ -526,47 +563,33 @@ export function AppShell() {
 
   // (Send/retry/AI-trigger pipeline moved to features/chat/useChatController.ts — R1)
 
-  /** §124A.2: create the real object, wait for confirmation, then mark ACCEPTED */
+  /** §124A.2: create the real object through the §111/§110 endpoints, wait
+   *  for the server row, then mark the candidate ACCEPTED with its id. */
   const handleAcceptMeetingCandidate = async (c: MeetingCandidate) => {
+    if (!activeProjectId) {
+      toast({ title: 'Open a project context first', description: 'Candidates promote into the active Project.' });
+      return;
+    }
     if (c.candidate_type === 'DECISION') {
-      const id = `dec_${Date.now()}`;
-      addDecision({
-        id,
-        decision_number: decisions.length + 1,
-        group_id: groupForRoute?.id ?? '',
-        project_id: projectForRoute?.id ?? '',
-        title: c.content,
-        status: 'APPROVED',
-        approved_by_name: user?.name || 'Arun Kumar',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-      await new Promise((r) => setTimeout(r, 400));
-      updateCandidateStatus(c.id, 'ACCEPTED', { type: 'DECISION', id });
-      toast({ title: 'Decision saved', variant: 'success' });
+      const decision = await decisionsCtl.propose({ title: c.content.slice(0, 300) });
+      if (decision) {
+        updateCandidateStatus(c.id, 'ACCEPTED', { type: 'DECISION', id: decision.id });
+        toast({ title: 'Decision proposed', variant: 'success' });
+      }
       return;
     }
     if (c.candidate_type === 'TASK') {
-      const id = `task_${Date.now()}`;
-      addTask({
-        id,
-        group_id: groupForRoute?.id ?? '',
-        project_id: projectForRoute?.id ?? '',
-        title: c.content,
-        status: 'TODO',
-        priority: 'HIGH',
-        assignee_id: currentUserId,
-        assignee_name: user?.name || 'Arun Kumar',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+      const task = await tasksCtl.create({
+        title: c.content.slice(0, 300),
+        owner_user_id: currentUserId,
       });
-      await new Promise((r) => setTimeout(r, 400));
-      updateCandidateStatus(c.id, 'ACCEPTED', { type: 'TASK', id });
-      toast({ title: 'Task created', variant: 'success' });
+      if (task) {
+        updateCandidateStatus(c.id, 'ACCEPTED', { type: 'TASK', id: task.id });
+        toast({ title: 'Task created', variant: 'success' });
+      }
       return;
     }
     // OPEN_QUESTION / CONTRADICTION / RESEARCH_NEED / MILESTONE_CHANGE — addressed
-    await new Promise((r) => setTimeout(r, 300));
     updateCandidateStatus(c.id, 'ACCEPTED');
   };
 
@@ -668,7 +691,6 @@ export function AppShell() {
   /** §128: saved summary becomes a Garage artifact */
   const handleSaveMeetingSummary = () => {
     const groupName = activeGroup?.name || 'Group';
-    const now = new Date().toISOString();
     const sessionDecisions =
       currentSession?.candidates.filter(
         (c) => c.status === 'ACCEPTED' && c.candidate_type === 'DECISION'
@@ -677,17 +699,27 @@ export function AppShell() {
       currentSession?.candidates.filter(
         (c) => c.status === 'ACCEPTED' && c.candidate_type === 'TASK'
       ).length ?? 0;
-    addMemory({
+    const now = new Date().toISOString();
+    // §128 — the saved summary lands in Project memory as a LESSON row
+    // (proper Garage artifact creation is P9 scope).
+    upsertMemory({
       id: `mem_summary_${Date.now()}`,
+      scope_type: 'PROJECT',
       group_id: groupForRoute?.id ?? '',
-      project_id: activeProject?.id,
-      scope: 'PROJECT',
-      entry_type: 'LESSON',
-      title: `${groupName} — Meeting summary`,
-      content: `Meeting summary with ${decisions.length + sessionDecisions} decisions and ${tasks.length + sessionTasks} tasks.`,
-      source: 'meeting',
+      project_id: activeProjectId,
+      user_id: null,
+      memory_type: 'LESSON',
+      content: `${groupName} — Meeting summary with ${sessionDecisions} accepted decisions and ${sessionTasks} accepted tasks.`,
+      normalized_content: null,
+      confidence: 1,
+      importance: 0.7,
+      source_type: 'meeting',
+      source_id: currentSession?.id ?? null,
+      status: 'ACTIVE',
       created_at: now,
       updated_at: now,
+      last_used_at: null,
+      archived_at: null,
     });
     toast({ title: 'Meeting summary saved', description: 'Available in Garage as an artifact.' });
   };
@@ -706,60 +738,75 @@ export function AppShell() {
     closeRightPanel();
   }, [closeRightPanel]);
 
+  /** §121 — prefilled create-task form; the source message stays linked. */
   const handleCreateTaskFromMessage = (msg: Message) => {
     setTaskTitle(msg.body.slice(0, 60));
     setTaskDesc(msg.body);
+    setTaskOwnerId(currentUserId);
+    setTaskPriority('MEDIUM');
+    setTaskDue('');
+    setTaskProjectId(projectForRoute?.id ?? '');
+    setTaskSourcePreview(`${msg.sender_name}: ${msg.body.slice(0, 80)}`);
     setIsTaskModalOpen(true);
   };
 
-  const handleSaveTask = () => {
-    if (!taskTitle.trim()) return;
-    const newTask: Task = {
-      id: `task_${Date.now()}`,
-      group_id: groupForRoute?.id ?? '',
-      project_id: projectForRoute?.id ?? '',
-      title: taskTitle.trim(),
-      description: taskDesc.trim(),
-      status: 'TODO',
-      priority: 'HIGH',
-      assignee_id: currentUserId,
-      assignee_name: user?.name || 'Arun Kumar',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    addTask(newTask);
-    setIsTaskModalOpen(false);
-    setTaskTitle('');
-    setTaskDesc('');
-    toast({ title: 'Task created', variant: 'success' });
+  /** POST /projects/:id/tasks (+ CAS PATCH for priority/due) — no local
+   *  fabrication: the store row is the server's. Honors the dialog's
+   *  Project choice (§121). */
+  const handleSaveTask = async () => {
+    if (!taskTitle.trim() || !taskProjectId) return;
+    const created = await tasksCtl.createWithDetails(
+      {
+        title: taskTitle.trim(),
+        description: taskDesc.trim() || null,
+        owner_user_id: taskOwnerId === '' ? null : taskOwnerId,
+        priority: taskPriority,
+        due_at: taskDue ? new Date(taskDue).toISOString() : null,
+      },
+      taskProjectId,
+    );
+    if (created) {
+      setIsTaskModalOpen(false);
+      setTaskTitle('');
+      setTaskDesc('');
+      setTaskSourcePreview(null);
+      toast({ title: 'Task created', variant: 'success' });
+    } else {
+      toast({ title: 'Could not create the task', description: tasksCtl.error ?? undefined });
+    }
   };
 
+  /** §122 — prefilled propose-decision form; default status PROPOSED. */
   const handleCreateDecisionFromMessage = (msg: Message) => {
     setDecisionTitle(msg.body.slice(0, 60));
-    setDecisionReason(msg.body);
+    setDecisionContext(msg.body);
+    setDecisionOptionsText('');
+    setDecisionSourcePreview(`${msg.sender_name}: ${msg.body.slice(0, 80)}`);
     setIsDecisionModalOpen(true);
   };
 
-  const handleSaveDecision = () => {
+  const handleSaveDecision = async () => {
     if (!decisionTitle.trim()) return;
-    const newDec: Decision = {
-      id: `dec_${Date.now()}`,
-      decision_number: decisions.length + 1,
-      group_id: groupForRoute?.id ?? '',
-      project_id: projectForRoute?.id ?? '',
+    const options = decisionOptionsText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((label) => ({ label }));
+    const decision = await decisionsCtl.propose({
       title: decisionTitle.trim(),
-      status: 'PROPOSED',
-      reason: decisionReason.trim(),
-      approved_by_id: currentUserId,
-      approved_by_name: user?.name || 'Arun Kumar',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    addDecision(newDec);
-    setIsDecisionModalOpen(false);
-    setDecisionTitle('');
-    setDecisionReason('');
-    toast({ title: 'Decision proposed', variant: 'success' });
+      context: decisionContext.trim() || null,
+      options: options.length > 0 ? options : null,
+    });
+    if (decision) {
+      setIsDecisionModalOpen(false);
+      setDecisionTitle('');
+      setDecisionContext('');
+      setDecisionOptionsText('');
+      setDecisionSourcePreview(null);
+      toast({ title: 'Decision proposed', variant: 'success' });
+    } else {
+      toast({ title: 'Could not propose the decision', description: decisionsCtl.error ?? undefined });
+    }
   };
 
   // §193 — every notification/activity route is a real URL now; the router
@@ -1244,6 +1291,21 @@ export function AppShell() {
                 tasks={tasks}
                 decisions={decisions}
                 artifacts={artifacts}
+                members={members}
+                aiName={activeGroup?.ai_name || 'Odin'}
+                decisionLabels={decisionLabels}
+                githubSummary={
+                  githubConn.connection &&
+                  githubConn.connection.repo_full_name &&
+                  githubConn.status !== 'NOT_CONNECTED' &&
+                  githubConn.status !== 'DISCONNECTED'
+                    ? {
+                        statusLabel: GITHUB_STATUS_LABEL[githubConn.status],
+                        repoFullName: githubConn.connection.repo_full_name,
+                      }
+                    : null
+                }
+                recentActivity={notifications.slice(0, 3)}
                 onNavigateToSection={(s: MainNavSection) => navigateToSection(s)}
               />
             </ErrorBoundary>
@@ -1261,9 +1323,20 @@ export function AppShell() {
           {activeNavSection === 'tasks' && (
             <ErrorBoundary label="Tasks">
               <TasksView
-                tasks={tasks}
-                onAddTask={() => setIsTaskModalOpen(true)}
-                onUpdateStatus={(id, status) => updateTask(id, { status })}
+                tasks={tasksCtl.tasks.length > 0 ? tasksCtl.tasks : tasks.filter((t) => t.project_id === activeProjectId)}
+                members={members}
+                isLoading={tasksCtl.isLoading}
+                error={tasksCtl.error}
+                onAddTask={() => {
+                  setTaskProjectId(activeProjectId ?? '');
+                  setTaskSourcePreview(null);
+                  setIsTaskModalOpen(true);
+                }}
+                onSetStatus={(task, status) => void tasksCtl.setStatus(task, status)}
+                onAssign={(task, ownerId) => void tasksCtl.assign(task, ownerId)}
+                onComplete={(task) => void tasksCtl.complete(task)}
+                relatedDecisionLabels={decisionLabels}
+                onNavigateToDecision={(id) => navigateToObject('decisions', id)}
               />
             </ErrorBoundary>
           )}
@@ -1271,8 +1344,20 @@ export function AppShell() {
           {activeNavSection === 'decisions' && (
             <ErrorBoundary label="Decisions">
               <DecisionsView
-                decisions={decisions}
-                onAddDecision={() => setIsDecisionModalOpen(true)}
+                decisions={
+                  decisionsCtl.decisions.length > 0
+                    ? decisionsCtl.decisions
+                    : decisions.filter((d) => d.project_id === activeProjectId)
+                }
+                members={members}
+                isLoading={decisionsCtl.isLoading}
+                error={decisionsCtl.error}
+                onPropose={() => {
+                  setDecisionSourcePreview(null);
+                  setIsDecisionModalOpen(true);
+                }}
+                onApprove={(d) => void decisionsCtl.approve(d)}
+                onReject={(d) => void decisionsCtl.reject(d)}
               />
             </ErrorBoundary>
           )}
@@ -1282,25 +1367,20 @@ export function AppShell() {
               <MemoryView
                 memories={memories}
                 memoryCandidates={memoryCandidates}
-                onSaveCandidate={(candId) => {
-                  const cand = memoryCandidates.find((c) => c.id === candId);
-                  if (cand) {
-                    addMemory({
-                      id: `mem_${Date.now()}`,
-                      group_id: groupForRoute?.id ?? '',
-                      scope: 'PROJECT',
-                      entry_type: 'CONVENTION',
-                      title: 'Accepted Convention',
-                      content: cand.content,
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString(),
-                    });
-                    removeMemoryCandidate(candId);
-                    toast({ title: 'Memory saved', variant: 'success' });
-                  }
+                inProject={activeProjectId != null}
+                aiName={activeGroup?.ai_name || 'Odin'}
+                isLoading={memoryCtl.isLoading}
+                error={memoryCtl.error}
+                onSaveCandidate={(candId) => void memoryCtl.acceptCandidate(candId)}
+                onDismissCandidate={(candId) => void memoryCtl.dismissCandidate(candId)}
+                onAddMemory={(scope, type, content) => {
+                  void memoryCtl.createExplicitMemory({
+                    scope_type: scope,
+                    project_id: scope === 'PROJECT' ? activeProjectId : null,
+                    memory_type: type,
+                    content,
+                  });
                 }}
-                onDismissCandidate={removeMemoryCandidate}
-                onAddMemory={() => toast({ title: 'Add memory', description: 'Type "Remember this" in chat.' })}
               />
             </ErrorBoundary>
           )}
@@ -1476,7 +1556,9 @@ export function AppShell() {
       <CreateGroupDialog open={isCreateGroupDialogOpen} onOpenChange={setCreateGroupDialogOpen} />
       <JoinGroupDialog open={isJoinGroupDialogOpen} onOpenChange={setJoinGroupDialogOpen} />
 
-      {/* Quick Task Modal (§121) */}
+      {/* §121 Create-task dialog — Title/Description/Assignee/Priority/Due/
+          Project with the source-message link kept visible. Priority/Due ride
+          a follow-up CAS PATCH because the real POST body omits them. */}
       <Dialog
         open={isTaskModalOpen}
         onOpenChange={setIsTaskModalOpen}
@@ -1486,13 +1568,23 @@ export function AppShell() {
             <Button size="sm" variant="ghost" onClick={() => setIsTaskModalOpen(false)}>
               Cancel
             </Button>
-            <Button size="sm" variant="primary" onClick={handleSaveTask}>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => void handleSaveTask()}
+              disabled={!taskTitle.trim() || !taskProjectId || tasksCtl.isMutating}
+            >
               Create Task
             </Button>
           </>
         }
       >
         <div className="space-y-3 text-xs">
+          {taskSourcePreview && (
+            <div className="px-3 py-2 rounded-lg bg-[var(--color-surface-hover)] border border-[var(--color-border)] text-[10px] text-[var(--color-text-tertiary)] truncate">
+              From message · {taskSourcePreview}
+            </div>
+          )}
           <div>
             <label className="block font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
               Title
@@ -1500,6 +1592,7 @@ export function AppShell() {
             <input
               value={taskTitle}
               onChange={(e) => setTaskTitle(e.target.value)}
+              maxLength={300}
               className="w-full px-3 py-1.5 rounded-lg border outline-none"
               style={{
                 borderColor: 'var(--color-border-strong)',
@@ -1524,10 +1617,98 @@ export function AppShell() {
               }}
             />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="task-assignee" className="block font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+                Assignee
+              </label>
+              <select
+                id="task-assignee"
+                value={taskOwnerId}
+                onChange={(e) => setTaskOwnerId(e.target.value)}
+                className="w-full px-3 py-1.5 rounded-lg border outline-none"
+                style={{
+                  borderColor: 'var(--color-border-strong)',
+                  background: 'var(--color-surface-raised)',
+                  color: 'var(--color-text)',
+                }}
+              >
+                <option value="">Unassigned</option>
+                {members.map((m) => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {m.nickname || m.user.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="task-priority" className="block font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+                Priority
+              </label>
+              <select
+                id="task-priority"
+                value={taskPriority}
+                onChange={(e) => setTaskPriority(e.target.value as Task['priority'])}
+                className="w-full px-3 py-1.5 rounded-lg border outline-none"
+                style={{
+                  borderColor: 'var(--color-border-strong)',
+                  background: 'var(--color-surface-raised)',
+                  color: 'var(--color-text)',
+                }}
+              >
+                {(['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const).map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="task-due" className="block font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+                Due
+              </label>
+              <input
+                id="task-due"
+                type="date"
+                value={taskDue}
+                onChange={(e) => setTaskDue(e.target.value)}
+                className="w-full px-3 py-1.5 rounded-lg border outline-none"
+                style={{
+                  borderColor: 'var(--color-border-strong)',
+                  background: 'var(--color-surface-raised)',
+                  color: 'var(--color-text)',
+                }}
+              />
+            </div>
+            <div>
+              <label htmlFor="task-project" className="block font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+                Project
+              </label>
+              <select
+                id="task-project"
+                value={taskProjectId}
+                onChange={(e) => setTaskProjectId(e.target.value)}
+                className="w-full px-3 py-1.5 rounded-lg border outline-none"
+                style={{
+                  borderColor: 'var(--color-border-strong)',
+                  background: 'var(--color-surface-raised)',
+                  color: 'var(--color-text)',
+                }}
+              >
+                <option value="">Select a project…</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </Dialog>
 
-      {/* Quick Decision Modal (§122) */}
+      {/* §122 Propose-decision dialog — Title/Context/Options/Source; the
+          created decision always lands PROPOSED server-side. */}
       <Dialog
         open={isDecisionModalOpen}
         onOpenChange={setIsDecisionModalOpen}
@@ -1537,13 +1718,23 @@ export function AppShell() {
             <Button size="sm" variant="ghost" onClick={() => setIsDecisionModalOpen(false)}>
               Cancel
             </Button>
-            <Button size="sm" variant="primary" onClick={handleSaveDecision}>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => void handleSaveDecision()}
+              disabled={!decisionTitle.trim() || decisionsCtl.isMutating}
+            >
               Save Decision
             </Button>
           </>
         }
       >
-        <div className="space-y-3 text-xs">
+        <form className="space-y-3 text-xs" onSubmit={(e) => { e.preventDefault(); void handleSaveDecision(); }} id="propose-decision-form">
+          {decisionSourcePreview && (
+            <div className="px-3 py-2 rounded-lg bg-[var(--color-surface-hover)] border border-[var(--color-border)] text-[10px] text-[var(--color-text-tertiary)] truncate">
+              Source · {decisionSourcePreview}
+            </div>
+          )}
           <div>
             <label className="block font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
               Decision Title
@@ -1551,6 +1742,7 @@ export function AppShell() {
             <input
               value={decisionTitle}
               onChange={(e) => setDecisionTitle(e.target.value)}
+              maxLength={300}
               className="w-full px-3 py-1.5 rounded-lg border outline-none"
               style={{
                 borderColor: 'var(--color-border-strong)',
@@ -1561,12 +1753,13 @@ export function AppShell() {
           </div>
           <div>
             <label className="block font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
-              Rationale
+              Context
             </label>
             <textarea
-              value={decisionReason}
-              onChange={(e) => setDecisionReason(e.target.value)}
+              value={decisionContext}
+              onChange={(e) => setDecisionContext(e.target.value)}
               rows={3}
+              maxLength={8000}
               className="w-full px-3 py-1.5 rounded-lg border outline-none"
               style={{
                 borderColor: 'var(--color-border-strong)',
@@ -1575,7 +1768,32 @@ export function AppShell() {
               }}
             />
           </div>
-        </div>
+          <div>
+            <label
+              htmlFor="decision-options"
+              className="block font-semibold mb-1"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              Options <span style={{ color: 'var(--color-text-tertiary)' }}>(one per line)</span>
+            </label>
+            <textarea
+              id="decision-options"
+              value={decisionOptionsText}
+              onChange={(e) => setDecisionOptionsText(e.target.value)}
+              rows={2}
+              placeholder={'Option A\nOption B'}
+              className="w-full px-3 py-1.5 rounded-lg border outline-none"
+              style={{
+                borderColor: 'var(--color-border-strong)',
+                background: 'var(--color-surface-raised)',
+                color: 'var(--color-text)',
+              }}
+            />
+          </div>
+          <p className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+            New proposals start as PROPOSED and appear in the project&apos;s decision log for review.
+          </p>
+        </form>
       </Dialog>
     </div>
   );

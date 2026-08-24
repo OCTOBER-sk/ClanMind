@@ -519,39 +519,75 @@ export interface Artifact {
   deleted?: boolean;
 }
 
+/**
+ * BE §48 `tasks` row (exact column set; §21.2 optimistic concurrency via
+ * `version`). There is no group_id — a Task lives inside one Project.
+ */
 export interface Task {
   id: string;
-  group_id: string;
   project_id: string;
   title: string;
-  description?: string;
+  description?: string | null;
+  owner_user_id?: string | null;
   status: TaskStatus;
   priority: TaskPriority;
-  assignee_id?: string;
-  assignee_name?: string;
-  due_date?: string;
-  source_message_id?: string;
-  related_decision_id?: string;
+  due_at?: string | null;
+  version: number;
+  created_by_user_id?: string | null;
+  created_by_ai_id?: string | null;
   created_at: string;
   updated_at: string;
+  completed_at?: string | null;
+  /**
+   * §119 card anatomy renders "related decision". NOT a §48 column — the
+   * real backend has no task→decision link today, so this rides only when
+   * some surface provides it (demo dataset exercises the rendering). Live
+   * rows never fabricate it.
+   */
+  related_decision_id?: string;
 }
 
+/**
+ * BE §47 `decisions` row (exact column set; CAS on `version` for §110
+ * approve/reject).
+ */
 export interface Decision {
   id: string;
-  decision_number: number;
-  group_id: string;
   project_id: string;
   title: string;
+  context?: string | null;
+  options?: unknown;
+  selected_option?: unknown;
+  rationale?: string | null;
   status: DecisionStatus;
-  context?: string;
-  options?: string[];
-  reason?: string;
-  sources?: string[];
-  approved_by_id?: string;
-  approved_by_name?: string;
-  source_message_id?: string;
+  version: number;
+  proposed_by?: string | null;
+  approved_by?: string | null;
   created_at: string;
   updated_at: string;
+  approved_at?: string | null;
+  /**
+   * §120 card shows "Sources". The §47 table has no sources column, so this
+   * is a tolerated extension rendered only when present (demo fixtures
+   * exercise it); live rows render an honest absence instead of inventing
+   * citations.
+   */
+  sources?: string[];
+}
+
+/** BE §36 `memory_candidates` row. */
+export interface MemoryCandidate {
+  id: string;
+  group_id: string;
+  project_id?: string | null;
+  user_id?: string | null;
+  source_message_id?: string | null;
+  candidate_type: string;
+  content: string;
+  confidence: number;
+  recommended_scope: MemoryScope;
+  status: MemoryCandidateStatus;
+  created_at: string;
 }
 
 export interface MeetingCandidate {
@@ -581,18 +617,42 @@ export interface MeetingSession {
   candidates: MeetingCandidate[];
 }
 
+/**
+ * BE §35 `memories` row. `memory_type` is free text server-side; the FE
+ * §116 card vocabulary (DECISION/CONSTRAINT/CONVENTION/PREFERENCE/FINDING/
+ * LESSON) is the render-time set and unknown values render as a generic
+ * typed badge (generalized UI policy, never a crash).
+ */
 export interface MemoryEntry {
   id: string;
+  scope_type: MemoryScope;
   group_id: string;
-  project_id?: string;
-  scope: MemoryScope;
-  entry_type: 'DECISION' | 'CONSTRAINT' | 'CONVENTION' | 'PREFERENCE' | 'FINDING' | 'LESSON' | 'FACT';
-  title: string;
+  project_id?: string | null;
+  user_id?: string | null;
+  memory_type: string;
   content: string;
-  source?: string;
+  normalized_content?: string | null;
+  confidence: number;
+  importance: number;
+  source_type: string;
+  source_id?: string | null;
+  status: 'ACTIVE' | 'ARCHIVED' | 'SUPERSEDED';
   created_at: string;
   updated_at: string;
+  last_used_at?: string | null;
+  archived_at?: string | null;
 }
+
+/** FE §116 card-type vocabulary for memory badges. */
+export const MEMORY_CARD_TYPES = [
+  'DECISION',
+  'CONSTRAINT',
+  'CONVENTION',
+  'PREFERENCE',
+  'FINDING',
+  'LESSON',
+] as const;
+export type MemoryCardType = (typeof MEMORY_CARD_TYPES)[number];
 
 export interface AiAction {
   id: string;

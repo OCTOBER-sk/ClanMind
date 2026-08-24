@@ -29,8 +29,11 @@ import { useAiStreamStore } from '@/features/ai/aiStreamStore';
 import {
   useConstructionStore,
 } from '@/features/artifacts/constructionStore';
-import { MessageSchema } from '@/api/schemas';
+import { MessageSchema, TaskSchema, DecisionSchema, MemoryEntrySchema } from '@/api/schemas';
 import { mapMessageRow } from '@/api/messageRow';
+import { mapTaskRow } from '@/api/endpoints/tasks';
+import { mapDecisionRow } from '@/api/endpoints/decisions';
+import { mapMemoryRow } from '@/api/endpoints/memory';
 import type { AiRun, Artifact, DiagramContent, Message } from '@/types';
 import type { RealtimeEvent } from '@/realtime/events';
 
@@ -711,6 +714,119 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
       const store = useProjectDataStore.getState();
       const existing = store.aiActions.find((a) => a.id === actionId);
       if (existing) store.updateAiAction(actionId, { status: 'WAITING_APPROVAL' });
+      break;
+    }
+
+    // ─── P8 project-intelligence fan-out (BE §18 taxonomy) ──────────────────
+    //
+    // The real outbox publishes `task.created/updated/assigned/completed/
+    // cancelled`, `decision.proposed/approved/rejected/updated` and
+    // `memory.*` as notify-stubs (D15 related items) — often just ids. The
+    // projection therefore applies ONLY full rows it can validate; sparse
+    // stubs fall through unknown-type tolerance rather than half-rendering.
+    // Demo broadcasts carry complete rows so both modes share one pathway.
+
+    case 'task.created':
+    case 'task.updated': {
+      const row = (payload.task ?? payload) as Record<string, unknown>;
+      const parsed = TaskSchema.safeParse(row);
+      if (parsed.success && typeof parsed.data.id === 'string') {
+        useProjectDataStore.getState().upsertTask(mapTaskRow(parsed.data));
+      }
+      break;
+    }
+
+    case 'task.assigned':
+    case 'task.completed':
+    case 'task.cancelled': {
+      const row = payload.task as Record<string, unknown> | undefined;
+      if (row) {
+        const parsed = TaskSchema.safeParse(row);
+        if (parsed.success) {
+          useProjectDataStore.getState().upsertTask(mapTaskRow(parsed.data));
+          break;
+        }
+      }
+      // Stub {task_id} — flip an already-held row's status only when this
+      // client actually holds it; never fabricates a card from nothing.
+      const taskId = firstString(payload.task_id);
+      if (!taskId) break;
+      const store = useProjectDataStore.getState();
+      const held = store.tasks.find((t) => t.id === taskId);
+      if (!held) break;
+      if (event.event_type === 'task.completed') {
+        store.upsertTask({ ...held, status: 'DONE', completed_at: new Date().toISOString() });
+      } else if (event.event_type === 'task.cancelled') {
+        store.upsertTask({ ...held, status: 'CANCELLED' });
+      } else if (typeof payload.owner_user_id === 'string') {
+        store.upsertTask({ ...held, owner_user_id: payload.owner_user_id });
+      }
+      break;
+    }
+
+    case 'decision.proposed':
+    case 'decision.updated':
+    case 'decision.approved':
+    case 'decision.rejected': {
+      const row = (payload.decision ?? payload) as Record<string, unknown>;
+      const parsed = DecisionSchema.safeParse(row);
+      if (parsed.success && typeof parsed.data.id === 'string') {
+        useProjectDataStore.getState().upsertDecision(mapDecisionRow(parsed.data));
+      }
+      break;
+    }
+
+    case 'memory.candidate.created': {
+      const row = (payload.candidate ?? payload) as Record<string, unknown>;
+      const content = typeof row.content === 'string' ? row.content : '';
+      const id = typeof row.id === 'string' ? row.id : '';
+      if (!id || !content) break;
+      useProjectDataStore.getState().upsertMemoryCandidate({
+        id,
+        group_id: typeof row.group_id === 'string' ? row.group_id : event.group_id ?? '',
+        project_id: typeof row.project_id === 'string' ? row.project_id : null,
+        user_id: typeof row.user_id === 'string' ? row.user_id : null,
+        source_message_id: typeof row.source_message_id === 'string' ? row.source_message_id : null,
+        candidate_type: typeof row.candidate_type === 'string' ? row.candidate_type : 'FACT',
+        content,
+        confidence: typeof row.confidence === 'number' ? row.confidence : 0.5,
+        recommended_scope:
+          row.recommended_scope === 'GROUP' || row.recommended_scope === 'USER_PRIVATE'
+            ? row.recommended_scope
+            : 'PROJECT',
+        status: 'PENDING',
+        created_at: typeof row.created_at === 'string' ? row.created_at : new Date().toISOString(),
+      });
+      break;
+    }
+
+    case 'memory.approved': {
+      // Acceptance fan-out: full memory row merges; the originating candidate
+      // leaves the pending list.
+      const row = (payload.memory ?? payload) as Record<string, unknown>;
+      const parsed = MemoryEntrySchema.safeParse(row);
+      if (parsed.success && typeof parsed.data.id === 'string') {
+        useProjectDataStore.getState().upsertMemory(mapMemoryRow(parsed.data));
+      }
+      const candidateId = firstString(payload.candidate_id);
+      if (candidateId) useProjectDataStore.getState().removeMemoryCandidate(candidateId);
+      break;
+    }
+
+    case 'memory.updated': {
+      const row = (payload.memory ?? payload) as Record<string, unknown>;
+      const parsed = MemoryEntrySchema.safeParse(row);
+      if (parsed.success && typeof parsed.data.id === 'string') {
+        useProjectDataStore.getState().upsertMemory(mapMemoryRow(parsed.data));
+      }
+      break;
+    }
+
+    case 'memory.archived':
+    case 'memory.deleted': {
+      const memoryId =
+        firstString(payload.memory_id, (payload.memory as Record<string, unknown> | undefined)?.id) ?? '';
+      if (memoryId) useProjectDataStore.getState().deleteMemory(memoryId);
       break;
     }
 

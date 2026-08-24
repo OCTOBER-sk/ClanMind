@@ -12,6 +12,7 @@ import {
   FileText,
 } from 'lucide-react';
 import type { Project, Artifact, Task, Decision, Message, GroupMember } from '@/types';
+import { decisionOrdinals } from '@/features/decisions/decisionOrdinal';
 import { cn } from '../utils';
 
 // §310: CommandPalette is a design-system primitive.
@@ -56,6 +57,14 @@ export function CommandPalette({
   onSelectMessage,
   onSelectMember,
 }: CommandPaletteProps) {
+
+  // §120 numbering — one derivation shared with DecisionsView/Overview.
+  const decisionLabels = React.useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const [id, n] of decisionOrdinals(decisions)) labels.set(id, `Decision #${n}`);
+    return labels;
+  }, [decisions]);
+
   // §63: Ctrl/Cmd + K — search/commands entry
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -257,7 +266,7 @@ export function CommandPalette({
                   >
                     <Bookmark className="w-4 h-4 text-[var(--color-success)]" aria-hidden="true" />
                     <span>
-                      Decision #{d.decision_number}: {d.title}
+                      {decisionLabels.get(d.id) ?? 'Decision'}: {d.title}
                     </span>
                   </Command.Item>
                 ))}

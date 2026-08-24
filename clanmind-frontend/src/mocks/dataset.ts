@@ -13,6 +13,7 @@ import type {
   Task,
   Decision,
   MemoryEntry,
+  MemoryCandidate,
   NotificationItem,
   AiAction,
   Artifact,
@@ -29,10 +30,14 @@ export interface DemoDataset {
   projects: Project[];
   members: GroupMember[];
   messages: Message[];
+  /** §48 contract rows. */
   tasks: Task[];
+  /** §47 contract rows. */
   decisions: Decision[];
+  /** §35 typed memory rows. */
   memories: MemoryEntry[];
-  memoryCandidates: Array<{ id: string; content: string; scope: string }>;
+  /** §36 PENDING candidate rows. */
+  memoryCandidates: MemoryCandidate[];
   notifications: NotificationItem[];
   aiActions: AiAction[];
   artifacts: Artifact[];
@@ -222,139 +227,237 @@ export function createDemoDataset(): DemoDataset {
     },
   ];
 
+  // ─── §48 tasks — exact BE column set (owner_user_id, due_at, version) ────
   const tasks: Task[] = [
     {
       id: 'task_1',
-      group_id: groups[0]!.id,
       project_id: projects[0]!.id,
       title: 'Configure DMA1 Stream 0 circular ring buffer for SPI1 RX',
       description:
         'Implement double-buffered circular DMA reception into SRAM1 memory space with EXTI line 1 interrupt handler.',
+      owner_user_id: 'user_priya_2',
       status: 'IN_PROGRESS',
       priority: 'HIGH',
-      assignee_id: 'user_priya_2',
-      assignee_name: 'Priya Sharma',
-      due_date: new Date(now + 2 * DAY).toISOString(),
+      due_at: new Date(now + 2 * DAY).toISOString(),
+      version: 2,
+      created_by_user_id: currentUser.id,
+      created_by_ai_id: null,
       created_at: new Date(now - DAY).toISOString(),
       updated_at: new Date(now - DAY).toISOString(),
+      completed_at: null,
     },
     {
       id: 'task_2',
-      group_id: groups[0]!.id,
       project_id: projects[0]!.id,
       title: 'Bench test 1 kHz sensor telemetry loop under vibration load',
-      description: 'Verify zero packet drops and consistent attitude timestamping on the hardware shaker table.',
+      description:
+        'Verify zero packet drops and consistent attitude timestamping on the hardware shaker table.',
+      owner_user_id: 'user_marcus_3',
       status: 'TODO',
       priority: 'MEDIUM',
-      assignee_id: 'user_marcus_3',
-      assignee_name: 'Marcus Vance',
-      due_date: new Date(now + 5 * DAY).toISOString(),
+      due_at: new Date(now + 5 * DAY).toISOString(),
+      version: 1,
+      created_by_user_id: currentUser.id,
+      created_by_ai_id: null,
       created_at: new Date(now - 2 * DAY).toISOString(),
       updated_at: new Date(now - 2 * DAY).toISOString(),
+      completed_at: null,
     },
     {
       id: 'task_3',
-      group_id: groups[0]!.id,
       project_id: projects[0]!.id,
       title: 'Approve & Merge GitHub PR #4 (feat/spi-dma-driver)',
       description: 'Review firmware diff and approve hardware merge into main branch.',
+      owner_user_id: currentUser.id,
       status: 'TODO',
       priority: 'HIGH',
-      assignee_id: currentUser.id,
-      assignee_name: currentUser.name,
+      due_at: null,
+      version: 1,
+      created_by_user_id: currentUser.id,
+      created_by_ai_id: null,
       created_at: new Date(now).toISOString(),
       updated_at: new Date(now).toISOString(),
+      completed_at: null,
+      // §119 "related decision" — demo-only extension (no §48 column; D22).
+      related_decision_id: 'dec_1',
     },
     {
       id: 'task_4',
-      group_id: groups[0]!.id,
       project_id: projects[0]!.id,
       title: 'Initial SPI clock polarity (CPOL) and phase (CPHA) validation',
       description: 'Verified with logic analyzer: SPI Mode 3 (CPOL=1, CPHA=1) active.',
+      owner_user_id: currentUser.id,
       status: 'DONE',
       priority: 'MEDIUM',
-      assignee_id: currentUser.id,
-      assignee_name: currentUser.name,
+      due_at: null,
+      version: 2,
+      created_by_user_id: currentUser.id,
+      created_by_ai_id: null,
       created_at: new Date(now - 4 * DAY).toISOString(),
       updated_at: new Date(now - 3 * DAY).toISOString(),
+      completed_at: new Date(now - 3 * DAY).toISOString(),
     },
   ];
 
+  // ─── §47 decisions — exact BE column set (rationale, CAS version) ────────
   const decisions: Decision[] = [
     {
       id: 'dec_1',
-      decision_number: 1,
-      group_id: groups[0]!.id,
       project_id: projects[0]!.id,
       title: 'Adopt SPI DMA over I2C for IMU Sensor Telemetry',
+      context:
+        'I2C bus arbitration introduced 150 µs jitter per cycle, violating the 1 kHz attitude control deadline.',
+      options: [
+        { label: 'SPI + DMA', note: '24 MHz, circular buffer into SRAM1' },
+        { label: 'I2C Fast Mode', note: '400 kHz, shared bus' },
+      ],
+      selected_option: { label: 'SPI + DMA' },
+      rationale:
+        'SPI DMA at 24 MHz with circular buffering reduces latency to 6.5 µs with zero CPU blocking.',
       status: 'APPROVED',
-      context: 'I2C bus arbitration introduced 150 µs jitter per cycle, violating the 1 kHz attitude control deadline.',
-      reason: 'SPI DMA at 24 MHz with circular buffering reduces latency to 6.5 µs with zero CPU blocking.',
-      approved_by_id: currentUser.id,
-      approved_by_name: currentUser.name,
+      version: 2,
+      proposed_by: 'odin_ai',
+      approved_by: currentUser.id,
+      approved_at: new Date(now - 2 * DAY).toISOString(),
+      // §120 "Sources" — tolerated extension, not a §47 column (D22).
       sources: ['ICM-42688P Datasheet Rev 1.2', 'STM32H7 Reference Manual RM0433'],
       created_at: new Date(now - 2 * DAY).toISOString(),
       updated_at: new Date(now - 2 * DAY).toISOString(),
     },
     {
       id: 'dec_2',
-      decision_number: 2,
-      group_id: groups[0]!.id,
       project_id: projects[0]!.id,
       title: 'Allocate SRAM1 for Real-Time Telemetry Ring Buffers',
+      context:
+        'AXI SRAM contention between Cortex-M7 D-Cache and DMA caused intermittent cache coherency stalls.',
+      options: [{ label: 'SRAM1 placement' }, { label: 'MPU non-cacheable AXI region' }],
+      selected_option: { label: 'SRAM1 placement' },
+      rationale:
+        'Placing DMA buffers in dedicated SRAM1 (D2 domain) eliminates cache invalidation requirements.',
       status: 'APPROVED',
-      context: 'AXI SRAM contention between Cortex-M7 D-Cache and DMA caused intermittent cache coherency stalls.',
-      reason: 'Placing DMA buffers in dedicated SRAM1 (D2 domain) eliminates cache invalidation requirements.',
-      approved_by_id: 'user_priya_2',
-      approved_by_name: 'Priya Sharma',
+      version: 2,
+      proposed_by: 'user_priya_2',
+      approved_by: 'user_priya_2',
+      approved_at: new Date(now - 3 * DAY).toISOString(),
       sources: ['AN5280: STM32H7 DMA Coherency Guidelines'],
       created_at: new Date(now - 3 * DAY).toISOString(),
       updated_at: new Date(now - 3 * DAY).toISOString(),
     },
+    {
+      id: 'dec_3',
+      project_id: projects[0]!.id,
+      title: 'Route flash logging over a dedicated SPI bus (SPI4)',
+      context:
+        'Sharing SPI1 with the IMU risks stalling the 1 kHz telemetry ring during page writes.',
+      rationale: null,
+      status: 'PROPOSED',
+      version: 1,
+      proposed_by: currentUser.id,
+      approved_by: null,
+      approved_at: null,
+      created_at: new Date(now - 6 * HOUR).toISOString(),
+      updated_at: new Date(now - 6 * HOUR).toISOString(),
+    },
   ];
 
+  // ─── §35 memories — typed rows with scope/provenance/confidence ──────────
   const memories: MemoryEntry[] = [
     {
       id: 'mem_1',
+      scope_type: 'PROJECT',
       group_id: groups[0]!.id,
       project_id: projects[0]!.id,
-      scope: 'PROJECT',
-      entry_type: 'CONVENTION',
-      title: 'STM32 Peripheral Clocks Rule',
-      content: 'All high-speed SPI peripherals on APB2 must maintain clock division <= /2 to preserve signal integrity.',
-      source: 'Discussion with Marcus Vance',
+      user_id: null,
+      memory_type: 'CONVENTION',
+      content:
+        'All high-speed SPI peripherals on APB2 must maintain clock division <= /2 to preserve signal integrity.',
+      normalized_content: null,
+      confidence: 0.92,
+      importance: 0.8,
+      source_type: 'conversation',
+      source_id: 'msg_2',
+      status: 'ACTIVE',
       created_at: new Date(now - 5 * DAY).toISOString(),
       updated_at: new Date(now - 5 * DAY).toISOString(),
+      last_used_at: null,
+      archived_at: null,
     },
     {
       id: 'mem_2',
+      scope_type: 'PROJECT',
       group_id: groups[0]!.id,
       project_id: projects[0]!.id,
-      scope: 'PROJECT',
-      entry_type: 'CONSTRAINT',
-      title: 'Attitude Loop Frequency Ceiling',
-      content: 'Attitude PID loop is strictly hard-coded to 1,000 Hz. Filter delays must remain below 3 ms.',
-      source: 'Odin Research Evaluation',
+      user_id: null,
+      memory_type: 'CONSTRAINT',
+      content:
+        'Attitude PID loop is strictly hard-coded to 1,000 Hz. Filter delays must remain below 3 ms.',
+      normalized_content: null,
+      confidence: 0.99,
+      importance: 0.95,
+      source_type: 'ai_research',
+      source_id: null,
+      status: 'ACTIVE',
       created_at: new Date(now - 4 * DAY).toISOString(),
       updated_at: new Date(now - 4 * DAY).toISOString(),
+      last_used_at: null,
+      archived_at: null,
     },
     {
       id: 'mem_3',
+      scope_type: 'GROUP',
       group_id: groups[0]!.id,
-      scope: 'GROUP',
-      entry_type: 'FACT',
-      title: 'Hardware Revision Target',
+      project_id: null,
+      user_id: null,
+      memory_type: 'FACT',
       content: 'Current prototype boards are Hardware Rev B with STM32H743VIT6 480 MHz chip.',
+      normalized_content: null,
+      confidence: 0.85,
+      importance: 0.6,
+      source_type: 'conversation',
+      source_id: null,
+      status: 'ACTIVE',
       created_at: new Date(now - 7 * DAY).toISOString(),
       updated_at: new Date(now - 7 * DAY).toISOString(),
+      last_used_at: null,
+      archived_at: null,
+    },
+    {
+      id: 'mem_4_private',
+      scope_type: 'USER_PRIVATE',
+      group_id: groups[0]!.id,
+      project_id: null,
+      user_id: currentUser.id,
+      memory_type: 'PREFERENCE',
+      content:
+        'Prefers datasheet-first reviews; cite register names when proposing peripheral configs.',
+      normalized_content: null,
+      confidence: 0.75,
+      importance: 0.5,
+      source_type: 'explicit',
+      source_id: null,
+      status: 'ACTIVE',
+      created_at: new Date(now - 6 * DAY).toISOString(),
+      updated_at: new Date(now - 6 * DAY).toISOString(),
+      last_used_at: null,
+      archived_at: null,
     },
   ];
 
-  const memoryCandidates: DemoDataset['memoryCandidates'] = [
+  // ─── §36 candidates — PENDING rows Odin proposed for confirmation ────────
+  const memoryCandidates: MemoryCandidate[] = [
     {
       id: 'cand_1',
-      content: 'Always disable SPI peripheral before reconfiguring DMA stream registers to avoid bus locking.',
-      scope: 'PROJECT',
+      group_id: groups[0]!.id,
+      project_id: projects[0]!.id,
+      user_id: null,
+      source_message_id: 'msg_2',
+      candidate_type: 'CONSTRAINT',
+      content:
+        'Always disable the SPI peripheral before reconfiguring DMA stream registers to avoid bus locking.',
+      confidence: 0.71,
+      recommended_scope: 'PROJECT',
+      status: 'PENDING',
+      created_at: new Date(now - HOUR).toISOString(),
     },
   ];
 

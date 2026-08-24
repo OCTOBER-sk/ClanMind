@@ -140,14 +140,21 @@ function resolveObjectLocation(kind: ObjectKind, id: string): string | null {
     return shellPath(a.group_id, a.project_id ?? undefined);
   }
   if (kind === 'task') {
+    // §48 — tasks carry no group_id; the enclosing Project resolves it.
     const t = useProjectDataStore.getState().tasks.find((x) => x.id === id);
     if (!t) return null;
-    return shellPath(t.group_id, t.project_id);
+    const group = useGroupStore
+      .getState()
+      .projects.find((p) => p.id === t.project_id)?.group_id;
+    return shellPath(group ?? '', t.project_id);
   }
   if (kind === 'decision') {
     const d = useProjectDataStore.getState().decisions.find((x) => x.id === id);
     if (!d) return null;
-    return shellPath(d.group_id, d.project_id);
+    const group = useGroupStore
+      .getState()
+      .projects.find((p) => p.id === d.project_id)?.group_id;
+    return shellPath(group ?? '', d.project_id);
   }
   // Meetings resolve through the session list in P9; safest shared surface now.
   const g = useGroupStore.getState().activeGroup ?? useGroupStore.getState().groups[0];

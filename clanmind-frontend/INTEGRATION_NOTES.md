@@ -352,3 +352,63 @@ handlers; the diff viewer opens via `onViewDiff` (no fetch-back).
   Tasks/Decisions/GitHub remain phase-scoped per D15's related items).
 
 
+
+---
+
+## 2026-08-24 — P8 tasks, decisions, memory, pulse (FE §83–86, §116–122; BE §108/§110/§111)
+
+### D22 — Endpoint parity: Tasks/Decisions/Memory REST all hit REAL contracts
+The P8 surfaces read/write through new §9 endpoint modules (`api/endpoints/
+tasks.ts`, `decisions.ts`, `memory.ts`) mirroring handlers/intel.ts and
+handlers/memory.ts exactly; every response is zod-validated at the boundary.
+Demo `transportRoutes` reproduces each shape over the dataset.
+
+| FE surface | Endpoint | BE contract | Demo parity |
+|---|---|---|---|
+| Task list / create | `GET`/`POST /projects/:p/tasks` → `{items}` / 201 row | §111 (server defaults TODO · MEDIUM · version 1) | identical incl. VALIDATION_FAILED on title 0/300+ |
+| Status / owner / due edits | `PATCH /tasks/:id {expected_version, patch}` | §48 + §21.2 CAS | stale version → 409 CONFLICT "Task changed elsewhere; reload and retry." |
+| Complete | `POST /tasks/:id/complete {expected_version}` | §111 | CAS-guarded; stamps completed_at |
+| Decision log / propose | `GET`/`POST /projects/:p/decisions` | §110 (always PROPOSED v1) | identical |
+| Approve / reject | `POST /decisions/:id/approve\|reject {expected_version}` | §21.2 CAS from PROPOSED | approve supersedes sibling APPROVED rows + stamps approver/approved_at; stale → 409 "Decision changed; reload and retry." |
+| Group memory | `GET /groups/:g/memory` → GROUP-scope rows only | §108 (mirrors listGroupMemories) | identical scope filter |
+| Project memory | `GET /projects/:p/memory` → PROJECT-scope rows only | §108 | identical |
+| Candidates | `GET /groups/:g/memory/candidates` (PENDING) | §36 | identical |
+| Save candidate | `POST /memory/:candId/accept` → 201 memory row | §108 (scope/type/confidence ride recommended values) | identical; second accept 404s like the handler |
+| Dismiss candidate | `POST /memory/:candId/reject` → `{ok}` | §108 | identical |
+| Edit / delete memory | `PATCH`/`DELETE /memory/:memoryId` | §108 (content/importance/confidence ranges) | identical validation messages |
+
+**Realtime fan-out:** dispatch now projects the full §18 vocabulary
+(`task.created/updated/assigned/completed/cancelled`,
+`decision.proposed/approved/rejected/updated`,
+`memory.candidate.created/approved/updated/archived/deleted`). The real
+backend's payloads are notify-stubs today (D15 related item), so projections
+apply ONLY full validated rows; sparse stubs flip statuses of already-held
+rows or are ignored — nothing half-rendered. Demo broadcasts carry complete
+rows so both modes share one pathway.
+
+### Honest gaps recorded this pass (nothing papered over)
+1. **USER_PRIVATE memory has no list route.** §108 documents ownership
+   enforcement but the Worker ships no private-memory feed. The §116 "Your
+   Private Memory" section renders client-held rows only and stays empty in
+   live mode until the backend exposes it.
+2. **No user-initiated memory create endpoint** (FE §118 "Remember this").
+   `createMemory()` posts to `POST /groups/:g/memory`, a DEMO-PARITY route;
+   live mode surfaces the honest NOT_FOUND instead of faking a save.
+3. **§119 related decision / §120 sources have no §47/§48 columns.**
+   `related_decision_id` and `sources` render only when a row carries them
+   (demo fixtures exercise both); live rows show an honest absence.
+4. **§122 `options` rides the propose body but the real create handler does
+   not parse it yet** — same shape as message `attachment_ids` (D16). Demo
+   persists into the §47 jsonb column; live drops it silently server-side.
+5. **§121 source-message links stay client-side.** The §48/§47 tables carry
+   no source column, so the dialog keeps the link visible but cannot persist
+   it; no invented column shipped.
+6. **Decision numbering is derived** — chronological log position per
+   project (oldest = #1), one shared derivation for Decisions view,
+   Overview, command palette. No `decision_number` column exists.
+7. **Pulse/digest:** FE spec defines Pulse only as part of Project Overview
+   (§84–85); there is no separate digest surface, so none was built. The §84
+   Odin notice count is computed from the real decision log (was hardcoded).
+8. **Memory pinning is SPEC-SILENT** — FE §116 lists no pin affordance for
+   memory items; none was added. (Pinning exists for artifacts §257 and
+   messages §33, both previously wired.)

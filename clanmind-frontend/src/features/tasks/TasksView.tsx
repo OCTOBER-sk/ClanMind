@@ -1,23 +1,62 @@
-﻿import React, { useState } from 'react';
-import { Plus, Calendar, User as UserIcon } from 'lucide-react';
+﻿/**
+ * Tasks view (FE §82 project section + §119). Renders the Project-scoped
+ * §48 task list with status filters, the §119 card anatomy and compact
+ * interactions. Empty states follow §179: what is empty, why it matters,
+ * what to do next.
+ */
+
+import React, { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { TaskCard } from './TaskCard';
 import { Button } from '@/design-system/components/Button';
-import { Badge } from '@/design-system/components/Badge';
 import { cn } from '@/design-system/utils';
-import type { Task, TaskStatus } from '@/types';
+import type { GroupMember, Task, TaskStatus } from '@/types';
 
 export interface TasksViewProps {
   tasks: Task[];
+  members: GroupMember[];
+  isLoading?: boolean;
+  error?: string | null;
   onAddTask: () => void;
-  onUpdateStatus: (taskId: string, status: TaskStatus) => void;
+  onSetStatus: (task: Task, status: TaskStatus) => void;
+  onAssign: (task: Task, ownerUserId: string | null) => void;
+  onComplete: (task: Task) => void;
+  /** decisionId → "Decision #3" label for §119 related-decision links. */
+  relatedDecisionLabels?: Map<string, string>;
+  onNavigateToDecision?: (decisionId: string) => void;
 }
 
-export function TasksView({ tasks, onAddTask, onUpdateStatus }: TasksViewProps) {
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+const FILTERS: Array<{ key: 'all' | TaskStatus; label: string }> = [
+  { key: 'all', label: 'All' },
+  { key: 'TODO', label: 'To Do' },
+  { key: 'IN_PROGRESS', label: 'In Progress' },
+  { key: 'DONE', label: 'Done' },
+  { key: 'CANCELLED', label: 'Cancelled' },
+];
 
-  const filteredTasks = tasks.filter((t) => {
-    if (filterStatus === 'all') return true;
-    return t.status === filterStatus;
-  });
+export function TasksView({
+  tasks,
+  members,
+  isLoading,
+  error,
+  onAddTask,
+  onSetStatus,
+  onAssign,
+  onComplete,
+  relatedDecisionLabels,
+  onNavigateToDecision,
+}: TasksViewProps) {
+  const [filterStatus, setFilterStatus] = useState<'all' | TaskStatus>('all');
+
+  const filteredTasks = useMemo(
+    () =>
+      tasks
+        .filter((t) => (filterStatus === 'all' ? true : t.status === filterStatus))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    [tasks, filterStatus],
+  );
+
+  const openCount = tasks.filter((t) => t.status === 'TODO' || t.status === 'IN_PROGRESS').length;
 
   return (
     <div className="flex flex-col h-full bg-[var(--color-surface-raised)] overflow-hidden">
@@ -26,7 +65,7 @@ export function TasksView({ tasks, onAddTask, onUpdateStatus }: TasksViewProps) 
         <div>
           <h1 className="text-xl font-bold text-[var(--color-text)]">Tasks</h1>
           <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Track and manage actionable engineering tasks linked to team decisions.
+            {openCount} open · actionable work linked to team decisions.
           </p>
         </div>
         <Button
@@ -40,81 +79,90 @@ export function TasksView({ tasks, onAddTask, onUpdateStatus }: TasksViewProps) 
       </div>
 
       {/* Filter Chips */}
-      <div className="flex items-center gap-2 px-6 py-3 border-b border-[var(--color-border)] bg-gray-50/50 dark:bg-gray-950">
-        {['all', 'TODO', 'IN_PROGRESS', 'DONE'].map((st) => (
-          <button
-            key={st}
-            onClick={() => setFilterStatus(st)}
-            className={cn(
-              'px-3 py-1 text-xs font-semibold rounded-lg capitalize transition-colors cursor-pointer',
-              filterStatus === st
-                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                : 'text-[var(--color-text-secondary)] hover:bg-gray-200 dark:hover:bg-gray-800'
-            )}
-          >
-            {st.replace('_', ' ')}
-          </button>
-        ))}
+      <div className="flex items-center gap-2 px-6 py-3 border-b border-[var(--color-border)]">
+        {FILTERS.map((f) => {
+          const count =
+            f.key === 'all' ? tasks.length : tasks.filter((t) => t.status === f.key).length;
+          return (
+            <button
+              key={f.key}
+              onClick={() => setFilterStatus(f.key)}
+              aria-pressed={filterStatus === f.key}
+              data-testid={`filter-${f.key}`}
+              className={cn(
+                'px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer',
+                filterStatus === f.key
+                  ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                  : 'text-[var(--color-text-secondary)] hover:bg-gray-200 dark:hover:bg-gray-800',
+              )}
+            >
+              {f.label} ({count})
+            </button>
+          );
+        })}
       </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="px-6 py-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-b border-red-100 dark:border-red-900"
+        >
+          {error}
+        </div>
+      )}
 
       {/* Task List */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-3">
-        {filteredTasks.map((task) => (
-          <div
-            key={task.id}
-            className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-2xs hover:border-gray-400 dark:hover:border-gray-600 transition-colors flex items-center justify-between text-xs"
-          >
-            <div className="space-y-1 max-w-xl">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-[var(--color-text)]">
-                  {task.title}
-                </span>
-                <Badge
-                  variant={
-                    task.priority === 'HIGH'
-                      ? 'danger'
-                      : task.priority === 'MEDIUM'
-                      ? 'warning'
-                      : 'neutral'
-                  }
-                  size="sm"
-                >
-                  {task.priority}
-                </Badge>
-              </div>
-              {task.description && (
-                <p className="text-gray-500 text-[11px] leading-relaxed line-clamp-2">
-                  {task.description}
-                </p>
-              )}
-              <div className="flex items-center gap-4 text-[10px] text-gray-400 pt-1">
-                <span className="flex items-center gap-1">
-                  <UserIcon className="w-3 h-3" /> {task.assignee_name || 'Unassigned'}
-                </span>
-                {task.due_date && (
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3" /> Due {new Date(task.due_date).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Status Select Buttons */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <select
-                value={task.status}
-                onChange={(e) => onUpdateStatus(task.id, e.target.value as TaskStatus)}
-                className="px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-[var(--color-surface-raised)] text-xs font-semibold text-[var(--color-text-secondary)] outline-none cursor-pointer"
-              >
-                <option value="TODO">To Do</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="DONE">Done</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
-            </div>
-          </div>
-        ))}
+      <div className="flex-1 overflow-y-auto p-6 space-y-3" aria-busy={isLoading}>
+        {isLoading && filteredTasks.length === 0 ? (
+          <p className="text-center py-12 text-gray-400 text-xs">Loading tasks…</p>
+        ) : filteredTasks.length === 0 ? (
+          <EmptyTasks filterStatus={filterStatus} onAddTask={onAddTask} />
+        ) : (
+          filteredTasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              members={members}
+              onSetStatus={onSetStatus}
+              onAssign={onAssign}
+              onComplete={onComplete}
+              relatedDecisionLabel={
+                task.related_decision_id
+                  ? relatedDecisionLabels?.get(task.related_decision_id) ?? null
+                  : null
+              }
+              onNavigateToDecision={onNavigateToDecision}
+            />
+          ))
+        )}
       </div>
+    </div>
+  );
+}
+
+/** §179 — empty state explains what / why / next. */
+function EmptyTasks({
+  filterStatus,
+  onAddTask,
+}: {
+  filterStatus: string;
+  onAddTask: () => void;
+}) {
+  return (
+    <div className="text-center py-12 space-y-1" data-testid="tasks-empty">
+      <p className="text-sm font-semibold text-[var(--color-text)]">
+        {filterStatus === 'all'
+          ? 'No tasks in this project yet.'
+          : `No ${filterStatus.replace('_', ' ').toLowerCase()} tasks.`}
+      </p>
+      <p className="text-xs text-[var(--color-text-secondary)] max-w-sm mx-auto leading-relaxed">
+        Tasks track the concrete work your decisions create — assign owners and due dates so nothing drifts.
+      </p>
+      {filterStatus === 'all' && (
+        <Button size="sm" variant="ghost" onClick={onAddTask} className="mt-2">
+          Create the first task
+        </Button>
+      )}
     </div>
   );
 }

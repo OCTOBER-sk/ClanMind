@@ -318,6 +318,7 @@ export const ValidateProviderResponseSchema = z
 
 // ─── Tasks / Decisions / Memory (BE §47/§48/§35/§36) ────────────────────────
 
+/** BE §48 tasks row — CAS field `version`, no group column. */
 export const TaskSchema = z
   .object({
     id: IdSchema,
@@ -328,32 +329,89 @@ export const TaskSchema = z
     status: z.string(),
     priority: z.string(),
     due_at: z.string().nullish(),
+    version: z.number().int(),
+    created_by_user_id: z.string().nullish(),
+    created_by_ai_id: z.string().nullish(),
+    created_at: IsoDateSchema,
     updated_at: IsoDateSchema,
+    completed_at: z.string().nullish(),
   })
   .passthrough();
 
+export const TaskListSchema = z
+  .object({ items: z.array(TaskSchema).nullish() })
+  .passthrough();
+
+/** BE §47 decisions row — CAS field `version` drives §110 approve/reject. */
 export const DecisionSchema = z
   .object({
     id: IdSchema,
     project_id: IdSchema,
     title: z.string(),
-    status: z.string(),
+    context: z.string().nullish(),
+    options: z.unknown().optional(),
+    selected_option: z.unknown().optional(),
     rationale: z.string().nullish(),
+    status: z.string(),
+    version: z.number().int(),
+    proposed_by: z.string().nullish(),
     approved_by: z.string().nullish(),
     created_at: IsoDateSchema,
     updated_at: IsoDateSchema,
+    approved_at: z.string().nullish(),
   })
   .passthrough();
 
+export const DecisionListSchema = z
+  .object({ items: z.array(DecisionSchema).nullish() })
+  .passthrough();
+
+/** BE §35 memories row — typed memory system, scope-tagged. */
 export const MemoryEntrySchema = z
   .object({
     id: IdSchema,
     scope_type: z.string(),
+    group_id: IdSchema,
+    project_id: z.string().nullish(),
+    user_id: z.string().nullish(),
     memory_type: z.string(),
     content: z.string(),
+    normalized_content: z.string().nullish(),
+    confidence: z.number(),
+    importance: z.number(),
+    source_type: z.string(),
+    source_id: z.string().nullish(),
+    status: z.string(),
     created_at: IsoDateSchema,
     updated_at: IsoDateSchema,
+    last_used_at: z.string().nullish(),
+    archived_at: z.string().nullish(),
   })
+  .passthrough();
+
+export const MemoryListSchema = z
+  .object({ items: z.array(MemoryEntrySchema).nullish() })
+  .passthrough();
+
+/** BE §36 memory_candidates row. */
+export const MemoryCandidateSchema = z
+  .object({
+    id: IdSchema,
+    group_id: IdSchema,
+    project_id: z.string().nullish(),
+    user_id: z.string().nullish(),
+    source_message_id: z.string().nullish(),
+    candidate_type: z.string(),
+    content: z.string(),
+    confidence: z.number(),
+    recommended_scope: z.string(),
+    status: z.string(),
+    created_at: IsoDateSchema,
+  })
+  .passthrough();
+
+export const MemoryCandidateListSchema = z
+  .object({ items: z.array(MemoryCandidateSchema).nullish() })
   .passthrough();
 
 export const MeetingCandidateSchema = z

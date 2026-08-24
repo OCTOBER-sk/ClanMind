@@ -762,6 +762,389 @@ export function createDemoTransport(ds: DemoDataset): Transport {
       return ok({ id: artifact.id, deleted_at: artifact.updated_at });
     }],
 
+    // ── Tasks (P8): BE §111 handlers/intel.ts parity over the dataset ───────
+
+    ['GET', '/projects/:projectId/tasks', (p) => {
+      const project = ds.projects.find((pr) => pr.id === p.projectId);
+      if (!project) return fail(404, 'NOT_FOUND', 'Project not found.');
+      const items = ds.tasks
+        .filter((t) => t.project_id === p.projectId)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return ok({ items });
+    }],
+
+    ['POST', '/projects/:projectId/tasks', (p, req) => {
+      const project = ds.projects.find((pr) => pr.id === p.projectId);
+      if (!project) return fail(404, 'NOT_FOUND', 'Project not found.');
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const title = typeof body.title === 'string' ? body.title.trim() : '';
+      if (title.length < 1 || title.length > 300) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid task body.');
+      }
+      if (
+        body.description !== undefined &&
+        body.description !== null &&
+        typeof body.description !== 'string'
+      ) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid task body.');
+      }
+      const ownerUserId =
+        typeof body.owner_user_id === 'string' && body.owner_user_id.length > 0
+          ? body.owner_user_id
+          : null;
+      const nowIso = new Date().toISOString();
+      // BE defaults: status TODO · priority MEDIUM · version 1.
+      const task = {
+        id: `task_${crypto.randomUUID()}`,
+        project_id: project.id,
+        title,
+        description: (body.description as string | null) ?? null,
+        owner_user_id: ownerUserId,
+        status: 'TODO' as const,
+        priority: 'MEDIUM' as const,
+        due_at: null,
+        version: 1,
+        created_by_user_id: ds.currentUser.id,
+        created_by_ai_id: null,
+        created_at: nowIso,
+        updated_at: nowIso,
+        completed_at: null,
+      };
+      ds.tasks.push(task);
+      getDemoHub().broadcast('task.created', project.group_id, { task });
+      return ok(task, 201);
+    }],
+
+    ['GET', '/tasks/:taskId', (p) => {
+      const task = ds.tasks.find((t) => t.id === p.taskId);
+      if (!task) return fail(404, 'NOT_FOUND', 'Task not found.');
+      return ok(task);
+    }],
+
+    ['PATCH', '/tasks/:taskId', (p, req) => {
+      const task = ds.tasks.find((t) => t.id === p.taskId);
+      if (!task) return fail(404, 'NOT_FOUND', 'Task not found.');
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const expectedVersion = Number(body.expected_version);
+      const patch = body.patch as Record<string, unknown> | undefined;
+      if (!Number.isInteger(expectedVersion) || !patch || typeof patch !== 'object') {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid task patch.');
+      }
+      if (
+        patch.status !== undefined &&
+        !['TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED'].includes(String(patch.status))
+      ) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid status.');
+      }
+      if (
+        patch.priority !== undefined &&
+        !['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(String(patch.priority))
+      ) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid priority.');
+      }
+      if (
+        patch.due_at !== undefined &&
+        patch.due_at !== null &&
+        typeof patch.due_at !== 'string'
+      ) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid due_at.');
+      }
+      // §21.2 optimistic concurrency — mirrors TaskService.update exactly.
+      if (task.version !== expectedVersion || task.status === 'CANCELLED') {
+        return fail(409, 'CONFLICT', 'Task changed elsewhere; reload and retry.');
+      }
+      if (typeof patch.title === 'string') task.title = patch.title;
+      if (patch.description !== undefined) task.description = patch.description as string | null;
+      if (patch.owner_user_id !== undefined) task.owner_user_id = patch.owner_user_id as string | null;
+      if (patch.status !== undefined) task.status = patch.status as typeof task.status;
+      if (patch.priority !== undefined) task.priority = patch.priority as typeof task.priority;
+      if (patch.due_at !== undefined) task.due_at = patch.due_at as string | null;
+      if (task.status === 'DONE' && !task.completed_at) task.completed_at = new Date().toISOString();
+      task.version = expectedVersion + 1;
+      task.updated_at = new Date().toISOString();
+      getDemoHub().broadcast('task.updated', ds.projects.find((pr) => pr.id === task.project_id)?.group_id ?? '', { task });
+      return ok(task);
+    }],
+
+    ['POST', '/tasks/:taskId/complete', (p, req) => {
+      const task = ds.tasks.find((t) => t.id === p.taskId);
+      if (!task) return fail(404, 'NOT_FOUND', 'Task not found.');
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const expectedVersion = Number(body.expected_version);
+      if (!Number.isInteger(expectedVersion)) {
+        return fail(400, 'VALIDATION_FAILED', 'expected_version is required.');
+      }
+      if (task.version !== expectedVersion) {
+        return fail(409, 'CONFLICT', 'Task changed elsewhere; reload and retry.');
+      }
+      task.status = 'DONE';
+      task.completed_at = new Date().toISOString();
+      task.version = expectedVersion + 1;
+      task.updated_at = task.completed_at;
+      getDemoHub().broadcast('task.completed', ds.projects.find((pr) => pr.id === task.project_id)?.group_id ?? '', { task });
+      return ok(task);
+    }],
+
+    // ── Decisions (P8): BE §110 handlers/intel.ts parity ────────────────────
+
+    ['GET', '/projects/:projectId/decisions', (p) => {
+      const project = ds.projects.find((pr) => pr.id === p.projectId);
+      if (!project) return fail(404, 'NOT_FOUND', 'Project not found.');
+      const items = ds.decisions
+        .filter((d) => d.project_id === p.projectId)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return ok({ items });
+    }],
+
+    ['POST', '/projects/:projectId/decisions', (p, req) => {
+      const project = ds.projects.find((pr) => pr.id === p.projectId);
+      if (!project) return fail(404, 'NOT_FOUND', 'Project not found.');
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const title = typeof body.title === 'string' ? body.title.trim() : '';
+      if (title.length < 1 || title.length > 300) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid decision body.');
+      }
+      if (body.context !== undefined && body.context !== null && typeof body.context !== 'string') {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid decision body.');
+      }
+      // §122 options — jsonb column exists (§47); the real handler does not
+      // parse this field yet, demo persists it as parity (D22).
+      let options: Array<{ label: string }> | null = null;
+      if (Array.isArray(body.options)) {
+        options = (body.options as unknown[])
+          .map((o) =>
+            typeof o === 'string'
+              ? { label: o }
+              : (o as { label?: unknown })?.label != null
+                ? { label: String((o as { label: unknown }).label) }
+                : null,
+          )
+          .filter((o): o is { label: string } => o !== null);
+      }
+      const nowIso = new Date().toISOString();
+      // §122 default — every proposal lands PROPOSED with version 1.
+      const decision = {
+        id: `dec_${crypto.randomUUID()}`,
+        project_id: project.id,
+        title,
+        context: (body.context as string | null) ?? null,
+        options,
+        selected_option: null,
+        rationale: null,
+        status: 'PROPOSED' as const,
+        version: 1,
+        proposed_by: ds.currentUser.id,
+        approved_by: null,
+        approved_at: null,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+      ds.decisions.push(decision);
+      getDemoHub().broadcast('decision.proposed', project.group_id, { decision });
+      return ok(decision, 201);
+    }],
+
+    ['GET', '/decisions/:decisionId', (p) => {
+      const decision = ds.decisions.find((d) => d.id === p.decisionId);
+      if (!decision) return fail(404, 'NOT_FOUND', 'Decision not found.');
+      return ok(decision);
+    }],
+
+    ['POST', '/decisions/:decisionId/approve', (p, req) => {
+      const decision = ds.decisions.find((d) => d.id === p.decisionId);
+      if (!decision) return fail(404, 'NOT_FOUND', 'Decision not found.');
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const expectedVersion = Number(body.expected_version);
+      if (!Number.isInteger(expectedVersion)) {
+        return fail(400, 'VALIDATION_FAILED', 'expected_version is required.');
+      }
+      // §21.2 CAS from PROPOSED — mirrors DecisionService.approve order.
+      if (decision.version !== expectedVersion) {
+        return fail(409, 'CONFLICT', 'Decision changed; reload and retry.');
+      }
+      if (decision.status !== 'PROPOSED') {
+        return fail(409, 'CONFLICT', 'Decision changed; reload and retry.');
+      }
+      decision.status = 'APPROVED';
+      decision.approved_by = ds.currentUser.id;
+      decision.approved_at = new Date().toISOString();
+      decision.version = expectedVersion + 1;
+      decision.updated_at = decision.approved_at;
+      // Approving supersedes this Project's other APPROVED decisions and
+      // promotes the row to a high-priority memory candidate (BE §134).
+      for (const other of ds.decisions) {
+        if (other.project_id === decision.project_id && other.id !== decision.id && other.status === 'APPROVED') {
+          other.status = 'SUPERSEDED';
+          other.updated_at = decision.approved_at!;
+        }
+      }
+      const groupId = ds.projects.find((pr) => pr.id === decision.project_id)?.group_id ?? '';
+      getDemoHub().broadcast('decision.approved', groupId, { decision });
+      return ok(decision);
+    }],
+
+    ['POST', '/decisions/:decisionId/reject', (p, req) => {
+      const decision = ds.decisions.find((d) => d.id === p.decisionId);
+      if (!decision) return fail(404, 'NOT_FOUND', 'Decision not found.');
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const expectedVersion = Number(body.expected_version);
+      if (!Number.isInteger(expectedVersion)) {
+        return fail(400, 'VALIDATION_FAILED', 'expected_version is required.');
+      }
+      if (decision.version !== expectedVersion || decision.status !== 'PROPOSED') {
+        return fail(409, 'CONFLICT', 'Decision changed; reload and retry.');
+      }
+      decision.status = 'REJECTED';
+      decision.version = expectedVersion + 1;
+      decision.updated_at = new Date().toISOString();
+      getDemoHub().broadcast('decision.rejected', ds.projects.find((pr) => pr.id === decision.project_id)?.group_id ?? '', { decision });
+      return ok({ ok: true });
+    }],
+
+    // ── Memory (P8): BE §108 handlers/memory.ts parity ──────────────────────
+
+    ['GET', '/groups/:groupId/memory', (p) =>
+      ok({ items: ds.memories.filter((m) => m.group_id === p.groupId && m.scope_type === 'GROUP') })],
+
+    ['GET', '/projects/:projectId/memory', (p) =>
+      ok({
+        items: ds.memories.filter(
+          (m) => m.project_id === p.projectId && m.scope_type === 'PROJECT',
+        ),
+      })],
+
+    ['GET', '/groups/:groupId/memory/candidates', (p) =>
+      ok({
+        items: ds.memoryCandidates.filter(
+          (c) => c.group_id === p.groupId && c.status === 'PENDING',
+        ),
+      })],
+
+    ['POST', '/memory/:candidateId/accept', (p) => {
+      const candidate = ds.memoryCandidates.find((c) => c.id === p.candidateId);
+      if (!candidate || candidate.status !== 'PENDING') {
+        return fail(404, 'NOT_FOUND', 'Candidate not found.');
+      }
+      candidate.status = 'ACCEPTED';
+      const nowIso = new Date().toISOString();
+      const memory = {
+        id: `mem_${crypto.randomUUID()}`,
+        scope_type: candidate.recommended_scope,
+        group_id: candidate.group_id,
+        project_id: candidate.project_id,
+        user_id: candidate.user_id,
+        memory_type: candidate.candidate_type,
+        content: candidate.content,
+        normalized_content: null,
+        confidence: candidate.confidence,
+        importance: 0.6,
+        source_type: 'candidate_accepted',
+        source_id: candidate.source_message_id,
+        status: 'ACTIVE' as const,
+        created_at: nowIso,
+        updated_at: nowIso,
+        last_used_at: null,
+        archived_at: null,
+      };
+      ds.memories.push(memory);
+      getDemoHub().broadcast('memory.approved', candidate.group_id, {
+        memory,
+        candidate_id: candidate.id,
+      });
+      return ok(memory, 201);
+    }],
+
+    ['POST', '/memory/:candidateId/reject', (p) => {
+      const candidate = ds.memoryCandidates.find((c) => c.id === p.candidateId);
+      if (!candidate || candidate.status !== 'PENDING') {
+        return fail(404, 'NOT_FOUND', 'Candidate not found.');
+      }
+      candidate.status = 'REJECTED';
+      return ok({ ok: true });
+    }],
+
+    ['PATCH', '/memory/:memoryId', (p, req) => {
+      const memory = ds.memories.find((m) => m.id === p.memoryId);
+      if (!memory) return fail(404, 'NOT_FOUND', 'Memory not found.');
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const keys = Object.keys(body);
+      if (keys.length === 0) {
+        return fail(400, 'VALIDATION_FAILED', 'At least one field is required.');
+      }
+      if (body.content !== undefined && (typeof body.content !== 'string' || body.content.length < 1 || body.content.length > 2000)) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid patch body.');
+      }
+      if (body.importance !== undefined && (typeof body.importance !== 'number' || body.importance < 0 || body.importance > 1)) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid patch body.');
+      }
+      if (body.confidence !== undefined && (typeof body.confidence !== 'number' || body.confidence < 0 || body.confidence > 1)) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid patch body.');
+      }
+      if (typeof body.content === 'string') memory.content = body.content;
+      if (typeof body.importance === 'number') memory.importance = body.importance;
+      if (typeof body.confidence === 'number') memory.confidence = body.confidence;
+      memory.updated_at = new Date().toISOString();
+      getDemoHub().broadcast('memory.updated', memory.group_id, { memory });
+      return ok(memory);
+    }],
+
+    ['DELETE', '/memory/:memoryId', (p) => {
+      const idx = ds.memories.findIndex((m) => m.id === p.memoryId);
+      if (idx < 0) return fail(404, 'NOT_FOUND', 'Memory not found.');
+      const [removed] = ds.memories.splice(idx, 1);
+      getDemoHub().broadcast('memory.deleted', removed!.group_id, { memory_id: removed!.id });
+      return ok({ ok: true });
+    }],
+
+    /**
+     * §118 explicit memory create — DEMO-PARITY ONLY extension (no real
+     * Worker route accepts user-authored memory yet; live mode answers the
+     * honest NOT_FOUND). Recorded in INTEGRATION_NOTES D22.
+     */
+    ['POST', '/groups/:groupId/memory', (p, req) => {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const content = typeof body.content === 'string' ? body.content.trim() : '';
+      const scopeType = body.scope_type;
+      const memoryType = body.memory_type;
+      if (!content || content.length > 2000) {
+        return fail(400, 'VALIDATION_FAILED', 'content is required (max 2000 chars).');
+      }
+      if (scopeType !== 'GROUP' && scopeType !== 'PROJECT' && scopeType !== 'USER_PRIVATE') {
+        return fail(400, 'VALIDATION_FAILED', 'scope_type must be GROUP, PROJECT or USER_PRIVATE.');
+      }
+      const groupId =
+        scopeType === 'USER_PRIVATE'
+          ? String(body.group_id ?? p.groupId)
+          : p.groupId;
+      if (scopeType !== 'USER_PRIVATE' && !ds.groups.some((g) => g.id === groupId)) {
+        return fail(404, 'NOT_FOUND', 'Group not found.');
+      }
+      const projectId = scopeType === 'PROJECT' ? (body.project_id as string | null) ?? null : null;
+      const nowIso = new Date().toISOString();
+      const memory = {
+        id: `mem_${crypto.randomUUID()}`,
+        scope_type: scopeType as 'GROUP' | 'PROJECT' | 'USER_PRIVATE',
+        group_id: groupId,
+        project_id: projectId,
+        user_id: scopeType === 'USER_PRIVATE' ? ds.currentUser.id : null,
+        memory_type: typeof memoryType === 'string' ? memoryType : 'FACT',
+        content,
+        normalized_content: null,
+        confidence: 1,
+        importance: 0.5,
+        source_type: 'explicit',
+        source_id: null,
+        status: 'ACTIVE' as const,
+        created_at: nowIso,
+        updated_at: nowIso,
+        last_used_at: null,
+        archived_at: null,
+      };
+      ds.memories.push(memory);
+      getDemoHub().broadcast('memory.approved', groupId, { memory });
+      return ok(memory, 201);
+    }],
+
     // ── Attachments (P4): BE §43 rows, §81 validation, §84 signing. ────────
 
     // §84 — mint a short-lived signed URL after "authorization".
