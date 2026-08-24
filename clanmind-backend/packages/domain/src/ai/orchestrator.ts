@@ -4,7 +4,7 @@ import type { EventOutbox } from "../common/ports";
 import type { RealtimePort } from "../realtime/broadcaster";
 import type { MembershipService } from "../groups/membership.service";
 import type { AiAgentService } from "./agent.service";
-import type { ContextEngine } from "./context-engine";
+import { ContextEngine } from "./context-engine";
 import { ToolLoopGuard, ToolRegistry, type ToolDefinition } from "./context-engine";
 import type { RunLifecycle, AiRunRepository, AiRun } from "./run-lifecycle";
 import type { UsageService } from "./run-lifecycle";
@@ -54,6 +54,17 @@ export interface AiMessageSink {
     reply_to_id: string | null;
   }): Promise<{ id: string }>;
 }
+
+/**
+ * §60 prompt assembly — production wiring resolves the FIXED prompt slices
+ * per run (system safety/platform policy, Odin identity, Group policy,
+ * Project policy, skill instructions) BEFORE any competitive ranking. The
+ * returned order IS the §60 assembly order; safety must come first and user
+ * content never enters this list.
+ */
+export type FixedSlicesProvider = (ctx: {
+  run: AiRun;
+}) => Promise<{ label: string; content: string }[]>;
 
 /**
  * §2.4/§40 server-side private-conversation resolution + membership gate.
@@ -124,6 +135,11 @@ export class AiOrchestrator {
       tool_total_time_per_run_seconds: number;
       ai_context_token_budget: number;
     },
+    /** §60 fixed-slice resolver (system safety, identity, policies, skills).
+     * Optional so tests can drive the engine directly; production wiring
+     * ALWAYS supplies one — an empty fixed-slice set means no safety text
+     * ever reaches a prompt. */
+    private readonly fixedSlices?: FixedSlicesProvider,
   ) {}
 
   /**
@@ -239,7 +255,17 @@ export class AiOrchestrator {
     }
 
     // Step 10–13: context + tools resolved through the engine/registry.
-    const assembled = this.contextEngine.assemble(input.contextCandidates);
+    // §60: when production wiring supplies a fixed-slice provider, the FIXED
+    // slices (system safety → identity → policies → skills) are resolved for
+    // THIS run and passed into ContextEngine construction; the ranked
+    // competitive slices below remain budget-governed by §54A.2.
+    const engine = this.fixedSlices
+      ? new ContextEngine(
+          await this.fixedSlices({ run }),
+          this.limits.ai_context_token_budget,
+        )
+      : this.contextEngine;
+    const assembled = engine.assemble(input.contextCandidates);
     // §60: the RANKED competitive slices are part of the prompt — dropping
     // them would silently discard memory/decisions/recent-conversation
     // context that §54A.2 selected. Provenance markers keep items traceable.

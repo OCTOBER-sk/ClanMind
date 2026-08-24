@@ -26,6 +26,10 @@ export function engagementRoutes(): Hono<{ Bindings: Env; Variables: AuthVariabl
           () => false,
         ),
     );
+    // §86 authorization chain: a reaction is a WRITE — the requester must be
+    // an ACTIVE member of the message's Group, for GROUP and private
+    // visibility alike (removed members and outsiders are denied here; §187).
+    await services.membership.requireMember(message.group_id, user.user_id);
     await services.reactions.react(message.id, user.user_id, parsed.data.emoji);
     void services.realtime.publish({
       group_id: message.group_id,
@@ -49,6 +53,8 @@ export function engagementRoutes(): Hono<{ Bindings: Env; Variables: AuthVariabl
           () => false,
         ),
     );
+    // §86: same active-membership gate as adding a reaction.
+    await services.membership.requireMember(message.group_id, user.user_id);
     await services.reactions.unreact(message.id, user.user_id, emoji);
     void services.realtime.publish({
       group_id: message.group_id,

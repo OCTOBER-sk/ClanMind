@@ -442,15 +442,17 @@ export class SupabaseUsageRepository implements UsageRepository {
   }
 
   async quotaLimit(groupId: string, category: string, defaultLimit: number): Promise<number> {
+    // §178: per-Group overrides live in quota_states.limit_override (the
+    // column the migration actually defines — 20260822000117_ai_runs_tools_usage.sql).
     const { data, error } = await this.db
       .from("quota_states")
-      .select("limit_value")
+      .select("limit_override")
       .eq("group_id", groupId)
       .eq("category", category)
       .maybeSingle();
     if (error) throw error;
-    const override = data as { limit_value?: number } | null;
-    return typeof override?.limit_value === "number" ? override.limit_value : defaultLimit;
+    const override = data as { limit_override?: number } | null;
+    return typeof override?.limit_override === "number" ? override.limit_override : defaultLimit;
   }
 }
 

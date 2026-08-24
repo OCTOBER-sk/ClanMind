@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { ModelEvent, ModelProviderAdapter } from "@clanmind/ai-providers";
+import type { ModelEvent, ModelProviderAdapter, ModelRequest } from "@clanmind/ai-providers";
 import { AppError } from "@clanmind/shared";
-import { AiOrchestrator, sanitizeToolOutput } from "../src/ai/orchestrator";
+import {
+  AiOrchestrator,
+  sanitizeToolOutput,
+  type FixedSlicesProvider,
+} from "../src/ai/orchestrator";
 import {
   AiAgentService,
   ContextEngine,
@@ -36,6 +40,8 @@ function makeHarness(overrides: {
   /** §61 fallback-chain overrides for router tests. */
   chain?: { id: string; provider_config_id: string; model_id: string }[];
   adapters?: Record<string, ModelProviderAdapter>;
+  /** §60 fixed-slice provider handed to the orchestrator (production wiring). */
+  fixedSlices?: FixedSlicesProvider;
 }) {
   const runs: AiRun[] = [];
   const runRepo: AiRunRepository = {
@@ -175,6 +181,8 @@ function makeHarness(overrides: {
   const enqueued: string[] = [];
   const publishedEvents: string[] = [];
   const outboxEvents: import("../src/index").OutboxEventInput[] = [];
+  /** Provider payloads seen by the default adapter (prompt assertions). */
+  const capturedRequests: ModelRequest[] = [];
   type PersistAiMessageInput = Parameters<
     import("../src/ai/orchestrator").AiMessageSink["persistAiMessage"]
   >[0];
@@ -238,7 +246,8 @@ function makeHarness(overrides: {
       async listModels() {
         return [];
       },
-      async *generate(): AsyncGenerator<ModelEvent> {
+      async *generate(request): AsyncGenerator<ModelEvent> {
+        capturedRequests.push(request);
         yield { type: "text_delta", text: "Hello " };
         yield { type: "text_delta", text: "team" };
         yield { type: "usage", input_tokens: 10, output_tokens: 5 };
@@ -319,9 +328,10 @@ function makeHarness(overrides: {
       },
     },
     { tool_calls_per_run_max: 8, tool_total_time_per_run_seconds: 60, ai_context_token_budget: 32_000 },
+    overrides.fixedSlices,
   );
 
-  return { orchestrator, runs, ledger, enqueued, publishedEvents, outboxEvents, persistedMessages, convRepo, convRows, registry };
+  return { orchestrator, runs, ledger, enqueued, publishedEvents, outboxEvents, persistedMessages, convRepo, convRows, registry, capturedRequests };
 }
 
 describe("§115 orchestrator", () => {
@@ -355,6 +365,44 @@ describe("§115 orchestrator", () => {
     // durable outbox (§122/§124), not the low-latency port.
     expect(h.publishedEvents).toContain("ai.response.delta");
     expect(h.publishedEvents.every((e) => e === "ai.response.delta")).toBe(true);
+  });
+
+  it("§60 injects provider-resolved fixed slices ahead of ranked context", async () => {
+    const h = makeHarness({
+      fixedSlices: async ({ run }) => [
+        { label: "SYSTEM_SAFETY", content: "platform safety policy text" },
+        { label: "ODIN_IDENTITY", content: `You are Odin for group ${run.group_id}` },
+        { label: "PROJECT_POLICY", content: "- Always answer in Welsh" },
+      ],
+    });
+    const run = await h.orchestrator.startRun({
+      group_id: G1,
+      requester_user_id: U1,
+      project_id: null,
+      mode: "ASSIST",
+      visibility: "GROUP",
+      input_message_id: null,
+      private_conversation_id: null,
+      byokConfigured: false,
+    });
+    await h.orchestrator.executeRun({
+      run,
+      requester_role: "OWNER",
+      userRequest: "hello there",
+      contextCandidates: { candidates: [], explicitReferences: [] },
+      requestedToolCalls: [],
+    });
+    // §60 order: the FIXED slices are the FIRST system message of the prompt.
+    const first = h.capturedRequests[0]?.messages[0];
+    expect(first?.role).toBe("system");
+    const payload = first?.content ?? "";
+    expect(payload).toContain("SYSTEM_SAFETY");
+    expect(payload).toContain("platform safety policy text");
+    expect(payload).toContain("You are Odin");
+    expect(payload).toContain("Always answer in Welsh");
+    // The user request is LAST (§60), never inside the fixed slice block.
+    const messages = h.capturedRequests[0]?.messages ?? [];
+    expect(messages[messages.length - 1]).toEqual({ role: "user", content: "hello there" });
   });
 
   it("throws the §94 exhaustion contract when quota is spent", async () => {

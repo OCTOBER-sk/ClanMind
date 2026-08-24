@@ -7,6 +7,7 @@ import {
 import {
   MessageService,
   MeetingService,
+  PrivateConversationService,
   RoomCore,
   gateProtocolVersion,
 } from "@clanmind/domain";
@@ -14,6 +15,7 @@ import { AppError, parseLimits } from "@clanmind/shared";
 import { getServiceClient } from "@clanmind/db";
 import { SupabaseMessageRepository } from "../repositories/message.repo";
 import { SupabaseReactionRepository } from "../repositories/engagement.repo";
+import { SupabasePrivateConversationRepository } from "../repositories/private-conversation.repo";
 import { SupabaseMeetingRepository } from "../repositories/project-intel.repo";
 import { SupabaseOutbox } from "../repositories/jobs.repo";
 import type { Env } from "../env";
@@ -67,6 +69,7 @@ export class GroupRoom implements DurableObject {
     messages: MessageService;
     reactions: SupabaseReactionRepository;
     meetings: MeetingService;
+    privateConversations: PrivateConversationService;
     db: ReturnType<typeof getServiceClient>;
   };
 
@@ -92,6 +95,9 @@ export class GroupRoom implements DurableObject {
         ),
         reactions: new SupabaseReactionRepository(db),
         meetings: new MeetingService(new SupabaseMeetingRepository(db)),
+        privateConversations: new PrivateConversationService(
+          new SupabasePrivateConversationRepository(db),
+        ),
       };
     }
     return this.roomServices;
@@ -100,6 +106,28 @@ export class GroupRoom implements DurableObject {
   /** The room id IS the Group id (one room per Group). */
   private get groupId(): string {
     return this.state.id.name ?? "";
+  }
+
+  /**
+   * §86/§185 #11: re-verify ACTIVE membership at write time. Connect-time
+   * checks go stale the moment a member is removed — a live socket must not
+   * preserve write access.
+   */
+  private async requireActiveMember(
+    groupId: string,
+    userId: string,
+    db: ReturnType<typeof getServiceClient>,
+  ): Promise<void> {
+    const { data: member, error } = await db
+      .from("group_members")
+      .select("role")
+      .eq("group_id", groupId)
+      .eq("user_id", userId)
+      .is("removed_at", null)
+      .maybeSingle();
+    if (error || !member) {
+      throw new AppError("FORBIDDEN", "You are not a member of this Group.");
+    }
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -353,8 +381,25 @@ export class GroupRoom implements DurableObject {
         return;
       }
       case "message.react": {
-        const { reactions } = this.services();
+        const { db, messages, reactions, privateConversations } = this.services();
         try {
+          // §86 authorization chain at WRITE time — connect-time membership
+          // is not enough (§185 #11: removed members lose access immediately;
+          // stale sockets must never keep write access) and the message must
+          // belong to THIS room's Group (never react across Groups).
+          const target = await messages.requireReadable(
+            message.data.message_id,
+            userId,
+            (conversationId, uid) =>
+              privateConversations.requireMember(conversationId, uid).then(
+                () => true,
+                () => false,
+              ),
+          );
+          if (target.group_id !== this.groupId) {
+            throw new AppError("FORBIDDEN", "This message belongs to another Group.");
+          }
+          await this.requireActiveMember(target.group_id, userId, db);
           if (message.data.action === "add") {
             await reactions.add({
               message_id: message.data.message_id,
