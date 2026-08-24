@@ -26,9 +26,19 @@ export function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isSessionExpired = useAuthStore((s) => s.isSessionExpired);
 
-  // Apply theme class to document root
+  // Apply theme class to document root. 'system' follows the OS preference
+  // live (Appearance settings; §11 UI preference — never server state).
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    const root = document.documentElement;
+    if (theme !== 'system') {
+      root.classList.toggle('dark', theme === 'dark');
+      return;
+    }
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => root.classList.toggle('dark', media.matches);
+    apply();
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
   }, [theme]);
 
   // FE §197 — any authenticated domain call answered 401 flips the session

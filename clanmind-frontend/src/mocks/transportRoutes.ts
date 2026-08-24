@@ -10,6 +10,7 @@ import type {
   Message,
   AiAction,
   AiProviderConfig,
+  Group,
   MeetingCandidate,
 } from '@/types';
 import { getDemoHub } from './wsHub';
@@ -1673,6 +1674,261 @@ export function createDemoTransport(ds: DemoDataset): Transport {
         byte_size: obj.byteSize,
       });
     }],
+
+    // ── Settings (P12): profile / members / invites / agent / usage ─────────
+    // Parity with handlers/me.ts, handlers/groups.ts, handlers/members.ts,
+    // handlers/invites.ts and packages/domain membership+invite services —
+    // same validation messages, same permission codes. The /ai/agent,
+    // provider-removal and /usage routes are DEMO-PARITY ONLY (no real Worker
+    // route yet; INTEGRATION_NOTES D26 records the gap).
+
+    // PATCH /me — display_name 1..100 (handlers/me.ts patchMeBody).
+    ['PATCH', '/me', (_p, req) => {
+      const body = (req.body ?? {}) as { display_name?: unknown; avatar_object_id?: unknown };
+      if (body.display_name !== undefined && (typeof body.display_name !== 'string' || body.display_name.length < 1 || body.display_name.length > 100)) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid request body.');
+      }
+      ds.currentUser = {
+        ...ds.currentUser,
+        name: typeof body.display_name === 'string' ? body.display_name : ds.currentUser.name,
+        updated_at: new Date().toISOString(),
+      };
+      return ok({
+        id: ds.currentUser.id,
+        email_snapshot: ds.currentUser.email,
+        display_name: ds.currentUser.name,
+        created_at: ds.currentUser.created_at ?? new Date().toISOString(),
+        updated_at: ds.currentUser.updated_at,
+        last_seen_at: new Date().toISOString(),
+      });
+    }],
+
+    // PATCH /groups/:groupId — name 1..80 / description ≤500; OWNER/ADMIN only.
+    ['PATCH', '/groups/:groupId', (p, req) => {
+      const role = memberRoleOf(ds, p.groupId);
+      if (role !== 'OWNER' && role !== 'ADMIN') {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'You do not have permission to update this Group.');
+      }
+      const group = ds.groups.find((g) => g.id === p.groupId);
+      if (!group) return fail(404, 'NOT_FOUND', 'Group not found.');
+      const body = (req.body ?? {}) as { name?: unknown; description?: unknown };
+      if (body.name !== undefined && (typeof body.name !== 'string' || body.name.length < 1 || body.name.length > 80)) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid request body.');
+      }
+      if (body.description !== undefined && body.description !== null && (typeof body.description !== 'string' || body.description.length > 500)) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid request body.');
+      }
+      if (typeof body.name === 'string') group.name = body.name;
+      if (body.description !== undefined) {
+        group.description = (body.description as string | null) ?? undefined;
+      }
+      group.updated_at = new Date().toISOString();
+      return ok(group);
+    }],
+
+    // PATCH members/:userId { role } — mirrors MembershipService.changeRole.
+    ['PATCH', '/groups/:groupId/members/:userId', (p, req) => {
+      const actorRole = memberRoleOf(ds, p.groupId);
+      if (actorRole !== 'OWNER' && actorRole !== 'ADMIN') {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'Only Owners and Admins can change roles.');
+      }
+      const target = ds.members.find((m) => m.group_id === p.groupId && m.user_id === p.userId);
+      if (!target) return fail(404, 'NOT_FOUND', 'Member not found.');
+      const role = (req.body as { role?: unknown })?.role;
+      if (role !== 'OWNER' && role !== 'ADMIN' && role !== 'MEMBER' && role !== 'GUEST') {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid request body.');
+      }
+      if (target.role === 'OWNER') {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'Ownership changes require an ownership transfer.');
+      }
+      if (actorRole === 'ADMIN' && (target.role === 'ADMIN' || role === 'ADMIN')) {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'Only the Owner can manage Administrators.');
+      }
+      target.role = role;
+      return ok(wireMember(target));
+    }],
+
+    // DELETE members/:userId — Owner removes anyone but themselves; Admin
+    // removes Members/Guests only (§230 consequence copy lives client-side).
+    ['DELETE', '/groups/:groupId/members/:userId', (p) => {
+      const actorRole = memberRoleOf(ds, p.groupId);
+      if (actorRole !== 'OWNER' && actorRole !== 'ADMIN') {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'Only Owners and Admins can remove members.');
+      }
+      const idx = ds.members.findIndex((m) => m.group_id === p.groupId && m.user_id === p.userId);
+      if (idx === -1) return fail(404, 'NOT_FOUND', 'Member not found.');
+      const target = ds.members[idx]!;
+      if (target.role === 'OWNER') {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'The Owner cannot be removed. Transfer ownership first.');
+      }
+      if (actorRole === 'ADMIN' && target.role === 'ADMIN') {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'Only the Owner can remove Administrators.');
+      }
+      ds.members.splice(idx, 1);
+      return ok({ ok: true });
+    }],
+
+    // POST transfer-ownership { new_owner_user_id } → {ok} (§7.2; Owner only).
+    ['POST', '/groups/:groupId/transfer-ownership', (p, req) => {
+      if (memberRoleOf(ds, p.groupId) !== 'OWNER') {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'Only the Owner can transfer ownership.');
+      }
+      const newOwnerId = (req.body as { new_owner_user_id?: unknown })?.new_owner_user_id;
+      if (typeof newOwnerId !== 'string' || newOwnerId.length < 1) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid request body.');
+      }
+      if (newOwnerId === ds.currentUser.id) {
+        return fail(400, 'VALIDATION_FAILED', 'Ownership already belongs to you.');
+      }
+      const target = ds.members.find((m) => m.group_id === p.groupId && m.user_id === newOwnerId);
+      if (!target) return fail(404, 'NOT_FOUND', 'Member not found.');
+      for (const m of ds.members) {
+        if (m.group_id !== p.groupId) continue;
+        if (m.user_id === ds.currentUser.id) m.role = 'ADMIN';
+        else if (m.user_id === newOwnerId) m.role = 'OWNER';
+      }
+      return ok({ ok: true });
+    }],
+
+    // POST invites — Owner/Admin only; token returned exactly once (§8.2).
+    ['POST', '/groups/:groupId/invites', (p, req) => {
+      const actorRole = memberRoleOf(ds, p.groupId);
+      if (actorRole !== 'OWNER' && actorRole !== 'ADMIN') {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'Only Owners and Admins can invite.');
+      }
+      const body = (req.body ?? {}) as { email?: unknown; role?: unknown; max_uses?: unknown };
+      const email = body.email ?? null;
+      if (email !== null && (typeof email !== 'string' || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid invite email.');
+      }
+      const role = body.role ?? 'MEMBER';
+      if (role !== 'ADMIN' && role !== 'MEMBER' && role !== 'GUEST') {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid request body.');
+      }
+      let maxUses: number | null = null;
+      if (body.max_uses !== undefined && body.max_uses !== null) {
+        if (typeof body.max_uses !== 'number' || !Number.isInteger(body.max_uses) || body.max_uses < 1) {
+          return fail(400, 'VALIDATION_FAILED', 'max_uses must be at least 1.');
+        }
+        maxUses = body.max_uses;
+      }
+      const token = `demo-invite-${crypto.randomUUID().slice(0, 12)}`;
+      const row = {
+        id: `inv_${crypto.randomUUID().slice(0, 8)}`,
+        group_id: p.groupId,
+        created_by: ds.currentUser.id,
+        email: email as string | null,
+        role,
+        expires_at: new Date(Date.now() + 7 * DAY_MS).toISOString(), // §178 token lifetime
+        max_uses: maxUses,
+        uses_count: 0,
+        revoked_at: null,
+        created_at: new Date().toISOString(),
+      };
+      ds.invites.push(row);
+      return ok({ invite: wireInvite(row), token }, 201);
+    }],
+
+    // GET invites — list NEVER carries the raw token (§8.2).
+    ['GET', '/groups/:groupId/invites', (p) => {
+      const actorRole = memberRoleOf(ds, p.groupId);
+      if (actorRole !== 'OWNER' && actorRole !== 'ADMIN') {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'Only Owners and Admins can view invites.');
+      }
+      return ok({ items: ds.invites.filter((i) => i.group_id === p.groupId).map(wireInvite) });
+    }],
+
+    ['POST', '/groups/:groupId/invites/:inviteId/revoke', (p) => {
+      const actorRole = memberRoleOf(ds, p.groupId);
+      if (actorRole !== 'OWNER' && actorRole !== 'ADMIN') {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'Only Owners and Admins can revoke invites.');
+      }
+      const invite = ds.invites.find((i) => i.id === p.inviteId && i.group_id === p.groupId);
+      if (!invite) return fail(404, 'NOT_FOUND', 'Invite not found.');
+      if (!invite.revoked_at) invite.revoked_at = new Date().toISOString();
+      return ok({ ok: true });
+    }],
+
+    // GET/PATCH ai/agent — BE §30 row surface. DEMO-PARITY route only (D26):
+    // the real Worker has no agent read/write endpoint yet.
+    ['GET', '/groups/:groupId/ai/agent', (p) => {
+      const agent = ds.aiAgents.find((a) => a.group_id === p.groupId);
+      if (!agent) return fail(404, 'NOT_FOUND', 'AI agent config not found.');
+      return ok(agent);
+    }],
+
+    ['PATCH', '/groups/:groupId/ai/agent', (p, req) => {
+      const agent = ds.aiAgents.find((a) => a.group_id === p.groupId);
+      if (!agent) return fail(404, 'NOT_FOUND', 'AI agent config not found.');
+      const body = (req.body ?? {}) as {
+        name?: unknown;
+        tone?: unknown;
+        personality_config?: { preset?: unknown; custom_instructions?: unknown };
+        mode_policy?: { proactivity?: unknown; permissions?: Record<string, boolean> };
+      };
+      if (body.name !== undefined && (typeof body.name !== 'string' || body.name.trim().length < 1)) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid request body.');
+      }
+      if (body.name !== undefined) agent.name = (body.name as string).trim();
+      if (body.tone !== undefined) agent.tone = body.tone as string | null;
+      if (body.personality_config !== undefined) {
+        const preset = body.personality_config.preset;
+        if (preset !== undefined && !['balanced', 'direct', 'creative', 'analytical', 'custom'].includes(String(preset))) {
+          return fail(400, 'VALIDATION_FAILED', 'Invalid personality preset.');
+        }
+        agent.personality_config = {
+          preset: (preset as string | undefined) ?? agent.personality_config.preset,
+          ...(body.personality_config.custom_instructions !== undefined
+            ? { custom_instructions: String(body.personality_config.custom_instructions ?? '') }
+            : {}),
+        };
+      }
+      if (body.mode_policy !== undefined) {
+        if (body.mode_policy.proactivity !== undefined) {
+          const level = body.mode_policy.proactivity;
+          if (!['off', 'low', 'balanced', 'high'].includes(String(level))) {
+            return fail(400, 'VALIDATION_FAILED', 'Invalid proactivity level.');
+          }
+          agent.mode_policy = { ...agent.mode_policy, proactivity: String(level) };
+        }
+        if (body.mode_policy.permissions !== undefined) {
+          agent.mode_policy = { ...agent.mode_policy, permissions: body.mode_policy.permissions };
+        }
+      }
+      agent.updated_at = new Date().toISOString();
+      // Keep the legacy Group mirror in sync so other surfaces see the name.
+      const group = ds.groups.find((g) => g.id === p.groupId);
+      if (group) {
+        group.ai_name = agent.name;
+        group.ai_proactivity = (agent.mode_policy.proactivity as Group['ai_proactivity']) ?? group.ai_proactivity;
+      }
+      return ok(agent);
+    }],
+
+    // DELETE ai/providers/:configId — §232 removal. DEMO-PARITY route only
+    // (D26); detaches any model routes pointing at the removed config.
+    ['DELETE', '/groups/:groupId/ai/providers/:configId', (p) => {
+      const idx = ds.aiProviderConfigs.findIndex(
+        (c) => c.id === p.configId && c.group_id === p.groupId,
+      );
+      if (idx === -1) return fail(404, 'NOT_FOUND', 'Provider config not found.');
+      ds.aiProviderConfigs.splice(idx, 1);
+      ds.aiModelRoutes = ds.aiModelRoutes.filter(
+        (r) => !(r.group_id === p.groupId && r.provider_config_id === p.configId),
+      );
+      return ok({ ok: true });
+    }],
+
+    // GET usage — BE §92 counter names. DEMO-PARITY route only (D26).
+    ['GET', '/groups/:groupId/usage', (p) => {
+      const counters = ds.usageByGroup[p.groupId];
+      if (!counters) return fail(404, 'NOT_FOUND', 'No usage recorded for this Group.');
+      return ok({
+        group_id: p.groupId,
+        counters,
+        period_start: ds.groups.find((g) => g.id === p.groupId)?.created_at ?? null,
+      });
+    }],
   ];
 
   return {
@@ -1797,6 +2053,45 @@ function verifyDemoToken(attachmentId: string, token: string): boolean {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+// ─── Settings (P12) helpers ──────────────────────────────────────────────────
+
+const DAY_MS = 24 * 3_600_000;
+
+/** The current demo user's role in a Group ('' when not a member). */
+function memberRoleOf(ds: DemoDataset, groupId: string): string {
+  return (
+    ds.members.find((m) => m.group_id === groupId && m.user_id === ds.currentUser.id)?.role ?? ''
+  );
+}
+
+/** Dataset member → wire row shape returned by GET/PATCH members routes. */
+function wireMember(m: DemoDataset['members'][number]): Record<string, unknown> {
+  return {
+    group_id: m.group_id,
+    user_id: m.user_id,
+    role: m.role,
+    joined_at: m.joined_at,
+    removed_at: null,
+    group_display_name: m.nickname ?? null,
+  };
+}
+
+/** §27 invite row WITHOUT the raw token — list responses never carry it. */
+function wireInvite(i: DemoDataset['invites'][number]): Record<string, unknown> {
+  return {
+    id: i.id,
+    group_id: i.group_id,
+    created_by: i.created_by,
+    email: i.email,
+    role: i.role,
+    expires_at: i.expires_at,
+    max_uses: i.max_uses,
+    uses_count: i.uses_count,
+    revoked_at: i.revoked_at,
+    created_at: i.created_at,
+  };
 }
 
 /** §64 model discovery — deterministic per-provider catalogs (ModelDescriptor shape). */

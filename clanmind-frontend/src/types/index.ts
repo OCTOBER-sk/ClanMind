@@ -288,6 +288,87 @@ export interface AiConfigResponse {
   routes: AiModelRoute[];
 }
 
+/**
+ * BE §30 `ai_agents` row — the Group AI identity/personality configuration.
+ * Reached through the settings agent surface; no REST route exists on the
+ * real Worker yet (demo-parity only — INTEGRATION_NOTES D26).
+ */
+export interface AiAgentConfig {
+  group_id: string;
+  /** §129 admin-configurable identity name (default "Odin"). */
+  name: string;
+  avatar_object_id: string | null;
+  tone: string | null;
+  /** §168 personality preset + optional custom instructions. */
+  personality_config: {
+    preset: 'balanced' | 'direct' | 'creative' | 'analytical' | 'custom';
+    custom_instructions?: string;
+  };
+  /**
+   * BE §30 mode_policy jsonb — carries the §150 proactivity level and the
+   * §169 capability toggles (client vocabulary mirrors FE spec ids).
+   */
+  mode_policy: {
+    proactivity?: 'off' | 'low' | 'balanced' | 'high';
+    permissions?: Record<
+      | 'read_shared_files'
+      | 'create_artifacts'
+      | 'edit_project_objects'
+      | 'use_web'
+      | 'read_github'
+      | 'modify_github'
+      | 'create_pr'
+      | 'merge_pr',
+      boolean
+    >;
+  };
+  updated_at?: string;
+}
+
+/** BE §27 `group_invites` row as returned by GET /groups/:id/invites. */
+export interface GroupInvite {
+  id: string;
+  group_id: string;
+  created_by: string;
+  email: string | null;
+  role: GroupRole;
+  expires_at: string;
+  max_uses: number | null;
+  uses_count: number;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+/**
+ * POST /groups/:id/invites → 201 { invite, token } — the raw token is shown
+ * ONCE to the inviting admin (BE §8.2); list responses never contain it.
+ */
+export interface InviteCreated {
+  invite: GroupInvite;
+  token: string;
+}
+
+/**
+ * BE §92 quota counters — the Usage section reads exactly these counter
+ * names. No real Worker route exists yet (demo-parity; D26).
+ */
+export interface UsageSnapshot {
+  group_id: string;
+  counters: {
+    ai_requests: number;
+    input_tokens: number;
+    output_tokens: number;
+    estimated_cost: number;
+    research_calls: number;
+    research_sources: number;
+    artifact_generations: number;
+    tool_calls: number;
+    github_actions: number;
+    shared_storage_bytes: number;
+  };
+  period_start: string;
+}
+
 // ==========================================
 // DOMAIN ENTITIES & INTERFACES
 // ==========================================

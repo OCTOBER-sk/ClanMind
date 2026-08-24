@@ -85,6 +85,52 @@ export interface DemoDataset {
   aiProviderConfigs: AiProviderConfig[];
   /** §32 model routes (PRIMARY + fallback slots). */
   aiModelRoutes: AiModelRoute[];
+  /**
+   * BE §27 group_invites rows (P12 settings surface). `token` exists ONLY at
+   * creation time (§8.2 shown-once) — the list route never returns it.
+   */
+  invites: Array<{
+    id: string;
+    group_id: string;
+    created_by: string;
+    email: string | null;
+    role: string;
+    expires_at: string;
+    max_uses: number | null;
+    uses_count: number;
+    revoked_at: string | null;
+    created_at: string;
+    token?: string;
+  }>;
+  /**
+   * §30 ai_agents rows per Group (identity/personality/mode policy).
+   * Demo-parity only — no real Worker route yet (D26).
+   */
+  aiAgents: Array<{
+    group_id: string;
+    name: string;
+    avatar_object_id: string | null;
+    tone: string | null;
+    personality_config: { preset: string; custom_instructions?: string };
+    mode_policy: { proactivity?: string; permissions?: Record<string, boolean> };
+    updated_at: string;
+  }>;
+  /** BE §92 usage counters per Group (demo-parity; D26). */
+  usageByGroup: Record<
+    string,
+    {
+      ai_requests: number;
+      input_tokens: number;
+      output_tokens: number;
+      estimated_cost: number;
+      research_calls: number;
+      research_sources: number;
+      artifact_generations: number;
+      tool_calls: number;
+      github_actions: number;
+      shared_storage_bytes: number;
+    }
+  >;
 }
 
 const HOUR = 3_600_000;
@@ -808,6 +854,85 @@ export function createDemoDataset(): DemoDataset {
     },
   ];
 
+  // ─── §27 invites — one live link, one already-revoked (list shape parity) ──
+  const invites: DemoDataset['invites'] = [
+    {
+      id: 'inv_seed_1',
+      group_id: groups[0]!.id,
+      created_by: currentUser.id,
+      email: 'dana@clanmind.io',
+      role: 'MEMBER',
+      expires_at: new Date(now + 6 * DAY).toISOString(), // §178: 7-day token lifetime
+      max_uses: null,
+      uses_count: 0,
+      revoked_at: null,
+      created_at: new Date(now - DAY).toISOString(),
+    },
+    {
+      id: 'inv_seed_2',
+      group_id: groups[0]!.id,
+      created_by: currentUser.id,
+      email: 'old@clanmind.io',
+      role: 'GUEST',
+      expires_at: new Date(now + 2 * DAY).toISOString(),
+      max_uses: 1,
+      uses_count: 1,
+      revoked_at: new Date(now - 3 * DAY).toISOString(),
+      created_at: new Date(now - 5 * DAY).toISOString(),
+    },
+  ];
+
+  // ─── §30 ai_agents rows — identity defaults per Group (demo-parity, D26) ───
+  const aiAgents: DemoDataset['aiAgents'] = groups.map((g) => ({
+    group_id: g.id,
+    name: g.ai_name ?? 'Odin',
+    avatar_object_id: null,
+    tone: null,
+    personality_config: { preset: 'balanced' },
+    mode_policy: {
+      proactivity: g.ai_proactivity,
+      permissions: {
+        read_shared_files: true,
+        create_artifacts: true,
+        edit_project_objects: false,
+        use_web: true,
+        read_github: true,
+        modify_github: false,
+        create_pr: false,
+        merge_pr: false,
+      },
+    },
+    updated_at: g.updated_at,
+  }));
+
+  // ─── BE §92 usage counters — derived from seeded activity (demo-parity) ────
+  const usageByGroup: DemoDataset['usageByGroup'] = {
+    [groups[0]!.id]: {
+      ai_requests: 42,
+      input_tokens: 128_400,
+      output_tokens: 36_900,
+      estimated_cost: 1.84,
+      research_calls: 11,
+      research_sources: 34,
+      artifact_generations: 6,
+      tool_calls: 27,
+      github_actions: 1,
+      shared_storage_bytes: 48 * 1024 * 1024,
+    },
+    [groups[1]!.id]: {
+      ai_requests: 3,
+      input_tokens: 8_200,
+      output_tokens: 1_950,
+      estimated_cost: 0.11,
+      research_calls: 1,
+      research_sources: 4,
+      artifact_generations: 0,
+      tool_calls: 2,
+      github_actions: 0,
+      shared_storage_bytes: 2 * 1024 * 1024,
+    },
+  };
+
   const artifacts: Artifact[] = [
     {
       id: 'art_diagram_1',
@@ -960,5 +1085,8 @@ export function createDemoDataset(): DemoDataset {
     githubActions,
     aiProviderConfigs,
     aiModelRoutes,
+    invites,
+    aiAgents,
+    usageByGroup,
   };
 }

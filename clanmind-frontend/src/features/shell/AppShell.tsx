@@ -1526,12 +1526,27 @@ export function AppShell() {
                   toast({ title: 'Settings saved', variant: 'success' });
                 }}
                 onUpdateFeatureFlags={() => {}}
-                onTransferOwnership={() => toast({ title: 'Ownership transfer', description: 'Available for group Owners.' })}
-                onDeleteGroup={() => toast({ title: 'Group deletion', description: 'Danger zone actions require confirmation.' })}
+                onTransferOwnership={() => {
+                  // Endpoint + role sync happen in the settings controller
+                  // (§7.2); the shell only mirrors the outcome.
+                  toast({ title: 'Ownership transferred.', variant: 'success' });
+                }}
+                onDeleteGroup={() => {
+                  // The §228 soft delete already succeeded server-side
+                  // (controller); drop the Group locally and leave.
+                  useGroupStore.getState().removeGroup(activeGroup.id);
+                  const next = useGroupStore
+                    .getState()
+                    .groups.find((g) => g.id !== activeGroup.id);
+                  if (next) {
+                    navigate(`/group/${next.id}/chat`);
+                  } else {
+                    navigate('/onboarding');
+                  }
+                }}
                 onUpdateMemberRole={(userId, role) => useGroupStore.getState().updateMemberRole(userId, role)}
                 onRemoveMember={(userId) => {
                   useGroupStore.getState().removeMember(userId);
-                  toast({ title: 'Member removed' });
                 }}
               />
             </ErrorBoundary>

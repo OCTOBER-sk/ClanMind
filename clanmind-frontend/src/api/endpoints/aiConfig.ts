@@ -14,8 +14,8 @@
  */
 
 import { api } from '@/api/client';
-import { AiConfigResponseSchema, ValidateProviderResponseSchema } from '@/api/schemas';
-import type { AiConfigResponse, AiRouteRole, ModelDescriptor } from '@/types';
+import { AiAgentConfigSchema, AiConfigResponseSchema, ValidateProviderResponseSchema } from '@/api/schemas';
+import type { AiAgentConfig, AiConfigResponse, AiRouteRole, ModelDescriptor } from '@/types';
 
 export async function fetchAiConfig(groupId: string): Promise<AiConfigResponse> {
   const raw = await api.get(`/groups/${encodeURIComponent(groupId)}/ai/config`);
@@ -80,4 +80,48 @@ export async function fetchProviderModels(
     return raw as { provider: string; models: ModelDescriptor[] };
   }
   throw new Error('Provider models response failed schema validation.');
+}
+
+// ─── Group AI agent identity/personality (BE §30 row) ───────────────────────
+//
+// The real Worker stores this in `ai_agents` (§30) but ships NO read/write
+// route yet. These two calls use the documented demo-parity route
+// `GET|PATCH /groups/:id/ai/agent`; live mode surfaces an honest failure
+// instead of pretending a save happened (INTEGRATION_NOTES D26).
+
+export async function fetchAiAgent(groupId: string): Promise<AiAgentConfig | null> {
+  const raw = await api.get(`/groups/${encodeURIComponent(groupId)}/ai/agent`, { retries: 0 });
+  const parsed = AiAgentConfigSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  return parsed.data as unknown as AiAgentConfig;
+}
+
+export interface AiAgentUpdateInput {
+  name?: string;
+  tone?: string | null;
+  personality_config?: AiAgentConfig['personality_config'];
+  mode_policy?: AiAgentConfig['mode_policy'];
+}
+
+export async function updateAiAgent(
+  groupId: string,
+  input: AiAgentUpdateInput,
+): Promise<AiAgentConfig> {
+  const raw = await api.patch(`/groups/${encodeURIComponent(groupId)}/ai/agent`, input);
+  const parsed = AiAgentConfigSchema.safeParse(raw);
+  if (!parsed.success) throw new Error('AI agent response failed schema validation.');
+  return parsed.data as unknown as AiAgentConfig;
+}
+
+/**
+ * §232 BYOK key removal. No DELETE route exists on the real Worker yet —
+ * demo-parity only; live mode surfaces the honest failure (D26).
+ */
+export async function removeProviderConfig(groupId: string, configId: string): Promise<void> {
+  const raw = await api.delete(
+    `/groups/${encodeURIComponent(groupId)}/ai/providers/${encodeURIComponent(configId)}`,
+  );
+  if (!(raw && typeof raw === 'object' && (raw as Record<string, unknown>).ok === true)) {
+    throw new Error('Unexpected removal response.');
+  }
 }

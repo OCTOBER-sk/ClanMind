@@ -3,17 +3,44 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SettingsView, type SettingsViewProps } from '@/features/settings/SettingsView';
 import { ToastProvider } from '@/design-system/components/Toast';
+import { useAuthStore } from '@/state/useAuthStore';
 import type { Group, GroupMember, GroupRole, ServerFeatureFlags } from '@/types';
 
 // BYOK reads go through the ai-config endpoints; mock them so the test never
 // depends on a live transport. The response is the SANITIZED shape §63.1 —
 // metadata + key_last4 ONLY, never the credential.
 const aiConfigModule = await import('@/api/endpoints/aiConfig');
-vi.mock('@/api/endpoints/aiConfig', () => ({
-  fetchAiConfig: vi.fn(),
+vi.mock('@/api/endpoints/aiConfig', () => ({  fetchAiConfig: vi.fn(),
   fetchProviderModels: vi.fn().mockResolvedValue({ provider: 'anthropic', models: [] }),
   saveModelRoutes: vi.fn(),
   validateProviderKey: vi.fn(),
+  // P12 controller surface — stubbed so the mocked namespace stays complete.
+  fetchAiAgent: vi.fn().mockResolvedValue(null),
+  updateAiAgent: vi.fn(),
+  removeProviderConfig: vi.fn(),
+}));
+
+vi.mock('@/api/endpoints/me', () => ({
+  fetchMyProfile: vi
+    .fn()
+    .mockResolvedValue({ id: 'u_1', display_name: 'Priya Sharma', email_snapshot: 'priya@x.io' }),
+  updateMyProfile: vi.fn(),
+}));
+vi.mock('@/api/endpoints/members', () => ({
+  updateMemberRole: vi.fn(),
+  removeMember: vi.fn(),
+  transferOwnership: vi.fn(),
+  createInvite: vi.fn(),
+  fetchInvites: vi.fn().mockResolvedValue([]),
+  revokeInvite: vi.fn(),
+}));
+vi.mock('@/api/client', () => ({
+  api: {
+    get: vi.fn().mockRejectedValue(new Error('offline in test')),
+    post: vi.fn().mockRejectedValue(new Error('offline in test')),
+    patch: vi.fn().mockRejectedValue(new Error('offline in test')),
+    delete: vi.fn().mockRejectedValue(new Error('offline in test')),
+  },
 }));
 
 const mockFetchAiConfig = aiConfigModule.fetchAiConfig as unknown as ReturnType<typeof vi.fn>;
@@ -66,6 +93,13 @@ function renderSettings(props: Partial<SettingsViewProps> = {}) {
     onTransferOwnership: vi.fn(),
     onDeleteGroup: vi.fn(),
   };
+  // Role gating needs the viewer on the roster — sign in the fixture Owner.
+  useAuthStore.getState().setUser({
+    id: 'u_1',
+    email: 'priya@x.io',
+    name: 'Priya Sharma',
+    created_at: new Date().toISOString(),
+  });
   return render(
     <ToastProvider>
       <SettingsView {...base} {...props} />

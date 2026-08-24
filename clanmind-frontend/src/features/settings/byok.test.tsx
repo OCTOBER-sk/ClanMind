@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SettingsView } from '@/features/settings/SettingsView';
+import { ToastProvider } from '@/design-system/components/Toast';
 import type {
   AiConfigResponse,
   AiProviderConfig,
@@ -24,12 +25,43 @@ vi.mock('@/api/endpoints/aiConfig', () => ({
   saveModelRoutes: vi.fn(),
   validateProviderKey: vi.fn(),
   fetchProviderModels: vi.fn(),
+  // P12 controller surface — not exercised here; stubbed so the mocked
+  // module namespace stays complete.
+  fetchAiAgent: vi.fn().mockResolvedValue(null),
+  updateAiAgent: vi.fn(),
+  removeProviderConfig: vi.fn(),
+}));
+
+// P12 controller reads /me + members endpoints on mount; stub them hermetically.
+vi.mock('@/api/endpoints/me', () => ({
+  fetchMyProfile: vi
+    .fn()
+    .mockResolvedValue({ id: 'user_arun_1', display_name: 'Arun Kumar', email_snapshot: 'arun@clanmind.io' }),
+  updateMyProfile: vi.fn(),
+}));
+vi.mock('@/api/endpoints/members', () => ({
+  updateMemberRole: vi.fn(),
+  removeMember: vi.fn(),
+  transferOwnership: vi.fn(),
+  createInvite: vi.fn(),
+  fetchInvites: vi.fn().mockResolvedValue([]),
+  revokeInvite: vi.fn(),
+}));
+// The §92 usage read goes through the raw client; keep it offline.
+vi.mock('@/api/client', () => ({
+  api: {
+    get: vi.fn().mockRejectedValue(new Error('offline in test')),
+    post: vi.fn().mockRejectedValue(new Error('offline in test')),
+    patch: vi.fn().mockRejectedValue(new Error('offline in test')),
+    delete: vi.fn().mockRejectedValue(new Error('offline in test')),
+  },
 }));
 
 import {
   fetchAiConfig,
   validateProviderKey,
 } from '@/api/endpoints/aiConfig';
+import { useAuthStore } from '@/state/useAuthStore';
 
 const mockedFetchAiConfig = vi.mocked(fetchAiConfig);
 const mockedValidate = vi.mocked(validateProviderKey);
@@ -83,16 +115,34 @@ function modelsFixture(): ModelDescriptor[] {
 function renderSettings() {
   const user = userEvent.setup();
   const onUpdateGroup = vi.fn();
+  // Role-gated sections need the viewer on the roster; sign in the fixture
+  // Owner before rendering (P12 permission model).
+  useAuthStore.getState().setUser({
+    id: 'user_arun_1',
+    email: 'arun@clanmind.io',
+    name: 'Arun Kumar',
+    created_at: new Date().toISOString(),
+  });
   render(
-    <SettingsView
-      group={groupFixture()}
-      members={[]}
-      featureFlags={FLAGS}
-      onUpdateGroup={onUpdateGroup}
-      onUpdateFeatureFlags={vi.fn()}
-      onTransferOwnership={vi.fn()}
-      onDeleteGroup={vi.fn()}
-    />,
+    <ToastProvider>
+      <SettingsView
+        group={groupFixture()}
+        members={[
+          {
+            user_id: 'user_arun_1',
+            group_id: 'grp_robotics_1',
+            role: 'OWNER',
+            user: useAuthStore.getState().user!,
+            joined_at: new Date().toISOString(),
+          },
+        ]}
+        featureFlags={FLAGS}
+        onUpdateGroup={onUpdateGroup}
+        onUpdateFeatureFlags={vi.fn()}
+        onTransferOwnership={vi.fn()}
+        onDeleteGroup={vi.fn()}
+      />
+    </ToastProvider>,
   );
   return { user, onUpdateGroup };
 }

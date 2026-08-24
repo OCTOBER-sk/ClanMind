@@ -29,7 +29,7 @@ export interface TopBarProps {
   isMeetingActive: boolean;
   /** §165A.2 — Meeting Mode entry point hidden entirely when flag is off */
   meetingEnabled: boolean;
-  theme: 'light' | 'dark';
+  theme: 'light' | 'dark' | 'system';
   onToggleTheme: () => void;
   onOpenSearch: () => void;
   onStartMeeting: () => void;
@@ -116,6 +116,11 @@ export function TopBar({
   }));
 
   // §272 Profile dropdown — theme + demo replay live here, not the top bar (§325 #12)
+  // 'system' resolves through the OS preference so the label names the theme
+  // a toggle click would switch AWAY from.
+  const effectiveDark =
+    theme === 'dark' ||
+    (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const profileMenuItems = [
     {
       id: 'profile',
@@ -131,8 +136,8 @@ export function TopBar({
     },
     {
       id: 'theme',
-      label: theme === 'dark' ? 'Light theme' : 'Dark theme',
-      icon: theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />,
+      label: effectiveDark ? 'Light theme' : 'Dark theme',
+      icon: effectiveDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />,
       onClick: onToggleTheme,
     },
     { divider: true as const, id: 'div-profile-1' },

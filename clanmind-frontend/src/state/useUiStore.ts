@@ -15,7 +15,8 @@ export type MainNavSection =
   | 'activity';
 
 export interface UiState {
-  theme: 'light' | 'dark';
+  /** §11 UI preference — light / dark / follow the OS (resolved at render). */
+  theme: 'light' | 'dark' | 'system';
   sidebarWidth: number; // default 240px
   rightPanelWidth: number; // default 460px
   isSidebarCollapsed: boolean;
@@ -43,7 +44,7 @@ export interface UiState {
   isApprovalDialogOpen: boolean;
   isByokDialogOpen: boolean;
 
-  setTheme: (theme: 'light' | 'dark') => void;
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
   toggleTheme: () => void;
   setSidebarWidth: (width: number) => void;
   setRightPanelWidth: (width: number) => void;

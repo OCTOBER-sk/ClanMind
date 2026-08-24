@@ -586,3 +586,81 @@ export const ArtifactRowSchema = z
 export const ArtifactListSchema = z
   .object({ items: z.array(ArtifactRowSchema).nullish() })
   .passthrough();
+
+// ─── Settings (P12): profile, members, invites, agent, usage ────────────────
+
+/** BE §104 members PATCH body vocabulary — exact role enum. */
+export const MemberRoleSchema = z.enum(['OWNER', 'ADMIN', 'MEMBER', 'GUEST']);
+
+/** POST /groups/:id/invites → 201 { invite, token } (token shown once, §8.2). */
+export const InviteCreatedSchema = z
+  .object({
+    invite: z
+      .object({
+        id: IdSchema,
+        group_id: IdSchema,
+        created_by: IdSchema,
+        email: z.string().nullable(),
+        role: z.string(),
+        expires_at: IsoDateSchema,
+        max_uses: z.number().nullable(),
+        uses_count: z.number(),
+        revoked_at: z.string().nullable(),
+        created_at: IsoDateSchema,
+      })
+      .passthrough(),
+    token: z.string().min(1),
+  })
+  .passthrough();
+
+/** GET /groups/:id/invites → { items } — rows NEVER carry the raw token. */
+export const InviteListSchema = z
+  .object({ items: z.array(z.object({ id: IdSchema }).passthrough()).nullish() })
+  .passthrough();
+
+/** BE §30 ai_agents row (settings agent surface; demo-parity route — D26). */
+export const AiAgentConfigSchema = z
+  .object({
+    group_id: IdSchema,
+    name: z.string().min(1),
+    avatar_object_id: z.string().nullable().nullish(),
+    tone: z.string().nullable().nullish(),
+    personality_config: z
+      .object({
+        preset: z.enum(['balanced', 'direct', 'creative', 'analytical', 'custom']).catch('balanced'),
+        custom_instructions: z.string().optional(),
+      })
+      .passthrough()
+      .default({ preset: 'balanced' }),
+    mode_policy: z
+      .object({
+        proactivity: z.enum(['off', 'low', 'balanced', 'high']).optional(),
+        permissions: z.record(z.string(), z.boolean()).optional(),
+      })
+      .passthrough()
+      .default({}),
+    updated_at: IsoDateSchema.optional(),
+  })
+  .passthrough();
+
+/** BE §92 usage counters (demo-parity route — D26). */
+export const UsageSnapshotSchema = z
+  .object({
+    group_id: IdSchema,
+    counters: z
+      .object({
+        ai_requests: z.number(),
+        input_tokens: z.number(),
+        output_tokens: z.number(),
+        estimated_cost: z.number(),
+        research_calls: z.number(),
+        research_sources: z.number(),
+        artifact_generations: z.number(),
+        tool_calls: z.number(),
+        github_actions: z.number(),
+        shared_storage_bytes: z.number(),
+      })
+      .passthrough(),
+    period_start: IsoDateSchema.nullish(),
+  })
+  .passthrough();
