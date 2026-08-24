@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useCallback, useMemo, useRef } from 'react';
 import * as RadixToast from '@radix-ui/react-toast';
 import { X, Check, AlertTriangle, Info, AlertCircle } from 'lucide-react';
 import { cn } from '../utils';
@@ -53,8 +53,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  // P14 §203/§288 — stable context identity: a toast firing (or any provider
+  // re-render) must not cascade into every useToast consumer app-wide
+  // (Composer, ArtifactPanel, settings…). Consumers re-render only on real
+  // state they hold themselves.
+  const contextValue = useMemo(() => ({ toast, dismiss }), [toast, dismiss]);
+
   return (
-    <ToastContext.Provider value={{ toast, dismiss }}>
+    <ToastContext.Provider value={contextValue}>
       <RadixToast.Provider swipeDirection="right">
         {children}
 

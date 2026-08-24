@@ -7,7 +7,7 @@
  * Version compare/restore/export flows run through the feature controller.
  */
 
-import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, memo, useEffect, useRef, useState } from 'react';
 import {
   Download,
   GitCompare,
@@ -90,7 +90,7 @@ function RendererIsolationFallback({ onExportRaw }: { onExportRaw?: () => void }
   );
 }
 
-export function ArtifactPanel({
+function ArtifactPanelBody({
   artifact,
   activeVersionNumber,
   compareVersionNumber,
@@ -407,4 +407,13 @@ export function ArtifactPanel({
     </div>
   );
 }
+
+/**
+ * P14 — memoized at the export boundary (FE §203/§288). AppShell re-renders on
+ * every composer keystroke and presence tick; the artifact surface must stay
+ * inert unless one of its actual inputs changes. All callback props are
+ * referentially stable in AppShell (store actions or useCallback), so shallow
+ * comparison is sufficient — no custom comparator that could go stale.
+ */
+export const ArtifactPanel = memo(ArtifactPanelBody);
 

@@ -85,7 +85,7 @@ import { useProjectDataStore } from '@/state/useProjectDataStore';
 import { useUiStore } from '@/state/useUiStore';
 import { cn } from '@/design-system/utils';
 import { AlertOctagon, X } from 'lucide-react';
-import type { GroupRole, Message, Task, MainNavSection, MeetingCandidate } from '@/types';
+import type { Artifact, GroupRole, Message, Task, MainNavSection, MeetingCandidate } from '@/types';
 import { applyWindowState, captureWindowState, checkForUpdate, installUpdate, restoreWindowState, saveWindowState } from '@/tauri/bridge';
 
 export function AppShell() {
@@ -353,6 +353,30 @@ export function AppShell() {
   // Live construction trace of the artifact currently on the surface (§97).
   const activeConstruction = useConstructionStore((s) =>
     activeArtifact ? s.byArtifact[activeArtifact.id] ?? null : null,
+  );
+
+  // ─── P14 §203/§288 — stable identities for the memoized ArtifactPanel ────
+  // AppShell re-renders on every composer keystroke (composerText lives in
+  // the chat store). Hoisting these callbacks keeps them referentially equal
+  // across keystrokes/presence ticks so the panel body (markdown re-parse,
+  // diagram layout) stays inert unless its actual inputs change.
+  const askOdinAboutNode = useCallback(
+    (nodeLabel: string) => {
+      // §107 — the selected object id/context rides into the request.
+      setComposerText(
+        `@${activeGroup?.ai_name || 'Odin'} About "${nodeLabel}" in ${activeArtifact?.title}: `,
+      );
+      navigateToSection('chat');
+    },
+    [setComposerText, activeGroup?.ai_name, activeArtifact?.title, navigateToSection],
+  );
+
+  const sendArtifactToChat = useCallback(
+    (art: Artifact) => {
+      setComposerText(`@${activeGroup?.ai_name || 'Odin'} Using "${art.title}" as context — `);
+      navigateToSection('chat');
+    },
+    [setComposerText, activeGroup?.ai_name, navigateToSection],
   );
 
   // §30 — the thread surface tracks a root MESSAGE ID and resolves it live
@@ -1077,15 +1101,8 @@ export function AppShell() {
           onClose={closeRightPanel}
           onSelectVersion={setActiveVersionNumber}
           onSetCompareVersion={setCompareVersionNumber}
-          onAskOdinAboutNode={(nodeLabel) => {
-            // §107 — the selected object id/context rides into the request.
-            setComposerText(`@${activeGroup?.ai_name || 'Odin'} About "${nodeLabel}" in ${activeArtifact.title}: `);
-            navigateToSection('chat');
-          }}
-          onSendToChat={(art) => {
-            setComposerText(`@${activeGroup?.ai_name || 'Odin'} Using "${art.title}" as context — `);
-            navigateToSection('chat');
-          }}
+          onAskOdinAboutNode={askOdinAboutNode}
+          onSendToChat={sendArtifactToChat}
         />
       ) : null}
     </>

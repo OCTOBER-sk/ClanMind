@@ -147,3 +147,4 @@ describe('ArtifactPanel', () => {
     expect(menu.textContent).toContain('Send to Chat');
   });
 });
+
