@@ -6,11 +6,13 @@
  */
 
 import { setTransportOverride } from '@/api/transport';
-import { initRealtime } from '@/realtime/connection';
+import { initRealtime, getRealtime } from '@/realtime/connection';
+import { clientEvents, getDeviceId } from '@/realtime/events';
 import { markProtocolUpdateRequired } from '@/sync/connectivity';
 import { useArtifactStore } from '@/state/useArtifactStore';
 import type { Message, MeetingCandidate } from '@/types';
 import { useChatStore } from '@/state/useChatStore';
+import { useSyncStore } from '@/state/useSyncStore';
 import { useMeetingStore } from '@/state/useMeetingStore';
 import { createDemoDataset } from './dataset';
 import {
@@ -158,6 +160,10 @@ export function installDemoMode(): DemoModeHandle {
 
   // 3. Route demo socket traffic through the SAME dispatch pipeline production
   // uses — the client cannot tell demo from live inside its own code paths.
+  // §17.1 gap recovery and §186A.1 checkpoint advancement are wired
+  // IDENTICALLY to live mode (src/live/liveRuntime.ts) — one pattern, both
+  // transports, per D2/D7.
+  const demoGroupId = ds.groups[0]?.id;
   initRealtime({
     getToken: async () => 'demo-token',
     socketFactory: runtime.socketFactory,
@@ -165,8 +171,18 @@ export function installDemoMode(): DemoModeHandle {
     onEvent: (event) => dispatchRealtimeEvent(event),
     onReady: () => {},
     onProtocolRequired: markProtocolUpdateRequired,
-    onSequenceGap: () => {},
-  }).connect([ds.groups[0]?.id].filter((id): id is string => Boolean(id)));
+    onSequenceGap: (gapGroupId, from) => {
+      getRealtime().send(clientEvents.syncRequest(gapGroupId, from));
+    },
+    onSequenceAdvance: (groupId, sequence) => {
+      useSyncStore.getState().setCheckpoint({
+        device_id: getDeviceId(),
+        group_id: groupId,
+        last_server_sequence: sequence,
+        last_synced_at: new Date().toISOString(),
+      });
+    },
+  }).connect([demoGroupId].filter((id): id is string => Boolean(id)));
 
   // 4. Hydrate stores (runtime stores ship empty in live mode).
   applyDemoHydration(ds);

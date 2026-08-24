@@ -58,6 +58,16 @@ export function useChatController() {
       if (!user || !activeGroup) return;
       if (!chat.composerText.trim() && chat.composerAttachments.length === 0) return;
 
+      // §58 — a private send requires an intact recipient selection. A
+      // stale/cleared selection must NEVER degrade into a public send.
+      const { members } = useGroupStore.getState();
+      const privateRecipientValid =
+        chat.visibility === 'PRIVATE_PAIR'
+          ? Boolean(chat.privateRecipientId) &&
+            members.some((m) => m.user_id === chat.privateRecipientId)
+          : chat.visibility === 'PRIVATE_AI';
+      if (chat.visibility !== 'GROUP' && !privateRecipientValid) return;
+
       // §186A.2: reuse the identical client_operation_id on retry.
       const clientOperationId =
         input.existingClientOperationId ??
@@ -249,6 +259,83 @@ export function useChatController() {
     });
   }, []);
 
+  /**
+   * §30 — thread reply composer (right work surface). Mirrors the main send
+   * pipeline: optimistic insert with a fresh §241 client id → POST with
+   * `reply_to_id` → reconcile via echo; offline queues like any message.
+   */
+  const sendThreadReply = useCallback(
+    (rootMessageId: string, body: string): void => {
+      const trimmed = body.trim();
+      if (!trimmed) return;
+      const { activeGroup, activeProject } = useGroupStore.getState();
+      const syncStatus = useSyncStore.getState().status;
+      if (!user || !activeGroup) return;
+
+      const clientOperationId = `client_op_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const rootPreview =
+        useChatStore
+          .getState()
+          .messages.find((m) => m.id === rootMessageId)
+          ?.body.slice(0, 80) ?? '';
+
+      const offline = syncStatus === 'offline' || syncStatus === 'reconnecting';
+      const replyMsg: Message = {
+        id: messageId,
+        client_message_id: clientOperationId,
+        group_id: activeGroup.id,
+        project_id: activeProject?.id,
+        sender_type: 'USER',
+        sender_id: user.id,
+        sender_name: user.name,
+        body: trimmed,
+        visibility: 'GROUP',
+        reply_to_message_id: rootMessageId,
+        reply_to_preview: rootPreview,
+        pinned: false,
+        edited: false,
+        deleted: false,
+        attachments: [],
+        reactions: [],
+        is_pending: offline,
+        is_failed: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      useChatStore.getState().addMessage(replyMsg);
+
+      if (offline) {
+        useChatStore.getState().addPendingMessage({
+          clientMessageId: clientOperationId,
+          body: trimmed,
+          attachmentIds: [],
+          createdAt: replyMsg.created_at,
+        });
+        return;
+      }
+
+      void api
+        .post(`/groups/${activeGroup.id}/messages`, {
+          project_id: activeProject?.id ?? null,
+          client_message_id: clientOperationId,
+          body: trimmed,
+          reply_to_id: rootMessageId,
+        })
+        .then(() => {
+          useChatStore.getState().updateMessage(messageId, { is_pending: false });
+        })
+        .catch(() => {
+          // §245 — never discard a failed reply.
+          useChatStore.getState().updateMessage(messageId, {
+            is_failed: true,
+            is_pending: false,
+          });
+        });
+    },
+    [user],
+  );
+
   /** §141 quota-failure injection surface (demo mode only). */
   const simulateQuotaError = useCallback(
     (messageId: string, canContinueWithByok: boolean): void => {
@@ -257,5 +344,5 @@ export function useChatController() {
     [],
   );
 
-  return { sendMessage, retryMessage, simulateQuotaError };
+  return { sendMessage, retryMessage, sendThreadReply, simulateQuotaError };
 }

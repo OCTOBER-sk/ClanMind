@@ -8,6 +8,14 @@ import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog';
 import { MessageList } from '@/features/chat/MessageList';
 import { Composer } from '@/features/chat/Composer';
 import { useChatController } from '@/features/chat/useChatController';
+import { useChatMessages } from '@/features/chat/useChatMessages';
+import {
+  mergeMessages,
+  filterMessagesForScope,
+  annotateThreadCounts,
+  activeTypingUsers,
+  type ChatScope,
+} from '@/features/chat/chatSelectors';
 import { ArtifactPanel } from '@/features/artifacts/ArtifactPanel';
 import { ThreadPanel } from '@/features/chat/ThreadPanel';
 import { MeetingActiveHeader } from '@/features/meetings/MeetingActiveHeader';
@@ -74,12 +82,13 @@ export function AppShell() {
     composerText,
     composerAttachments,
     visibility,
+    privateRecipientId,
     privateRecipientName,
     typingUsers,
+    presenceOnlineCount,
     lastReadMessageIdByScope,
     pendingMessages,
     setComposerText,
-    addMessage,
     updateMessage,
     deleteMessage,
     addReaction,
@@ -233,7 +242,9 @@ export function AppShell() {
   const { toast } = useToast();
   useGlobalShortcuts();
 
-  const [activeThreadMessage, setActiveThreadMessage] = useState<Message | null>(null);
+  // §30 — the thread surface tracks a root MESSAGE ID and resolves it live
+  // from the merged list, so replies/edits appear without stale snapshots.
+  const [threadRootId, setThreadRootId] = useState<string | null>(null);
   const [isJoinGroupDialogOpen, setJoinGroupDialogOpen] = useState(false);
 
   // Quick Action Dialog States
@@ -256,9 +267,60 @@ export function AppShell() {
 
   // ─── Chat pipeline (refactor R1) — send/retry/AI-trigger live in the
   // chat controller; the shell only wires UI events to it. ───────────────────
-  const { sendMessage, retryMessage } = useChatController();
+  const { sendMessage, retryMessage, sendThreadReply } = useChatController();
   const handleSendMessage = useCallback(() => sendMessage(), [sendMessage]);
   const handleRetryMessage = retryMessage;
+  const handleSendThreadReply = useCallback(
+    (rootId: string, body: string) => sendThreadReply(rootId, body),
+    [sendThreadReply],
+  );
+
+  // ─── §202/§289 — cursor-paged history (server truth) merged with the live
+  // realtime tail (store) into ONE ascending list, then scoped per FE rule 26:
+  // GROUP view never sees PRIVATE_* content; private views see only their own
+  // conversation. The same scoped list feeds search (§176). ──────────────────
+  const { historyMessages, hasOlder, isLoadingOlder, loadOlder } = useChatMessages(
+    groupForRoute?.id,
+  );
+  const chatScope = useMemo<ChatScope | null>(
+    () =>
+      groupForRoute
+        ? {
+            groupId: groupForRoute.id,
+            visibility,
+            currentUserId: user?.id ?? '',
+            recipientId: privateRecipientId ?? null,
+          }
+        : null,
+    [groupForRoute, visibility, user?.id, privateRecipientId],
+  );
+
+  // §37 — typing indicators are ephemeral; prune on a 1s tick while any exist.
+  const [typingNow, setTypingNow] = useState(Date.now());
+  useEffect(() => {
+    if (typingUsers.length === 0) return;
+    const id = setInterval(() => setTypingNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [typingUsers.length]);
+  const activeTyping = useMemo(
+    () => activeTypingUsers(typingUsers, typingNow),
+    [typingUsers, typingNow],
+  );
+
+  /** Server history ⊕ realtime tail → one ascending list (§202). */
+  const allMessages = useMemo(
+    () => annotateThreadCounts(mergeMessages(historyMessages, messages)),
+    [historyMessages, messages],
+  );
+
+  /** Rule-26 scope filter — shared surface AND search see only their scope. */
+  const scopedMessages = useMemo(
+    () =>
+      chatScope
+        ? filterMessagesForScope(allMessages, chatScope)
+        : [],
+    [allMessages, chatScope],
+  );
 
   // ─── §190 drafts: persist per account:group:project scope; restore on switch ───
   const scopeKey = `${user?.id ?? 'anon'}:${groupForRoute?.id ?? 'none'}:${projectForRoute?.id ?? 'group'}`;
@@ -453,10 +515,19 @@ export function AppShell() {
     toast({ title: 'Meeting summary saved', description: 'Available in Garage as an artifact.' });
   };
 
-  const handleOpenThread = (msg: Message) => {
-    setActiveThreadMessage(msg);
-    setRightPanelMode('thread');
-  };
+  /** §30 — Reply opens the thread in the right work surface. */
+  const handleOpenThread = useCallback(
+    (msg: Message) => {
+      setThreadRootId(msg.id);
+      setRightPanelMode('thread');
+    },
+    [setRightPanelMode],
+  );
+
+  const handleCloseThread = useCallback(() => {
+    setThreadRootId(null);
+    closeRightPanel();
+  }, [closeRightPanel]);
 
   const handleCreateTaskFromMessage = (msg: Message) => {
     setTaskTitle(msg.body.slice(0, 60));
@@ -519,6 +590,19 @@ export function AppShell() {
   const handleDeepLink = (route: string) => {
     navigate(route);
   };
+
+  // §30 — resolve the open thread's root + replies LIVE from merged messages.
+  const activeThreadMessage = useMemo(
+    () => (threadRootId ? allMessages.find((m) => m.id === threadRootId) ?? null : null),
+    [allMessages, threadRootId],
+  );
+  const activeThreadReplies = useMemo(
+    () =>
+      threadRootId
+        ? allMessages.filter((m) => m.reply_to_message_id === threadRootId)
+        : [],
+    [allMessages, threadRootId],
+  );
 
   if (!user || !groupForRoute) {
     // Live mode before the workspace query resolves; demo hydrates instantly.
@@ -595,30 +679,9 @@ export function AppShell() {
       ) : rightPanelMode === 'thread' && activeThreadMessage ? (
         <ThreadPanel
           rootMessage={activeThreadMessage}
-          currentUserId={currentUserId}
-          currentUserName={user?.name}
-          onClose={closeRightPanel}
-          onSendReply={(rootId, text) => {
-            const replyMsg: Message = {
-              id: `msg_${Date.now()}`,
-              group_id: groupForRoute?.id ?? '',
-              project_id: activeProject?.id,
-              sender_type: 'USER',
-              sender_id: currentUserId,
-              sender_name: user?.name || 'Arun Kumar',
-              body: text,
-              visibility: 'GROUP',
-              reply_to_message_id: rootId,
-              pinned: false,
-              edited: false,
-              deleted: false,
-              attachments: [],
-              reactions: [],
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            };
-            addMessage(replyMsg);
-          }}
+          replies={activeThreadReplies}
+          onClose={handleCloseThread}
+          onSendReply={handleSendThreadReply}
         />
       ) : rightPanelMode === 'research' ? (
         <ResearchDrawer
@@ -900,19 +963,19 @@ export function AppShell() {
             <ErrorBoundary label="Chat">
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <MessageList
-                  messages={messages}
+                  messages={scopedMessages}
                   currentUserId={currentUserId}
-                  typingUsers={typingUsers}
+                  typingUsers={activeTyping}
                   lastReadMessageId={lastReadMessageIdByScope[scopeKey]}
                   onMarkRead={(messageId) => markScopeRead(scopeKey, messageId)}
                   aiRunsByMessage={aiRunsByMessage}
-                  streamingMessageIds={messages
+                  streamingMessageIds={scopedMessages
                     .filter((m) => aiRunsByMessage[m.id]?.status === 'STREAMING')
                     .map((m) => m.id)}
                   aiName={activeGroup?.ai_name || 'Odin'}
                   groupName={activeGroup?.name || 'Group Chat'}
                   activeProjectName={activeProject?.name}
-                  presenceCount={members.length}
+                  presenceCount={presenceOnlineCount ?? members.length}
                   aiWorking={Object.values(aiRunsByMessage).some(
                     (r) => r.status === 'RUNNING' || r.status === 'WAITING_TOOL' || r.status === 'STREAMING'
                   )}
@@ -924,18 +987,13 @@ export function AppShell() {
                   canModerate={members.find((m) => m.user_id === currentUserId)?.role === 'OWNER' || members.find((m) => m.user_id === currentUserId)?.role === 'ADMIN'}
                   userRole={members.find((m) => m.user_id === currentUserId)?.role ?? 'MEMBER'}
                   onOpenSettings={() => navigateToSection('settings')}
-                  onReply={(msg) =>
-                    setReplyTarget({
-                      messageId: msg.id,
-                      senderName: msg.sender_name,
-                      preview: msg.body.slice(0, 80),
-                    })
-                  }
+                  // §30 — Reply opens the thread in the right work surface.
+                  onReply={handleOpenThread}
                   onReact={(messageId, emoji) => addReaction(messageId, emoji, currentUserId)}
                   onEditSave={(id, text) => updateMessage(id, { body: text, edited: true })}
                   onDelete={deleteMessage}
                   onTogglePin={(id) => {
-                    const m = messages.find((msg) => msg.id === id);
+                    const m = scopedMessages.find((msg) => msg.id === id);
                     if (m) updateMessage(id, { pinned: !m.pinned });
                   }}
                   onCreateTask={handleCreateTaskFromMessage}
@@ -944,6 +1002,9 @@ export function AppShell() {
                     toast({ title: 'Added to Odin context', description: `${msg.body.slice(0, 40)}…` })
                   }
                   onOpenThread={handleOpenThread}
+                  onLoadOlder={loadOlder}
+                  hasOlder={hasOlder}
+                  isLoadingOlder={isLoadingOlder}
                   onCreateProject={() => navigateToSection('overview')}
                   onInviteTeammates={() => navigateToSection('settings')}
                   onAskOdin={() => {
@@ -961,9 +1022,10 @@ export function AppShell() {
                   replyTarget={replyTarget}
                   onClearReplyTarget={() => setReplyTarget(null)}
                   visibility={visibility}
+                  privateRecipientId={privateRecipientId}
                   privateRecipientName={privateRecipientName}
                   onClearPrivateMode={() => setVisibility('GROUP')}
-                  onSetPrivateMode={(recId, recName) => setVisibility('PRIVATE_PAIR', recId, recName)}
+                  onSetPrivateMode={(vis, recId, recName) => setVisibility(vis, recId, recName)}
                   members={members}
                   aiName={activeGroup?.ai_name || 'Odin'}
                   activeProjectName={activeProject?.name}
@@ -1134,7 +1196,9 @@ export function AppShell() {
         {showRightSheet ? renderRightSurface() : null}
       </Sheet>
 
-      {/* Global Command Palette (§61) */}
+      {/* Global Command Palette (§61) — §176: it receives ONLY the active
+          conversational scope's messages; private content can never surface
+          in a shared search view. */}
       <CommandPalette
         open={isCommandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
@@ -1142,7 +1206,7 @@ export function AppShell() {
         artifacts={artifacts}
         tasks={tasks}
         decisions={decisions}
-        messages={messages}
+        messages={scopedMessages}
         members={members}
         onSelectProject={(p) => {
           setActiveProject(p);
@@ -1152,7 +1216,7 @@ export function AppShell() {
         onSelectArtifact={(a) => openArtifactPanel(a)}
         onSelectMessage={(msg) => {
           navigateToSection('chat');
-          const m = messages.find((x) => x.id === msg.id);
+          const m = scopedMessages.find((x) => x.id === msg.id);
           if (m) setReplyTarget({ messageId: m.id, senderName: m.sender_name, preview: m.body.slice(0, 80) });
         }}
         onSelectMember={(m) => {

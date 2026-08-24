@@ -23,11 +23,17 @@ export interface MentionPickerProps {
   aiName: string;
   onSelect: (item: MentionItem) => void;
   onClose: () => void;
+  /**
+   * §60 — viewport-space placement computed by the composer from the live
+   * caret position. When absent the picker falls back to its static
+   * anchor above the composer.
+   */
+  placement?: { left: number; top: number } | null;
 }
 
 /** §34: typing @ opens this popover — ↑ ↓ Enter Esc supported (§34) */
 export const MentionPicker = forwardRef<MentionPickerHandle, MentionPickerProps>(
-  function MentionPicker({ query, members, aiName, onSelect, onClose }, ref) {
+  function MentionPicker({ query, members, aiName, onSelect, onClose, placement }, ref) {
     const items: MentionItem[] = [
       {
         id: 'odin_ai',
@@ -68,8 +74,20 @@ export const MentionPicker = forwardRef<MentionPickerHandle, MentionPickerProps>
       <div
         role="listbox"
         aria-label="Mention a teammate"
-        className="absolute bottom-full left-4 mb-2 z-50 w-72 rounded-xl border p-1.5 shadow-[var(--shadow-xl)] max-h-56 overflow-y-auto"
-        style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+        className={cn(
+          'z-50 w-72 rounded-xl border p-1.5 shadow-[var(--shadow-xl)] max-h-56 overflow-y-auto',
+          placement ? 'fixed' : 'absolute bottom-full left-4 mb-2'
+        )}
+        style={
+          placement
+            ? {
+                left: placement.left,
+                top: placement.top,
+                borderColor: 'var(--color-border)',
+                background: 'var(--color-surface-raised)',
+              }
+            : { borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }
+        }
       >
         <div
           className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider"

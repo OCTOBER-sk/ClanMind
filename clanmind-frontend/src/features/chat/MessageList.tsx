@@ -1,10 +1,19 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { MessageRow } from './MessageRow';
 import { ChatHeader } from './ChatHeader';
 import { ArrowDown, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/design-system/utils';
 import { Button } from '@/design-system/components/Button';
 import type { Message, TypingIndicator, AiRun, GroupRole } from '@/types';
+
+/** Below this count the virtualizer overhead buys nothing (§201). */
+export const VIRTUALIZATION_THRESHOLD = 80;
+/** Estimated row height for first paint; corrected by measurement. */
+const ROW_ESTIMATE_PX = 64;
+const OVERSCAN_ROWS = 8;
+/** Scroll distance from top that triggers cursor-loading older history. */
+const LOAD_OLDER_TRIGGER_PX = 480;
 
 export interface MessageListProps {
   messages: Message[];
@@ -42,12 +51,25 @@ export interface MessageListProps {
   onCreateDecision: (message: Message) => void;
   onUseAsContext: (message: Message) => void;
   onOpenThread?: (message: Message) => void;
+  /** §202/§289 — cursor-load one older page; wired by useChatMessages */
+  onLoadOlder?: () => void;
+  hasOlder?: boolean;
+  isLoadingOlder?: boolean;
   /** §78 group empty state actions */
   onCreateProject?: () => void;
   onInviteTeammates?: () => void;
   onAskOdin?: () => void;
 }
 
+/**
+ * §21/§22/§24/§39/§40/§41 + §202/§289 — the conversation surface.
+ *
+ * Long histories are VIRTUALIZED with stable keys (`message.id`), dynamic
+ * row measurement, preserved scroll anchors when older pages prepend
+ * (height-delta compensation — no scroll-jump), and a top-of-list trigger
+ * that cursor-loads older messages. Short histories render directly.
+ * The unread divider rides INSIDE its row wrapper so anchors hold.
+ */
 export function MessageList({
   messages,
   currentUserId,
@@ -78,6 +100,9 @@ export function MessageList({
   onCreateDecision,
   onUseAsContext,
   onOpenThread,
+  onLoadOlder,
+  hasOlder = false,
+  isLoadingOlder = false,
   onCreateProject,
   onInviteTeammates,
   onAskOdin,
@@ -87,13 +112,49 @@ export function MessageList({
   const [unreadNewCount, setUnreadNewCount] = useState(0);
   const lastMessageCountRef = useRef(messages.length);
 
-  const checkIfNearBottom = () => {
+  // ── §202 anchor bookkeeping ─────────────────────────────────────────────
+  // When prepending an older page the content above the viewport grows; we
+  // compensate scrollTop by the measured height delta so the anchored row
+  // stays visually stationary ("do not scroll-jump").
+  const pendingAnchorRef = useRef<{
+    /** Container scrollHeight captured when the older page was requested. */
+    scrollHeight: number;
+    /** Message count captured when the older page was requested. */
+    prevCount: number;
+    frames: number;
+  } | null>(null);
+  const loadOlderGuardRef = useRef(false);
+
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => ROW_ESTIMATE_PX,
+    getItemKey: (index) => messages[index]?.id ?? `idx_${index}`,
+    overscan: OVERSCAN_ROWS,
+  });
+
+  const checkIfNearBottom = useCallback(() => {
     const el = containerRef.current;
     if (!el) return true;
     return el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-  };
+  }, []);
 
-  const handleScroll = () => {
+  const scrollToBottom = useCallback(
+    (smooth = true) => {
+      const el = containerRef.current;
+      if (!el) return;
+      el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+      setUnreadNewCount(0);
+      setIsNearBottom(true);
+      const last = messages[messages.length - 1];
+      if (last && onMarkRead) onMarkRead(last.id);
+    },
+    [messages, onMarkRead],
+  );
+
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
     const nearBottom = checkIfNearBottom();
     setIsNearBottom(nearBottom);
     if (nearBottom) {
@@ -101,24 +162,27 @@ export function MessageList({
       const last = messages[messages.length - 1];
       if (last && onMarkRead) onMarkRead(last.id);
     }
-  };
-
-  const scrollToBottom = (smooth = true) => {
-    const el = containerRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
-    setUnreadNewCount(0);
-    setIsNearBottom(true);
-    const last = messages[messages.length - 1];
-    if (last && onMarkRead) onMarkRead(last.id);
-  };
+    // §202 — approaching the top of the loaded window fetches older pages.
+    if (
+      el.scrollTop < LOAD_OLDER_TRIGGER_PX &&
+      hasOlder &&
+      !isLoadingOlder &&
+      !loadOlderGuardRef.current
+    ) {
+      loadOlderGuardRef.current = true;
+      pendingAnchorRef.current = { scrollHeight: el.scrollHeight, prevCount: messages.length, frames: 0 };
+      onLoadOlder?.();
+    }
+  }, [checkIfNearBottom, messages, onMarkRead, hasOlder, isLoadingOlder, onLoadOlder]);
 
   // §41: auto-follow only when near bottom; accumulate otherwise
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     if (messages.length > lastMessageCountRef.current) {
-      if (isNearBottom) {
+      if (pendingAnchorRef.current) {
+        // Growth came from a history prepend — handled by the anchor effect.
+      } else if (isNearBottom) {
         scrollToBottom(true);
       } else {
         setUnreadNewCount((prev) => prev + (messages.length - lastMessageCountRef.current));
@@ -128,10 +192,70 @@ export function MessageList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length]);
 
+  // Initial paint lands at the latest message without animation.
   useEffect(() => {
     scrollToBottom(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // §202 — restore the scroll anchor after an older page mounts. The exact
+  // height delta above the anchor is added back to scrollTop once per frame
+  // until measurements settle (dynamic row heights arrive asynchronously).
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el || !pendingAnchorRef.current) return;
+    let raf = 0;
+    const settle = () => {
+      const anchor = pendingAnchorRef.current;
+      if (!anchor || !containerRef.current) return;
+      const delta = containerRef.current.scrollHeight - anchor.scrollHeight;
+      if (delta !== 0) {
+        containerRef.current.scrollTop += delta;
+        anchor.scrollHeight = containerRef.current.scrollHeight;
+      }
+      anchor.frames += 1;
+      // Two consecutive settled frames (or a sane cap) releases the anchor.
+      if ((delta === 0 && anchor.frames >= 2) || anchor.frames >= 12) {
+        pendingAnchorRef.current = null;
+        loadOlderGuardRef.current = false;
+        return;
+      }
+      raf = requestAnimationFrame(settle);
+    };
+    raf = requestAnimationFrame(settle);
+    return () => cancelAnimationFrame(raf);
+  }, [messages.length]);
+
+  // A failed/empty older-page fetch must not wedge the load-older trigger.
+  // Only releases when the fetch finished WITHOUT appending rows — a landed
+  // prepend keeps the anchor alive so §202/§289 compensation can run. The
+  // comparison uses the count captured at trigger time (prevCount), never
+  // lastMessageCountRef, which is already updated by the time effects run.
+  useEffect(() => {
+    const anchor = pendingAnchorRef.current;
+    if (!anchor || isLoadingOlder) return;
+    if (messages.length === anchor.prevCount) {
+      pendingAnchorRef.current = null;
+      loadOlderGuardRef.current = false;
+    }
+  }, [isLoadingOlder, messages.length]);
+
+  // Keep following the latest message while measurement-driven height
+  // corrections stream in after the initial paint (§41 near-bottom rule).
+  const totalSize = virtualizer.getTotalSize();
+  const prevTotalSizeRef = useRef(totalSize);
+  useEffect(() => {
+    if (
+      totalSize > prevTotalSizeRef.current &&
+      isNearBottom &&
+      !pendingAnchorRef.current
+    ) {
+      const el = containerRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
+    prevTotalSizeRef.current = totalSize;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalSize]);
 
   const renderTypingText = () => {
     if (typingUsers.length === 0) return null;
@@ -141,12 +265,64 @@ export function MessageList({
     return 'Several teammates are typing…';
   };
 
-  const streamingIds = new Set(streamingMessageIds);
+  const streamingIds = useMemo(() => new Set(streamingMessageIds), [streamingMessageIds]);
 
   // §39: draw the unread divider after the last-read message
   const unreadDividerIndex = lastReadMessageId
     ? messages.findIndex((m) => m.id === lastReadMessageId) + 1
     : -1;
+
+  const renderRow = (message: Message, index: number) => {
+    const prevMessage = index > 0 ? messages[index - 1] : undefined;
+    const isConsecutive =
+      !!prevMessage &&
+      prevMessage.sender_id === message.sender_id &&
+      new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime() <
+        1000 * 60 * 5 &&
+      !prevMessage.deleted;
+
+    return (
+      <>
+        {/* §39 unread divider */}
+        {index === unreadDividerIndex && (
+          <div
+            className="flex items-center gap-3 px-4 py-2 select-none"
+            role="separator"
+            aria-label="New messages start here"
+          >
+            <span className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
+            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-info)' }}>
+              New messages
+            </span>
+            <span className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
+          </div>
+        )}
+        <MessageRow
+          message={message}
+          currentUserId={currentUserId}
+          isConsecutive={isConsecutive}
+          aiRun={aiRunsByMessage[message.id]}
+          aiName={aiName}
+          isStreaming={streamingIds.has(message.id)}
+          onRetry={onRetry}
+          canModerate={canModerate}
+          userRole={userRole}
+          onOpenSettings={onOpenSettings}
+          onReply={onReply}
+          onReact={onReact}
+          onEditSave={onEditSave}
+          onDelete={onDelete}
+          onTogglePin={onTogglePin}
+          onCreateTask={onCreateTask}
+          onCreateDecision={onCreateDecision}
+          onUseAsContext={onUseAsContext}
+          onOpenThread={onOpenThread}
+        />
+      </>
+    );
+  };
+
+  const isEmpty = messages.length === 0;
 
   return (
     <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -166,12 +342,13 @@ export function MessageList({
       <div
         ref={containerRef}
         onScroll={handleScroll}
+        data-virt-viewport="true"
         className="flex-1 overflow-y-auto overflow-x-hidden pt-4 pb-2"
         role="log"
         aria-label="Group conversation"
       >
         {/* §179/§78 group empty state */}
-        {messages.length === 0 && (
+        {isEmpty && (
           <div className="h-full flex flex-col items-center justify-center gap-4 px-8 text-center">
             <div className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>
               Your team is ready.
@@ -204,57 +381,56 @@ export function MessageList({
           </div>
         )}
 
-        {messages.map((message, index) => {
-          const prevMessage = messages[index - 1];
-          const isConsecutive =
-            !!prevMessage &&
-            prevMessage.sender_id === message.sender_id &&
-            new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime() <
-              1000 * 60 * 5 &&
-            !prevMessage.deleted;
+        {!isEmpty && messages.length <= VIRTUALIZATION_THRESHOLD && (
+          /* Short histories render directly — no virtualizer overhead. */
+          messages.map((message, index) => (
+            <React.Fragment key={message.id}>{renderRow(message, index)}</React.Fragment>
+          ))
+        )}
 
-          const isStreaming = streamingIds.has(message.id);
-
-          return (
-            <React.Fragment key={message.id}>
-              {/* §39 unread divider */}
-              {index === unreadDividerIndex && (
+        {!isEmpty && messages.length > VIRTUALIZATION_THRESHOLD && (
+          <div
+            style={{
+              height: virtualizer.getTotalSize(),
+              position: 'relative',
+              width: '100%',
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const message = messages[virtualRow.index];
+              if (!message) return null;
+              return (
                 <div
-                  className="flex items-center gap-3 px-4 py-2 select-none"
-                  role="separator"
-                  aria-label="New messages start here"
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
                 >
-                  <span className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-info)' }}>
-                    New messages
-                  </span>
-                  <span className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
+                  {renderRow(message, virtualRow.index)}
                 </div>
-              )}
-              <MessageRow
-                message={message}
-                currentUserId={currentUserId}
-                isConsecutive={isConsecutive}
-                aiRun={aiRunsByMessage[message.id]}
-                aiName={aiName}
-                isStreaming={isStreaming}
-                onRetry={onRetry}
-                canModerate={canModerate}
-                userRole={userRole}
-                onOpenSettings={onOpenSettings}
-                onReply={onReply}
-                onReact={onReact}
-                onEditSave={onEditSave}
-                onDelete={onDelete}
-                onTogglePin={onTogglePin}
-                onCreateTask={onCreateTask}
-                onCreateDecision={onCreateDecision}
-                onUseAsContext={onUseAsContext}
-                onOpenThread={onOpenThread}
-              />
-            </React.Fragment>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
+
+        {/* §289 older-page loading indicator at the head of the list */}
+        {isLoadingOlder && !isEmpty && (
+          <div
+            className="flex items-center justify-center gap-2 py-2 text-[11px]"
+            role="status"
+            aria-label="Loading older messages"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+            Loading earlier messages…
+          </div>
+        )}
       </div>
 
       {/* Typing Indicator (§37) */}

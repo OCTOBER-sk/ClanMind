@@ -49,6 +49,12 @@ export interface RealtimeClientOptions {
   /** Server rejected us for version/protocol reasons — do NOT retry. */
   onProtocolRequired: (info: { code: string; message?: string }) => void;
   onSequenceGap: (groupId: string, from: number, to: number) => void;
+  /**
+   * §186A.1 — fires whenever a group's last-applied §17 sequence advances,
+   * so hosts can persist the sync checkpoint (last_server_sequence) used by
+   * reconnect hello / sync recovery.
+   */
+  onSequenceAdvance?: (groupId: string, sequence: number) => void;
 }
 
 const DEFAULT_HEARTBEAT_MS = 25_000;
@@ -409,6 +415,7 @@ export class RealtimeClient {
     }
     if (last === undefined || event.sequence > last) {
       this.lastSequenceByGroup.set(event.group_id, event.sequence);
+      this.opts.onSequenceAdvance?.(event.group_id, event.sequence);
     }
   }
 

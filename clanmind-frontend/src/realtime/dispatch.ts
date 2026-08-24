@@ -17,7 +17,11 @@
 
 import { useChatStore } from '@/state/useChatStore';
 import { useArtifactStore } from '@/state/useArtifactStore';
-import type { AiRun, Artifact } from '@/types';
+import { useAuthStore } from '@/state/useAuthStore';
+import { useGroupStore } from '@/state/useGroupStore';
+import { MessageSchema } from '@/api/schemas';
+import { mapMessageRow } from '@/api/messageRow';
+import type { AiRun, Artifact, Message } from '@/types';
 import type { RealtimeEvent } from '@/realtime/events';
 
 const runsByMessage = new Map<string, { run: AiRun; streamedBody: string; artifactOpened: boolean }>();
@@ -100,24 +104,150 @@ function streamDelta(runId: string, fallbackMessageId: string, delta: string): v
   upsertRun(messageId, runId ? { id: runId, status: 'STREAMING' } : { status: 'STREAMING' });
 }
 
+/**
+ * FE rule 26 / BE §55A — PRIVATE_* events may only enter this device's
+ * cache when the local user demonstrably participates. The backend ACL is
+ * the real authority (§11.2: never rely on the flag alone) — this gate is
+ * client defense-in-depth: when participation CANNOT be established from
+ * the payload, the message is dropped rather than risk a leak.
+ */
+function privateEventIncludesMe(payload: Record<string, unknown>): boolean {
+  const me = useAuthStore.getState().user?.id;
+  if (!me) return false;
+  const message = (payload.message ?? {}) as Record<string, unknown>;
+  const senderId =
+    firstString(message.sender_id, message.sender_user_id, payload.sender_user_id) ?? '';
+  const recipientId = firstString(
+    message.recipient_id,
+    payload.recipient_user_id,
+    payload.private_to,
+  );
+  if (senderId === me) return true;
+  // PRIVATE_AI threads belong to exactly one requester + the AI identity.
+  return recipientId === me || recipientId === 'ai';
+}
+
+function firstString(...values: unknown[]): string | null {
+  for (const v of values) {
+    if (typeof v === 'string' && v.length > 0) return v;
+  }
+  return null;
+}
+
+function payloadOf(event: RealtimeEvent): unknown {
+  return event.payload ?? {};
+}
+
+/**
+ * Normalize an inbound message payload into the canonical FE Message.
+ * Accepts BOTH shapes that arrive on the wire: a full §39 row (real backend
+ * fan-out, D13) — validated + mapped through the shared row adapter — and
+ * FE-shaped objects (demo hub echoes). Returns null when the payload is too
+ * sparse to render (never invents content).
+ */
+function normalizeIncomingMessage(
+  event: RealtimeEvent,
+  messageId: string,
+  incoming: Record<string, unknown>,
+  visibility: string | null,
+): Message | null {
+  const asRow = MessageSchema.safeParse({ ...incoming, id: messageId });
+  if (asRow.success) {
+    const { memberNicknames, activeGroup } = useGroupStore.getState();
+    const names = new Map(Object.entries(memberNicknames));
+    return mapMessageRow(asRow.data, names, activeGroup?.ai_name || 'Odin');
+  }
+
+  // FE-shaped / demo echo path — requires the fields a bubble needs to exist.
+  const body = firstString(incoming.body);
+  if (body == null) return null;
+  const senderType = firstString(incoming.sender_type) ?? 'USER';
+  const senderId =
+    firstString(incoming.sender_id, incoming.sender_user_id, incoming.sender_ai_id) ??
+    firstString(event.actor_id) ??
+    '';
+  return {
+    id: messageId,
+    client_message_id: firstString(incoming.client_message_id) ?? undefined,
+    group_id: firstString(incoming.group_id, event.group_id) ?? '',
+    project_id: firstString(incoming.project_id) ?? undefined,
+    sender_type: senderType as Message['sender_type'],
+    sender_id: senderId,
+    sender_name:
+      senderType === 'AI'
+        ? firstString(incoming.sender_name) ?? (useGroupStore.getState().activeGroup?.ai_name || 'Odin')
+        : firstString(incoming.sender_name) ?? 'Member',
+    body,
+    visibility: (visibility ?? 'GROUP') as Message['visibility'],
+    recipient_id: firstString(incoming.recipient_id) ?? undefined,
+    reply_to_message_id: firstString(incoming.reply_to_message_id, incoming.reply_to_id) ?? undefined,
+    reply_to_preview: firstString(incoming.reply_to_preview) ?? undefined,
+    pinned: incoming.pinned === true,
+    edited: false,
+    deleted: false,
+    attachments: Array.isArray(incoming.attachments)
+      ? (incoming.attachments as Message['attachments'])
+      : [],
+    reactions: Array.isArray(incoming.reactions) ? (incoming.reactions as Message['reactions']) : [],
+    is_pending: false,
+    is_failed: false,
+    created_at: firstString(incoming.created_at, event.occurred_at) ?? new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
 export function dispatchRealtimeEvent(event: RealtimeEvent): void {
-  const payload = (event.payload ?? {}) as Record<string, unknown>;
+  const payload = (payloadOf(event)) as Record<string, unknown>;
   const chat = useChatStore.getState();
 
   switch (event.event_type) {
-    case 'message.created': {
-      const message = payload.message as { id: string; [k: string]: unknown } | undefined;
-      if (!message?.id) return;
-      // Dedupe against optimistic inserts by id or client_message_id.
-      const exists = chat.messages.some(
-        (m) => m.id === message.id || (!!message.client_message_id && m.client_message_id === message.client_message_id),
-      );
-      if (!exists) {
-        chat.addMessage(message as unknown as Parameters<typeof chat.addMessage>[0]);
-      } else {
-        // Server echo reconciles the optimistic copy (pending → confirmed).
-        chat.updateMessage(String(message.id), { is_pending: false });
+    case 'message.created':
+    case 'message.updated':
+    case 'message.edited': {
+      const incoming = (payload.message ?? {}) as Record<string, unknown> & { id?: string };
+      const messageId = typeof incoming.id === 'string' && incoming.id
+        ? incoming.id
+        : firstString(payload.message_id, payload.id);
+      if (!messageId) return;
+
+      const visibility = firstString(incoming.visibility, payload.visibility);
+      // Cache gate — see privateEventIncludesMe. GROUP events always pass.
+      if (visibility && visibility !== 'GROUP' && !privateEventIncludesMe({ ...payload, message: incoming })) {
+        return;
       }
+
+      if (event.event_type === 'message.created') {
+        // Dedupe against optimistic inserts by id or client_message_id.
+        const exists = chat.messages.some(
+          (m) => m.id === messageId || (!!incoming.client_message_id && m.client_message_id === incoming.client_message_id),
+        );
+        if (!exists) {
+          const normalized = normalizeIncomingMessage(event, messageId, incoming, visibility);
+          if (normalized) chat.addMessage(normalized);
+        } else {
+          // Server echo reconciles the optimistic copy (pending → confirmed).
+          chat.updateMessage(messageId, { is_pending: false });
+        }
+        break;
+      }
+
+      // §31/§32 fan-out: message.updated (§114 name) / message.edited (§18).
+      // Payload carries either a full row or {message_id, body, edited_at}.
+      const body = firstString(incoming.body, payload.body);
+      const updates: Partial<Message> = {};
+      if (body != null && !incoming.deleted_at && payload.deleted !== true) updates.body = body;
+      if (firstString(incoming.edited_at, payload.edited_at) != null || event.event_type === 'message.edited') {
+        updates.edited = true;
+      }
+      chat.updateMessage(messageId, updates);
+      break;
+    }
+
+    case 'message.deleted': {
+      const messageId =
+        firstString(payload.message_id, (payload.message as Record<string, unknown> | undefined)?.id) ?? '';
+      if (!messageId) return;
+      chat.deleteMessage(messageId);
       break;
     }
 
@@ -296,7 +426,12 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
     }
 
     case 'presence.updated': {
-      // Payload carries user_id + state (ONLINE/IDLE/AWAY/OFFLINE).
+      // §19/§38 — project live viewer counts into the header when the room
+      // provides them (demo hub + real presence snapshot both do).
+      const viewers = payload.viewers_online;
+      if (typeof viewers === 'number' && Number.isFinite(viewers)) {
+        useChatStore.setState({ presenceOnlineCount: Math.max(0, Math.round(viewers)) });
+      }
       void payload.state;
       break;
     }

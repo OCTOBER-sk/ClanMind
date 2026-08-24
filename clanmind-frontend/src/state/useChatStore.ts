@@ -24,6 +24,8 @@ export interface ChatState {
   privateRecipientId?: string;
   privateRecipientName?: string;
   typingUsers: TypingIndicator[];
+  /** §19/§38 — live viewer count from realtime presence; null until first signal */
+  presenceOnlineCount: number | null;
   /** Draft text keyed by `group:{id}` or `group:{id}:project:{id}` */
   draftsByScope: Record<string, string>;
   /** Last-read message ID per scope key — for unread badge tracking */
@@ -76,6 +78,7 @@ export const useChatStore = create<ChatState>()(
   composerAttachments: [],
   visibility: 'GROUP',
   typingUsers: [],
+  presenceOnlineCount: null,
   draftsByScope: {},
   lastReadMessageIdByScope: {},
   pendingMessages: [],

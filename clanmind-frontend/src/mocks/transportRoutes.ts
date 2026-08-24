@@ -6,6 +6,7 @@
 
 import type { Transport, TransportRequest, TransportResponse } from '@/api/transport';
 import type { DemoDataset } from './dataset';
+import type { Message } from '@/types';
 import { getDemoHub } from './wsHub';
 
 type Handler = (
@@ -39,6 +40,40 @@ function matchPath(pattern: string, path: string): Record<string, string> | null
 let serverSequence = 1421;
 
 /**
+ * BE §39 wire shape for history reads (GET /messages). The dataset stores
+ * canonical FE messages; the REST surface must reproduce the REAL backend
+ * row (`server_sequence`, `sender_user_id`, `body_format`, …) because the
+ * client validates every page through MessageSchema at the boundary.
+ * Sequence assignment is stable per message id so cursor paging is
+ * deterministic across refetches.
+ */
+const wireSeqById = new Map<string, number>();
+function toWireMessage(m: Message): Record<string, unknown> {
+  let seq = wireSeqById.get(m.id);
+  if (seq === undefined) {
+    seq = ++serverSequence;
+    wireSeqById.set(m.id, seq);
+  }
+  return {
+    id: m.id,
+    group_id: m.group_id,
+    project_id: m.project_id ?? null,
+    sender_type: m.sender_type,
+    sender_user_id: m.sender_type === 'USER' ? m.sender_id : null,
+    sender_ai_id: m.sender_type === 'AI' ? m.sender_id : null,
+    visibility: m.visibility,
+    body: m.body,
+    body_format: 'markdown',
+    reply_to_id: m.reply_to_message_id ?? null,
+    client_message_id: m.client_message_id ?? `demo_${m.id}`,
+    server_sequence: seq,
+    created_at: m.created_at,
+    edited_at: m.edited ? m.updated_at : null,
+    deleted_at: m.deleted ? m.updated_at : null,
+  };
+}
+
+/**
  * Demo session-expiry injection (FE §197 testing). Once tripped, every
  * authenticated domain call answers 401 AUTH_SESSION_EXPIRED until the next
  * successful login "refreshes" the demo session. Auth routes are exempt —
@@ -58,7 +93,10 @@ function requireSession(req: TransportRequest): TransportResponse | null {
 }
 
 export function createDemoTransport(ds: DemoDataset): Transport {
-  let cursorBase = [...ds.messages];
+  // History store speaks §39 WIRE rows end-to-end: seeded dataset entries are
+  // converted once at install, POST appends wire rows directly, GET pages
+  // slice them verbatim — exactly what the real Worker's Postgres returns.
+  let cursorBase: Array<Record<string, unknown>> = ds.messages.map((m) => toWireMessage(m));
 
   const routes: Array<[string, string, Handler]> = [
     ['GET', '/me', () =>
@@ -111,12 +149,14 @@ export function createDemoTransport(ds: DemoDataset): Transport {
     ['GET', '/groups/:groupId/projects', (p) =>
       ok({ items: ds.projects.filter((proj) => proj.group_id === p.groupId) })],
 
-    // BE §105/§156 — Page<Message>: { items, next_cursor }.
+    // BE §105/§156 — Page<Message>: { items, next_cursor } with real §39 rows.
     ['GET', '/groups/:groupId/messages', (p, req) => {
       const limit = Number(req.query?.limit ?? 50);
       const before = req.query?.before as string | undefined;
       const all = cursorBase.filter((m) => m.group_id === p.groupId);
-      const ordered = [...all].sort((a, b) => a.created_at.localeCompare(b.created_at));
+      const ordered = [...all].sort((a, b) =>
+        String(a.created_at).localeCompare(String(b.created_at)),
+      );
       let endIdx = ordered.length;
       if (before) {
         const idx = ordered.findIndex((m) => m.id === before);
@@ -129,13 +169,20 @@ export function createDemoTransport(ds: DemoDataset): Transport {
 
     ['POST', '/groups/:groupId/messages', async (p, req) => {
       const body = (req.body ?? {}) as Record<string, unknown>;
+      // §2.4 — private scope rides `private_to` ("ai" | teammate id); the
+      // demo mirrors it onto the wire row's visibility so client-side scope
+      // isolation (FE rule 26) is exercisable end-to-end in demo mode.
+      const privateTo = body.private_to;
+      const isPrivateAi = privateTo === 'ai';
+      const isPrivatePair = typeof privateTo === 'string' && privateTo !== 'ai' && privateTo.length > 0;
       const message = {
         id: `msg_srv_${serverSequence}`,
         group_id: p.groupId,
         project_id: (body.project_id as string | null) ?? null,
         sender_type: 'USER',
         sender_user_id: ds.currentUser.id,
-        visibility: String(body.visibility ?? 'GROUP'),
+        visibility: isPrivateAi ? 'PRIVATE_AI' : isPrivatePair ? 'PRIVATE_PAIR' : String(body.visibility ?? 'GROUP'),
+        ...(isPrivatePair ? { recipient_id: privateTo } : {}),
         body: String(body.body ?? ''),
         reply_to_id:
           (body.reply_to_id as string | null) ??

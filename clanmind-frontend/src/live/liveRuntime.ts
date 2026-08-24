@@ -8,9 +8,12 @@
  *   GET /groups                          → { items: Group[] }        (§104)
  *   GET /groups/:id/projects             → { items: Project[] }      (§104)
  *   GET /groups/:id/members              → { items: GroupMember[] }  (§104)
- *   GET /groups/:id/messages?limit=50     → { items, next_cursor }    (§105/§156)
  *   GET /client-versions                 → §165 metadata (309A.1 banner)
  *   WS  /groups/:id/ws?token=…           → per-group room (§16)
+ *
+ * Message HISTORY is intentionally NOT prefetched here: P3 moves history to
+ * the TanStack Query cursor-pagination layer (src/api/endpoints/messages.ts,
+ * FE §202/§289) — one owner, no duplicate source of truth.
  */
 
 import { api } from '@/api/client';
@@ -18,7 +21,6 @@ import type { ZodTypeAny, z as zodNamespace } from 'zod';
 import {
   GroupSchema,
   ProjectSchema,
-  MessageSchema,
   VersionMetaSchema,
 } from '@/api/schemas';
 import { wsRoomEndpoint, env } from '@/config/env';
@@ -29,12 +31,11 @@ import { initConnectivity, markProtocolUpdateRequired } from '@/sync/connectivit
 import { useGroupStore, DEFAULT_FLAGS } from '@/state/useGroupStore';
 import { useChatStore } from '@/state/useChatStore';
 import { useSyncStore } from '@/state/useSyncStore';
-import type { Group, Message, Project } from '@/types';
+import type { Group, Project } from '@/types';
 
 type ZodInfer<T extends ZodTypeAny> = zodNamespace.infer<T>;
 type BEGroup = ZodInfer<typeof GroupSchema>;
 type BEProject = ZodInfer<typeof ProjectSchema>;
-type BEMessage = ZodInfer<typeof MessageSchema>;
 
 // ─── Row mapping (BE §24/§29/§39 rows → canonical FE types) ─────────────────
 
@@ -66,35 +67,6 @@ function mapProject(row: BEProject): Project {
     pulse_progress: typeof row.progress === 'number' ? row.progress : 0,
     created_at: row.created_at,
     updated_at: row.updated_at,
-  };
-}
-
-function mapMessage(row: BEMessage, memberNames: Map<string, string>, aiName: string): Message {
-  const senderUserId = typeof row.sender_user_id === 'string' ? row.sender_user_id : null;
-  const senderAiId = (row as { sender_ai_id?: string | null }).sender_ai_id ?? null;
-  return {
-    id: row.id,
-    client_message_id: row.client_message_id,
-    group_id: row.group_id,
-    project_id: row.project_id ?? undefined,
-    sender_type: row.sender_type as Message['sender_type'],
-    sender_id: senderUserId ?? senderAiId ?? '',
-    sender_name:
-      row.sender_type === 'AI'
-        ? aiName
-        : (senderUserId && memberNames.get(senderUserId)) || 'Member',
-    body: row.body,
-    visibility: row.visibility as Message['visibility'],
-    reply_to_message_id: row.reply_to_id ?? undefined,
-    pinned: false,
-    edited: row.edited_at != null,
-    deleted: row.deleted_at != null,
-    attachments: [],
-    reactions: [],
-    is_pending: false,
-    is_failed: false,
-    created_at: row.created_at,
-    updated_at: row.edited_at ?? row.created_at,
   };
 }
 
@@ -134,29 +106,21 @@ export async function bootstrapLiveWorkspace(): Promise<void> {
 
   let projects: Project[] = [];
   const memberNames = new Map<string, string>();
-  let messages: Message[] = [];
 
   if (activeGroup) {
-    const [projectRows, memberPage, messagePage] = await Promise.all([
+    const [projectRows, memberPage] = await Promise.all([
       getItems(`/groups/${activeGroup.id}/projects`, ProjectSchema).catch(() => []),
       api
         .get<ItemsPage<{ user_id: string; group_display_name?: string | null }>>(
           `/groups/${activeGroup.id}/members`,
         )
         .catch(() => ({ items: [] as Array<{ user_id: string; group_display_name?: string | null }> })),
-      api.get<ItemsPage<unknown>>(`/groups/${activeGroup.id}/messages?limit=50`).catch(() => ({ items: [] as unknown[] })),
     ]);
 
     projects = projectRows.map(mapProject);
     for (const m of memberPage.items ?? []) {
       if (m.user_id) memberNames.set(m.user_id, m.group_display_name ?? 'Member');
     }
-    messages = (messagePage.items ?? []).flatMap((row) => {
-      const parsed = MessageSchema.safeParse(row);
-      return parsed.success
-        ? [mapMessage(parsed.data, memberNames, activeGroup.ai_name)]
-        : [];
-    });
 
     useGroupStore.setState({
       groups: mappedGroups,
@@ -166,7 +130,9 @@ export async function bootstrapLiveWorkspace(): Promise<void> {
       featureFlags: { ...DEFAULT_FLAGS }, // §165A — server flags endpoint pending; safe defaults
       memberNicknames: Object.fromEntries(memberNames),
     });
-    useChatStore.setState({ messages, projectFilterId: projects[0]?.id });
+    // History arrives through the messages query layer (FE §202/§289);
+    // only the project context filter is seeded here.
+    useChatStore.setState({ messages: [], projectFilterId: projects[0]?.id });
   } else {
     useGroupStore.setState({ groups: [], activeGroup: null });
   }
@@ -226,6 +192,16 @@ export function ensureLiveRealtime(groupId?: string): void {
       onSequenceGap: (gapGroupId, from) => {
         // §17.1 — recover missing events from the room ring.
         getRealtime().send(clientEvents.syncRequest(gapGroupId, from));
+      },
+      onSequenceAdvance: (groupId, sequence) => {
+        // §186A.1 — the checkpoint IS the reconnect resume point; it must
+        // track applied sequences, not just the handshake position.
+        useSyncStore.getState().setCheckpoint({
+          device_id: getDeviceId(),
+          group_id: groupId,
+          last_server_sequence: sequence,
+          last_synced_at: new Date().toISOString(),
+        });
       },
     });
     initConnectivity(getRealtime());

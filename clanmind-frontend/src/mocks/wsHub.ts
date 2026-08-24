@@ -91,6 +91,13 @@ export class DemoRealtimeHub {
   private clients = new Map<string, HubConnection>();
   private clientCounter = 0;
   private sequenceByGroup = new Map<string, number>();
+  /**
+   * §17.1/§20.2 — per-group ring of recently delivered envelopes so
+   * `sync.request` recovery replays EXACTLY what was missed (mirrors the
+   * real GroupRoom's Durable-Object ring storage).
+   */
+  private envelopeRingByGroup = new Map<string, Array<Record<string, unknown>>>();
+  private static RING_CAPACITY = 200;
   /** BE §165 version metadata served during handshake. */
   versionMeta = {
     // The oldest client build this demo "server" accepts. Must be a version
@@ -181,28 +188,48 @@ export class DemoRealtimeHub {
       case 'ping':
         this.deliverRaw(conn, JSON.stringify({ type: 'pong' }));
         break;
+      case 'sync.request': {
+        // §17.1 recovery — the real room answers with a PLAIN control frame
+        // `{type:"sync.events", from_sequence, events[]}` (Q3 in
+        // INTEGRATION_NOTES); envelopes are ordered ascending and only those
+        // with sequence ≥ from_sequence replay.
+        const groupId = String(frameData.group_id ?? '');
+        const from = Number(frameData.from_sequence ?? 0);
+        if (!groupId || !Number.isFinite(from)) break;
+        const ring = this.envelopeRingByGroup.get(groupId) ?? [];
+        const events = ring.filter((e) => typeof e.sequence === 'number' && (e.sequence as number) >= from);
+        this.deliverRaw(conn, JSON.stringify({ type: 'sync.events', from_sequence: from, events }));
+        break;
+      }
       default:
         break;
     }
   }
 
-  private deliver(conn: HubConnection, partial: { event_type: string; group_id?: string; payload?: unknown }): void {
+  private deliver(conn: HubConnection, partial: { event_type: string; group_id?: string; payload?: unknown; sequence?: number }): void {
     const groupId = partial.group_id ?? [...conn.groups][0] ?? '';
-    const sequence = this.nextSequence(groupId);
-    this.deliverRaw(
-      conn,
-      JSON.stringify({
-        protocol_version: this.versionMeta.protocol_version,
-        event_id: `evt_${sequence}_${Math.random().toString(36).slice(2, 8)}`,
-        event_type: partial.event_type,
-        sequence,
-        group_id: groupId,
-        actor_id: 'srv_demo',
-        visibility: 'GROUP',
-        occurred_at: new Date().toISOString(),
-        payload: partial.payload ?? {},
-      }),
-    );
+    const sequence = partial.sequence ?? this.nextSequence(groupId);
+    const envelope = {
+      protocol_version: this.versionMeta.protocol_version,
+      event_id: `evt_${sequence}_${Math.random().toString(36).slice(2, 8)}`,
+      event_type: partial.event_type,
+      sequence,
+      group_id: groupId,
+      actor_id: 'srv_demo',
+      visibility: 'GROUP',
+      occurred_at: new Date().toISOString(),
+      payload: partial.payload ?? {},
+    };
+    if (partial.sequence === undefined) this.recordEnvelope(groupId, envelope);
+    this.deliverRaw(conn, JSON.stringify(envelope));
+  }
+
+  /** Append to the §17.1 recovery ring, dropping the oldest when full. */
+  private recordEnvelope(groupId: string, envelope: Record<string, unknown>): void {
+    const ring = this.envelopeRingByGroup.get(groupId) ?? [];
+    ring.push(envelope);
+    while (ring.length > DemoRealtimeHub.RING_CAPACITY) ring.shift();
+    this.envelopeRingByGroup.set(groupId, ring);
   }
 
   private deliverRaw(conn: HubConnection, text: string): void {
@@ -225,6 +252,18 @@ export class DemoRealtimeHub {
     for (const conn of this.clients.values()) {
       if (conn.groups.size > 0 && !conn.groups.has(groupId)) continue;
       this.deliver(conn, { event_type: eventType, group_id: groupId, payload });
+    }
+  }
+
+  /**
+   * Test seam — deliver an event with a FORCED §17 sequence and WITHOUT
+   * recording it in the recovery ring, simulating exactly what a dropped
+   * frame looks like on the wire (the gap the client must detect).
+   */
+  emitWithSequence(eventType: string, groupId: string, payload: unknown, sequence: number): void {
+    for (const conn of this.clients.values()) {
+      if (conn.groups.size > 0 && !conn.groups.has(groupId)) continue;
+      this.deliver(conn, { event_type: eventType, group_id: groupId, payload, sequence });
     }
   }
 
