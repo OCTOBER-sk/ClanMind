@@ -18,11 +18,35 @@ import { Button } from '@/design-system/components/Button';
 import { Switch } from '@/design-system/components/Switch';
 import { Badge } from '@/design-system/components/Badge';
 import { Input } from '@/design-system/components/Input';
+import { Dialog } from '@/design-system/components/Dialog';
 import { cn } from '@/design-system/utils';
 import { SyncDiagnosticsView } from '@/features/sync/SyncDiagnosticsView';
 import { useSyncStore } from '@/state/useSyncStore';
 import { useAuthStore } from '@/state/useAuthStore';
-import type { Group, GroupMember, GroupRole, ServerFeatureFlags, NotificationCategory } from '@/types';
+import {
+  fetchAiConfig,
+  fetchProviderModels,
+  saveModelRoutes,
+  validateProviderKey,
+  type ModelRouteInput,
+} from '@/api/endpoints/aiConfig';
+import {
+  GITHUB_STATUS_LABEL,
+  errorMessageOf,
+  useGithubConnection,
+} from '@/features/github/useGithubConnection';
+import { ApiError } from '@/api/errors';
+import { api } from '@/api/client';
+import type {
+  Group,
+  GroupMember,
+  GroupRole,
+  ServerFeatureFlags,
+  NotificationCategory,
+  AiProviderConfig,
+  AiModelRoute,
+  ModelDescriptor,
+} from '@/types';
 
 export interface SettingsViewProps {
   group: Group;
@@ -46,6 +70,16 @@ type SettingsSection =
   | 'notifications'
   | 'diagnostics'
   | 'danger';
+
+/** §156 provider list — mirrors BE PROVIDER_BASE_URLS keys. */
+const PROVIDERS = ['anthropic', 'openai', 'google', 'openrouter'] as const;
+
+const ROUTE_ROLES: Array<{ role: ModelRouteInput['role']; label: string }> = [
+  { role: 'PRIMARY', label: 'Primary' },
+  { role: 'FALLBACK_1', label: 'Fallback 1' },
+  { role: 'FALLBACK_2', label: 'Fallback 2' },
+  { role: 'FALLBACK_3', label: 'Fallback 3' },
+];
 
 // §171 — exact backend category identifiers, mapped 1:1
 const NOTIFICATION_CATEGORIES: Array<{
@@ -107,28 +141,124 @@ export function SettingsView({
   const [groupDesc, setGroupDesc] = useState(group.description ?? '');
   const generalDirty = groupName !== group.name || groupDesc !== (group.description ?? '');
 
-  // ─── AI & BYOK ───
+  // ─── AI & BYOK (BE §107 ai-config routes; §156/§157 UI) ───
   const [aiName, setAiName] = useState(group.ai_name || 'Odin');
   const [proactivity, setProactivity] = useState<Group['ai_proactivity']>(group.ai_proactivity || 'balanced');
   const aiDirty = aiName !== group.ai_name || proactivity !== group.ai_proactivity;
+
+  // §156 BYOK — provider/key/test-connection/models/slots. The raw key lives
+  // ONLY in this input's transient state (never localStorage — §325.11) and
+  // is wiped the moment validation finishes.
+  const [byokProvider, setByokProvider] = useState<(typeof PROVIDERS)[number]>('anthropic');
   const [byokKey, setByokKey] = useState('');
-  const [providerTestState, setProviderTestState] = useState<'idle' | 'testing' | 'connected' | 'failed'>('idle');
-  const testTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  type ProviderTestState = 'idle' | 'testing' | 'connected' | 'failed';
+  const [providerTestState, setProviderTestState] = useState<ProviderTestState>('idle');
+  const [providerModels, setProviderModels] = useState<ModelDescriptor[]>([]);
+  const [aiConfigs, setAiConfigs] = useState<AiProviderConfig[]>([]);
+  const [aiRoutes, setAiRoutes] = useState<AiModelRoute[]>([]);
+  const [aiConfigError, setAiConfigError] = useState<string | null>(null);
+  const [isSavingRoutes, setIsSavingRoutes] = useState(false);
 
-  // §157 provider test — cleanup on unmount
+  // Load the sanitized config + route slots (Owner/Admin only server-side).
   useEffect(() => {
+    let disposed = false;
+    fetchAiConfig(group.id)
+      .then((cfg) => {
+        if (!disposed) {
+          setAiConfigs(cfg.configs);
+          setAiRoutes(cfg.routes);
+        }
+      })
+      .catch((err: unknown) => {
+        if (disposed) return;
+        // §302 — permission failures render the human copy, never codes.
+        setAiConfigError(
+          err instanceof ApiError && err.code === 'GROUP_PERMISSION_DENIED'
+            ? 'Only Owners and Admins can change Group AI settings.'
+            : errorMessageOf(err),
+        );
+      });
     return () => {
-      if (testTimerRef.current) clearTimeout(testTimerRef.current);
+      disposed = true;
     };
-  }, []);
+  }, [group.id]);
 
-  const handleTestProvider = () => {
+  /**
+   * §64 validate-before-store against POST …/providers/validate. Success
+   * means the key is ALREADY stored server-side; only the sanitized config
+   * (with key_last4) and discovered models come back.
+   */
+  const handleTestProvider = async () => {
     setProviderTestState('testing');
-    if (testTimerRef.current) clearTimeout(testTimerRef.current);
-    testTimerRef.current = setTimeout(() => {
-      // §157 — mock connection result; real provider validation arrives with the API layer
-      setProviderTestState(byokKey.length > 8 ? 'connected' : 'failed');
-    }, 1200);
+    try {
+      const result = await validateProviderKey(group.id, byokProvider, byokKey);
+      setAiConfigs((prev) => [...prev.filter((c) => c.id !== result.config.id), result.config]);
+      setProviderModels(result.models);
+      setProviderTestState('connected');
+      // §63.1/§325.11 — the raw key has served its purpose; drop it NOW.
+      setByokKey('');
+    } catch {
+      // §157 failure copy — never leaks backend error internals.
+      setProviderTestState('failed');
+    }
+  };
+
+  /** Route-slot draft state: role → {config_id, model_id}. */
+  const [routeDraft, setRouteDraft] = useState<Record<string, { configId: string; modelId: string }>>({});
+  /** §156 models per provider config — fetched WITHOUT any key material. */
+  const [routeModelsCache, setRouteModelsCache] = useState<Record<string, ModelDescriptor[]>>({});
+  useEffect(() => {
+    const configIds = new Set<string>();
+    for (const slot of ROUTE_ROLES) {
+      const draft = routeDraft[slot.role];
+      if (draft?.configId) configIds.add(draft.configId);
+    }
+    for (const configId of configIds) {
+      if (routeModelsCache[configId]) continue;
+      fetchProviderModels(group.id, configId)
+        .then((res) => setRouteModelsCache((prev) => ({ ...prev, [configId]: res.models })))
+        .catch(() => undefined); // slot stays empty; never fabricate models
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeDraft, group.id]);
+  useEffect(() => {
+    setRouteDraft(() => {
+      const next: Record<string, { configId: string; modelId: string }> = {};
+      for (const slot of ROUTE_ROLES) {
+        const existing = aiRoutes.find((r) => r.role === slot.role);
+        next[slot.role] = existing
+          ? { configId: existing.provider_config_id, modelId: existing.model_id }
+          : { configId: '', modelId: '' };
+      }
+      return next;
+    });
+  }, [aiRoutes]);
+
+  const routesDirty = ROUTE_ROLES.some((slot) => {
+    const draft = routeDraft[slot.role];
+    const existing = aiRoutes.find((r) => r.role === slot.role);
+    if (!draft) return false;
+    if (!!draft.configId !== !!existing) return true;
+    return !!existing && (existing.provider_config_id !== draft.configId || existing.model_id !== draft.modelId);
+  });
+
+  const handleSaveRoutes = async () => {
+    const routes: ModelRouteInput[] = ROUTE_ROLES.flatMap((slot) => {
+      const draft = routeDraft[slot.role];
+      return draft && draft.configId && draft.modelId
+        ? [{ provider_config_id: draft.configId, role: slot.role, model_id: draft.modelId }]
+        : [];
+    });
+    if (!routes.some((r) => r.role === 'PRIMARY')) return;
+    setIsSavingRoutes(true);
+    try {
+      const updated = await saveModelRoutes(group.id, routes);
+      setAiRoutes(updated.routes);
+    } catch (err) {
+      setAiConfigError(errorMessageOf(err));
+    } finally {
+      setIsSavingRoutes(false);
+    }
   };
 
   // ─── §171 notification preferences (client-local mirror of notification_preferences) ───
@@ -157,6 +287,31 @@ export function SettingsView({
       [category]: { ...prev[category], [channel]: value },
     }));
   };
+
+  // ─── §158 search-provider test states: Connecting → Searching → Results
+  //     received → Ready (failure renders an honest error, never fake success).
+  type SearchTestState = 'idle' | 'connecting' | 'searching' | 'received' | 'ready' | 'failed';
+  const [searchTestState, setSearchTestState] = useState<SearchTestState>('idle');
+  const [searchResultsSampled, setSearchResultsSampled] = useState(0);
+
+  const handleTestSearchProvider = async () => {
+    setSearchTestState('connecting');
+    try {
+      // One real probe drives all four staged labels; timing is client-side.
+      const stage = setTimeout(() => setSearchTestState('searching'), 350);
+      const raw = await api.post<{ ok?: boolean; results_sampled?: number }>(
+        `/groups/${encodeURIComponent(group.id)}/search-provider/test`,
+        {},
+      );
+      clearTimeout(stage);
+      setSearchResultsSampled(Number(raw?.results_sampled ?? 0));
+      setSearchTestState('received');
+      setTimeout(() => setSearchTestState('ready'), 350);
+    } catch {
+      setSearchTestState('failed');
+    }
+  };
+
 
   // ─── Diagnostics (§285) ───
   const sync = useSyncStore();
@@ -378,38 +533,108 @@ export function SettingsView({
               </Button>
             </div>
 
-            {/* BYOK (§156 — never reveal saved key, never store locally) */}
+            {/* BYOK (§156 — provider, key, test connection; never reveals the
+                saved key: password input + last4 metadata only) */}
             <div className={card} style={cardBorder}>
               <div className="flex items-center gap-2 font-bold" style={{ color: 'var(--color-text)' }}>
                 <Key className="w-4 h-4" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
-                <span>Bring Your Own Key (BYOK) Configuration</span>
+                <span>Bring Your Own Key (BYOK)</span>
               </div>
+              {aiConfigError && (
+                <p className="text-[11px]" style={{ color: 'var(--color-danger)' }} role="alert">
+                  {aiConfigError}
+                </p>
+              )}
               <p style={{ color: 'var(--color-text-secondary)' }}>
-                Provide custom API keys for your provider. Keys are never stored on this device.
+                Keys are validated and stored server-side — they are never kept on this device or shown again.
               </p>
+
+              {/* Saved provider configs — sanitized metadata only (§63.1) */}
+              {aiConfigs.length > 0 && (
+                <div
+                  className="divide-y rounded-lg border overflow-hidden"
+                  style={{ borderColor: 'var(--color-border)' }}
+                  data-testid="byok-saved-configs"
+                >
+                  {aiConfigs.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between px-3 py-2">
+                      <span className="font-medium capitalize" style={{ color: 'var(--color-text)' }}>
+                        {c.provider}
+                        <span className="ml-2 text-[10px] uppercase" style={{ color: 'var(--color-text-tertiary)' }}>
+                          {c.kind}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-2">
+                        {/* §156/§63.1 — last4 only, NEVER the key itself */}
+                        {c.key_last4 && (
+                          <span className="font-mono text-[10px]" data-testid="byok-last4" style={{ color: 'var(--color-text-tertiary)' }}>
+                            ••••{c.key_last4}
+                          </span>
+                        )}
+                        <Badge variant={c.enabled ? 'success' : 'neutral'} size="sm">
+                          {c.enabled ? 'Active' : 'Off'}
+                        </Badge>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="space-y-3">
+                <label className="space-y-1 block">
+                  <span className="block text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                    Provider
+                  </span>
+                  <select
+                    value={byokProvider}
+                    onChange={(e) => {
+                      setByokProvider(e.target.value as (typeof PROVIDERS)[number]);
+                      setProviderTestState('idle');
+                    }}
+                    className="px-3.5 py-2 rounded-lg border outline-none cursor-pointer capitalize"
+                    style={{
+                      borderColor: 'var(--color-border-strong)',
+                      background: 'var(--color-surface-raised)',
+                      color: 'var(--color-text)',
+                    }}
+                  >
+                    {PROVIDERS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <Input
                   type="password"
-                  placeholder="Enter API Key (e.g. sk-ant-...)"
+                  placeholder={`Paste your ${byokProvider} API key`}
                   value={byokKey}
+                  autoComplete="off"
                   onChange={(e) => {
                     setByokKey(e.target.value);
                     setProviderTestState('idle');
                   }}
                 />
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <Button
                     size="sm"
                     variant="outline"
                     isLoading={providerTestState === 'testing'}
-                    disabled={byokKey.length === 0}
-                    onClick={handleTestProvider}
+                    disabled={byokKey.length === 0 || providerTestState === 'testing'}
+                    onClick={() => void handleTestProvider()}
                   >
-                    Test Connection
+                    Test connection
                   </Button>
+                  {/* §157 exact states */}
+                  {providerTestState === 'testing' && (
+                    <span className="flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Testing…
+                    </span>
+                  )}
                   {providerTestState === 'connected' && (
                     <span className="flex items-center gap-1 font-medium" style={{ color: 'var(--color-success)' }}>
-                      <Check className="w-3.5 h-3.5" aria-hidden="true" /> Connected · 3 models found
+                      <Check className="w-3.5 h-3.5" aria-hidden="true" />
+                      Connected · {providerModels.length} model{providerModels.length === 1 ? '' : 's'} found
                     </span>
                   )}
                   {providerTestState === 'failed' && (
@@ -417,12 +642,89 @@ export function SettingsView({
                       Couldn&rsquo;t authenticate. Check the provider key.
                     </span>
                   )}
-                  {providerTestState === 'testing' && (
-                    <span className="flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Testing…
-                    </span>
-                  )}
                 </div>
+              </div>
+
+              {/* §156 model slots — Primary + Fallback 1..3 */}
+              <div className="space-y-2 pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                <p className="font-semibold" style={{ color: 'var(--color-text)' }}>
+                  Model routes
+                </p>
+                {ROUTE_ROLES.map((slot) => {
+                  const draft = routeDraft[slot.role];
+                  const selectClass =
+                    'px-2.5 py-1.5 rounded-lg border outline-none text-[11px] cursor-pointer';
+                  const selectStyle = {
+                    borderColor: 'var(--color-border-strong)',
+                    background: 'var(--color-surface-raised)',
+                    color: 'var(--color-text)',
+                  } as const;
+                  return (
+                    <div key={slot.role} className="grid grid-cols-[90px_1fr_1fr] items-center gap-2">
+                      <span className="text-[11px] font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                        {slot.label}
+                      </span>
+                      <select
+                        value={draft?.configId ?? ''}
+                        aria-label={`${slot.label} provider`}
+                        onChange={(e) => {
+                          const configId = e.target.value;
+                          setRouteDraft((prev) => ({
+                            ...prev,
+                            [slot.role]: { configId, modelId: '' },
+                          }));
+                        }}
+                        className={selectClass}
+                        style={selectStyle}
+                      >
+                        <option value="">—</option>
+                        {aiConfigs.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.provider} ••••{c.key_last4 ?? ''}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={draft?.modelId ?? ''}
+                        aria-label={`${slot.label} model`}
+                        disabled={!draft?.configId}
+                        onChange={(e) => {
+                          const modelId = e.target.value;
+                          setRouteDraft((prev) => ({
+                            ...prev,
+                            [slot.role]: { configId: prev[slot.role]?.configId ?? '', modelId },
+                          }));
+                        }}
+                        className={selectClass}
+                        style={selectStyle}
+                      >
+                        <option value="">—</option>
+                        {(routeModelsCache[draft?.configId ?? ''] ?? []).map((m) => (
+                          <option key={m.model_id} value={m.model_id}>
+                            {m.display_name}
+                          </option>
+                        ))}
+                        {draft?.modelId && !(routeModelsCache[draft.configId] ?? []).some((m) => m.model_id === draft.modelId) && (
+                          <option value={draft.modelId}>{draft.modelId}</option>
+                        )}
+                      </select>
+                    </div>
+                  );
+                })}
+                {routesDirty && (
+                  <p className="text-[11px]" style={{ color: 'var(--color-warning)' }}>
+                    Unsaved changes
+                  </p>
+                )}
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={!routesDirty}
+                  isLoading={isSavingRoutes}
+                  onClick={() => void handleSaveRoutes()}
+                >
+                  Save model routes
+                </Button>
               </div>
             </div>
           </div>
@@ -490,45 +792,45 @@ export function SettingsView({
                   {featureFlags.deep_research === false ? 'Deep mode off' : 'Deep mode on'}
                 </Badge>
               </div>
-              <Button size="sm" variant="outline">
-                Test search provider
-              </Button>
+              {/* §158 search-provider test — same staged pattern as §157.
+                  The real backend has no search-provider endpoint yet; a
+                  failed probe renders an honest failure state (never fake
+                  success). Demo transport answers for parity. */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <Button size="sm" variant="outline" isLoading={searchTestState === 'connecting' || searchTestState === 'searching'} onClick={() => void handleTestSearchProvider()}>
+                  Test search provider
+                </Button>
+                {searchTestState === 'connecting' && (
+                  <span style={{ color: 'var(--color-text-secondary)' }}>Connecting…</span>
+                )}
+                {searchTestState === 'searching' && (
+                  <span style={{ color: 'var(--color-text-secondary)' }}>Searching…</span>
+                )}
+                {searchTestState === 'received' && (
+                  <span className="flex items-center gap-1 font-medium" style={{ color: 'var(--color-info)' }}>
+                    <Check className="w-3.5 h-3.5" aria-hidden="true" /> Results received
+                  </span>
+                )}
+                {searchTestState === 'ready' && (
+                  <span className="flex items-center gap-1 font-medium" style={{ color: 'var(--color-success)' }}>
+                    <Check className="w-3.5 h-3.5" aria-hidden="true" /> Ready · {searchResultsSampled} results sampled
+                  </span>
+                )}
+                {searchTestState === 'failed' && (
+                  <span className="font-medium" style={{ color: 'var(--color-danger)' }}>
+                    Couldn&rsquo;t reach the search provider.
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {/* ── GITHUB (§159, §160, §165) ── */}
+        {/* ── GITHUB (§159, §160, §165, §231) — real §113 endpoints ── */}
         {activeSection === 'github' && (
           <div className="space-y-6">
-            {sectionHeading('GitHub Connection', 'Repository access for your Project.')}
-            <div className={card} style={cardBorder}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
-                    Connected
-                  </h3>
-                  <p className="font-mono text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
-                    robotics-core/flight-controller · main
-                  </p>
-                  <p className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
-                    Last synced just now
-                  </p>
-                </div>
-                <Badge
-                  variant={featureFlags.github_write === false ? 'neutral' : 'success'}
-                  size="sm"
-                >
-                  {featureFlags.github_write === false ? 'Read only' : 'Read/write'}
-                </Badge>
-              </div>
-              {/* §160: a public URL never grants write access */}
-              <p className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
-                A public repository URL provides read access only. For write capability, connect GitHub.
-              </p>
-              <Button size="sm" variant="outline">
-                Disconnect
-              </Button>
-            </div>
+            {sectionHeading('GitHub Connection', 'Repository access for your Group.')}
+            <SettingsGithubCard groupId={group.id} />
           </div>
         )}
 
@@ -654,6 +956,160 @@ export function SettingsView({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+/**
+ * Compact §159 connection card for the Settings GitHub section — status
+ * matrix (§165), repo metadata, §160 read-only rule, §231 disconnect dialog.
+ * Action/PR management lives in the GitHub project panel, not Settings.
+ */
+function SettingsGithubCard({ groupId }: { groupId: string }) {
+  const { status, connection, error, connect, disconnect } = useGithubConnection(groupId, null);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const isConnected = status === 'READ_ONLY' || status === 'READ_WRITE';
+
+  return (
+    <div
+      className="p-4 rounded-xl border space-y-4"
+      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
+            {connection?.repo_full_name ?? GITHUB_STATUS_LABEL[status]}
+          </h3>
+          {connection && (
+            <>
+              <p className="font-mono text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
+                {connection.repo_full_name} · {connection.default_branch ?? '—'}
+              </p>
+              <p className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                Last synced{' '}
+                {connection.connected_at
+                  ? new Date(connection.connected_at).toLocaleDateString()
+                  : '—'}
+              </p>
+            </>
+          )}
+        </div>
+        <Badge variant={status === 'READ_WRITE' ? 'success' : status === 'READ_ONLY' ? 'info' : 'neutral'} size="sm">
+          {GITHUB_STATUS_LABEL[status]}
+        </Badge>
+      </div>
+
+      {error && (
+        <p className="text-[11px]" style={{ color: 'var(--color-danger)' }} role="alert">
+          {error}
+        </p>
+      )}
+
+      {/* §160: a public URL never grants write access */}
+      <p className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+        A public repository URL provides read access only. For write capability, connect GitHub.
+      </p>
+
+      <div className="flex items-center gap-2">
+        {isConnected && (
+          <Button size="sm" variant="outline" onClick={() => setDisconnectOpen(true)}>
+            Disconnect
+          </Button>
+        )}
+        {!isConnected && status !== 'CONNECTING' && (
+          <ConnectInlineForm onConnect={connect} />
+        )}
+      </div>
+
+      {/* §231 exact consequence copy */}
+      <Dialog
+        open={disconnectOpen}
+        onOpenChange={(open) => {
+          setDisconnectOpen(open);
+        }}
+        title="Disconnect GitHub?"
+        footer={
+          <>
+            <Button size="sm" variant="ghost" onClick={() => setDisconnectOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => {
+                setDisconnectOpen(false);
+                void disconnect();
+              }}
+            >
+              Disconnect
+            </Button>
+          </>
+        }
+      >
+        <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+          ClanMind will stop repository actions. Existing project history remains.
+        </p>
+      </Dialog>
+    </div>
+  );
+}
+
+/** Minimal Owner/Admin connect form (§160 write-capability grant). */
+function ConnectInlineForm({
+  onConnect,
+}: {
+  onConnect: (input: {
+    installation_id: number;
+    owner_login: string;
+    repo_name: string;
+    default_branch?: string | null;
+    permission_mode?: 'READ_ONLY' | 'READ_WRITE';
+  }) => Promise<boolean>;
+}) {
+  const [ownerLogin, setOwnerLogin] = useState('');
+  const [repoName, setRepoName] = useState('');
+  const [installationId, setInstallationId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const valid =
+    ownerLogin.trim().length > 0 &&
+    repoName.trim().length > 0 &&
+    Number.isInteger(Number(installationId)) &&
+    Number(installationId) > 0;
+
+  return (
+    <div className="flex flex-wrap items-end gap-2" data-testid="settings-connect-form">
+      <Input value={ownerLogin} onChange={(e) => setOwnerLogin(e.target.value)} placeholder="owner" className="!w-32" />
+      <Input value={repoName} onChange={(e) => setRepoName(e.target.value)} placeholder="repository" className="!w-40" />
+      <input
+        value={installationId}
+        onChange={(e) => setInstallationId(e.target.value.replace(/\D/g, ''))}
+        inputMode="numeric"
+        placeholder="Installation ID"
+        aria-label="GitHub App installation ID"
+        className="px-3.5 py-2 rounded-lg border outline-none w-36 font-mono text-xs focus:shadow-[var(--focus-ring)]"
+        style={{
+          borderColor: 'var(--color-border-strong)',
+          background: 'var(--color-surface-raised)',
+          color: 'var(--color-text)',
+        }}
+      />
+      <Button
+        size="sm"
+        variant="primary"
+        disabled={!valid}
+        isLoading={busy}
+        onClick={() => {
+          setBusy(true);
+          void onConnect({
+            installation_id: Number(installationId),
+            owner_login: ownerLogin.trim(),
+            repo_name: repoName.trim(),
+            default_branch: 'main',
+            permission_mode: 'READ_WRITE',
+          }).then(() => setBusy(false));
+        }}
+      >
+        Connect GitHub
+      </Button>
     </div>
   );
 }

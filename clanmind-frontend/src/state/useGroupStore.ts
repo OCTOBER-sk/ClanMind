@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { api } from '@/api/client';
+import { FeatureFlagsSchema } from '@/api/schemas';
 import type { Group, Project, GroupMember, ServerFeatureFlags } from '@/types';
 
 export interface GroupState {
@@ -81,20 +83,24 @@ export const useGroupStore = create<GroupState>((set, get) => ({
 
     set({ flagsLoading: true });
     try {
-      if (__DEMO_MODE__) {
-        // Demo-only: deterministic flags from the dataset. The real Worker
-        // has no §165A flags endpoint yet — LIVE mode keeps the safe
-        // all-off defaults (never assume a flag is enabled until the server
-        // says so), it never fakes a response.
-        await new Promise<void>((resolve) => setTimeout(resolve, 200));
-        set({ featureFlags: { ...DEFAULT_FLAGS }, flagsLoading: false });
-        return;
-      }
-      // LIVE — no server endpoint yet (documented in INTEGRATION_NOTES);
-      // keep the safe defaults and record that the fetch was a no-op.
-      set({ featureFlags: { ...DEFAULT_FLAGS }, flagsLoading: false });
+      // §165A.1 — flags come from the SERVER (GET /groups/:id/flags), never a
+      // local toggle; the client must not assume a flag is enabled just
+      // because its UI path exists in the build.
+      const raw = await api.get(`/groups/${encodeURIComponent(groupId)}/flags`, { retries: 0 });
+      const parsed = FeatureFlagsSchema.safeParse(raw);
+      // Ignore stale responses that land after the user switched away.
+      if (get().activeGroup?.id !== groupId) return;
+      set({
+        featureFlags: parsed.success ? { ...DEFAULT_FLAGS, ...parsed.data } : { ...DEFAULT_FLAGS },
+        flagsLoading: false,
+      });
     } catch {
-      set({ flagsLoading: false });
+      // LIVE honesty (D14): the real Worker has no §165A flags endpoint yet —
+      // the request fails and safe all-off defaults stay in force rather than
+      // faking an answer. Demo mode serves the same route from the dataset.
+      if (get().activeGroup?.id === groupId) {
+        set({ featureFlags: { ...DEFAULT_FLAGS }, flagsLoading: false });
+      }
     }
   },
 

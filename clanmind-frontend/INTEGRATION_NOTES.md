@@ -291,3 +291,64 @@ Open items observed during this pass (backend stream):
 - No artifact comments/presence endpoints exist yet (FE §108/§109 remain
   UI-ready but unwired rather than faked).
 
+---
+
+## 2026-08-24 — P7 approvals & GitHub (FE §156–§165A, §231; BE §107/§113/§140)
+
+### D18 — Endpoint parity: aiConfig + GitHub/approval REST all hit REAL contracts
+The P7 surfaces read/write through the same §113 modules used elsewhere, never
+hard-coded demo values:
+
+| FE surface | Endpoint (FE §9 module) | BE contract | Demo transport parity |
+|---|---|---|---|
+| BYOK config read/write | `GET`/`PATCH /groups/:g/ai/config` (`aiConfig.ts`) | §107 ai-config routes (§32 slots) | `transportRoutes` reproduces both shapes incl. §102 envelopes |
+| Provider key validation | `POST /groups/:g/ai/providers/validate` | §107 validate | demo route mirrors response shape (validate → config + models) |
+| Provider model refresh | `POST /groups/:g/ai/providers/:id/models` | §107 models re-discover | demo route mirrors (no key sent) |
+| GitHub status | `GET /groups/:g/github/status` → `{connected, connection}` | §76.2 (one Group = one repo) | demo handler derives from dataset (connected = connection && !disconnected_at && installation_id) |
+| GitHub connect | `POST /groups/:g/github/connect` | §160 App-installation body (201 → connection row) | demo handler persists to dataset + broadcasts `github.connected` |
+| GitHub disconnect | `POST /groups/:g/github/disconnect` → `{ok}` | §231 (history rows kept server-side) | demo marks `disconnected_at`, nulls `installation_id` |
+| GitHub actions list | `GET /projects/:p/github/actions` → `{items}` | §78 join (status/risk via `ai_actions`) | demo returns joined rows with §78A.2 payload/hash NOT echoed |
+| GitHub action propose | `POST /projects/:p/github/actions` → 202 | §78 create_branch/apply_patch/create_pr | demo validates connected+installation, broadcasts `github.action.proposed` |
+| Approve / Reject | `POST /github/actions/:id/approve\|reject` | §164A.2/§164A.3 | demo answers `{executed, reason?, action}` / `{ok}` |
+
+### D19 — Approval bindings follow §164A.2 exactly (hash+version, never a boolean)
+`approveGithubAction(actionId, payloadHash, payloadVersion)` posts
+`displayed_payload_hash` + `displayed_payload_version` — the payload the human
+SAW, not an `approved: true`. An `ACTION_EXPIRED` answer means the payload
+changed since render; the caller must surface re-review (§164A.4) and never
+silently retry with the stale hash. Reject is terminal (§164A.3). `ApprovalCard`
+(§163/§164A) is reused by `GitHubPanel` with the generic approve/reject/review
+handlers; the diff viewer opens via `onViewDiff` (no fetch-back).
+
+### D20 — Demo-only surfaces (never shipped in live mode)
+- **Inline line hunks (`payload.file_diffs`)** — a demo-only extension. The real
+  backend ships per-file `changed_files` stats only (§140 `buildDiffPreview`
+  shape); there is NO line-hunk endpoint. `GitHubDiffViewer` therefore renders
+  line hunks when present and otherwise shows the honest "Line-level changes not
+  available for this file — stats above are authoritative." state instead of
+  inventing content. The `file_diffs` fixture lives only in `mocks/dataset.ts`.
+- **§165A feature flags** — no backend flags endpoint exists yet (D14). Live
+  mode keeps the safe all-off `DEFAULT_FLAGS` (§165A: never assume enabled),
+  so `github_write`/`github_merge` default ON is a DEMO dataset choice only;
+  live defaults to the conservative flags from the store. The flags hide
+  (never disable) the risky affordances per §165A.2.
+- **`NEEDS_REAUTH`** — token expiry is not exposed by the backend (no signal).
+  It stays in the §165 status union for protocol completeness and is never
+  fabricated by `deriveGithubStatus`; only demo/test fixtures exercise it.
+- **BYOK raw key** — a saved provider key is never revealed (§325.11/§63.1);
+  only `••••last4` metadata renders and the raw key is dropped from client
+  state once validation finishes.
+
+### D21 — Open gaps (backend stream)
+- **No line-hunk endpoint** for GitHub diffs (§162 requires diff; FE shows
+  stats-only with honest fallback until the backend ships inline hunks or a
+  preview content surface).
+- **No §165A feature-flags endpoint** (extends D14) — flags remain
+  demo/compile-gated.
+- **No token-expiry signal** for `NEEDS_REAUTH`.
+- `github.*` fan-out events (`github.action.proposed`, `github.connected`,
+  `github.disconnected`) are demo broadcasts; the shared dispatch consumes them
+  via unknown-type tolerance (vocabulary is handled, live projections for
+  Tasks/Decisions/GitHub remain phase-scoped per D15's related items).
+
+

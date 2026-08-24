@@ -24,7 +24,19 @@ import { MeetingActiveHeader } from '@/features/meetings/MeetingActiveHeader';
 import { MeetingPanel } from '@/features/meetings/MeetingPanel';
 import { MeetingStartDialog, MeetingEndSummaryDialog } from '@/features/meetings/MeetingDialogs';
 import { GitHubDiffViewer } from '@/features/approvals/GitHubDiffViewer';
-import { ApprovalCard } from '@/features/approvals/ApprovalCard';
+import { ApprovalCard, isGithubAction } from '@/features/approvals/ApprovalCard';
+import { GitHubActionCard } from '@/features/approvals/GitHubActionCard';
+import { GitHubPanel } from '@/features/github/GitHubPanel';
+import {
+  errorMessageOf,
+  useGithubConnection,
+} from '@/features/github/useGithubConnection';
+import {
+  approveGithubAction,
+  rejectGithubAction,
+  fetchGithubActions,
+} from '@/api/endpoints/github';
+import { ApiError } from '@/api/errors';
 import { ContextInspector } from '@/features/artifacts/ContextInspector';
 import { ResearchDrawer } from '@/features/ai/ResearchDrawer';
 import { SyncConflictCard } from '@/features/sync/SyncConflictCard';
@@ -157,7 +169,6 @@ export function AppShell() {
     addMemory,
     removeMemoryCandidate,
     updateAiAction,
-    refreshAiAction,
   } = useProjectDataStore();
 
   const {
@@ -317,6 +328,36 @@ export function AppShell() {
       (a, b) => (rank.get(a.id) ?? Number.POSITIVE_INFINITY) - (rank.get(b.id) ?? Number.POSITIVE_INFINITY),
     );
   }, [groups, recentGroupIds]);
+
+  // ─── §159/§165 GitHub connection — ONE hook instance feeds the panel, the
+  // diff viewer (default branch) and the §78 joined-row reconciliation. ─────
+  const githubConn = useGithubConnection(
+    groupForRoute?.id,
+    projectForRoute?.id ?? null,
+  );
+  // Reconcile joined github_actions rows into held approval envelopes by
+  // ai_action_id — statuses stay server-truth; cards render only for rows
+  // whose hash/version the client actually holds (§164A.2).
+  useEffect(() => {
+    if (githubConn.actions.length > 0) {
+      useProjectDataStore.getState().applyGithubActionRows(githubConn.actions);
+    }
+  }, [githubConn.actions]);
+
+  // §165A.2 github_write — write-triggering GitHub affordances never appear
+  // when the flag is off; non-GitHub approvals and reads are unaffected.
+  const githubWriteAllowed = featureFlags.github_write !== false;
+  const githubMergeAllowed = featureFlags.github_merge !== false;
+  const approvableActions = useMemo(
+    () =>
+      aiActions.filter((a) => !(isGithubAction(a) && !githubWriteAllowed)),
+    [aiActions, githubWriteAllowed],
+  );
+  /** Pending GitHub envelopes for the §159 panel (flag-gated). */
+  const githubPanelActions = useMemo(
+    () => approvableActions.filter((a) => isGithubAction(a) && a.project_id === (projectForRoute?.id ?? null)),
+    [approvableActions, projectForRoute?.id],
+  );
 
   // ─── Chat pipeline (refactor R1) — send/retry/AI-trigger live in the
   // chat controller; the shell only wires UI events to it. ───────────────────
@@ -529,40 +570,99 @@ export function AppShell() {
     updateCandidateStatus(c.id, 'ACCEPTED');
   };
 
-  /** §164A.2/3: approve submits exact payload hash+version; success → APPROVED→EXECUTING→SUCCEEDED */
-  const handleApproveAction = (actionId: string, hash: string, version: number) => {
-    const action = aiActions.find((a) => a.id === actionId);
+  /** §164A.2 — approve submits the exact displayed hash+version to the real
+   *  §113 endpoint (generic engine; works for every action kind). The backend
+   *  answers ACTION_EXPIRED when the payload changed since render → §164A.4. */
+  const handleApproveAction = async (actionId: string, hash: string, version: number) => {
+    const action = useProjectDataStore.getState().aiActions.find((a) => a.id === actionId);
     if (!action) return;
     // §164A.2: only valid for the payload snapshot on screen
     if (action.payload_hash !== hash || action.payload_version !== version) {
       updateAiAction(actionId, { status: 'EXPIRED' });
       return;
     }
-    updateAiAction(actionId, { status: 'APPROVED' });
-    setTimeout(() => {
-      updateAiAction(actionId, { status: 'EXECUTING' });
-      setTimeout(() => {
-        updateAiAction(actionId, { status: 'SUCCEEDED' });
-        toast({ title: 'Action completed', variant: 'success' });
-      }, 1200);
-    }, 400);
+    try {
+      const result = await approveGithubAction(actionId, hash, version);
+      if (result.action) {
+        updateAiAction(actionId, {
+          status: result.action.status as typeof action.status,
+          rejected_by_user_id: undefined,
+          rejected_by_name: undefined,
+        });
+      } else {
+        updateAiAction(actionId, { status: 'APPROVED' });
+      }
+      if (result.executed) {
+        toast({ title: 'Action approved', description: 'Execution started.', variant: 'success' });
+      } else {
+        // §79 transparent execution — never a fabricated success.
+        toast({
+          title: 'Approved',
+          description:
+            result.reason === 'github_credentials_not_configured'
+              ? 'Queued for execution — repository credentials are not configured yet.'
+              : 'Starting…',
+        });
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'ACTION_EXPIRED') {
+        // §164A.4 — never silently retry with the old hash; surface the
+        // re-review flow instead.
+        updateAiAction(actionId, { status: 'EXPIRED' });
+        toast({ title: 'This approval request is no longer valid.', description: 'Review the latest version.' });
+      } else if (err instanceof ApiError && err.code === 'GROUP_PERMISSION_DENIED') {
+        toast({ title: 'Only Owners and Admins can approve this.' });
+      } else {
+        toast({ title: 'Approval failed', description: errorMessageOf(err) });
+      }
+      throw err; // let the card reset its busy state
+    }
   };
 
-  const handleRejectAction = (actionId: string) => {
-    updateAiAction(actionId, {
-      status: 'REJECTED',
-      rejected_by_user_id: currentUserId,
-      rejected_by_name: user?.name || 'Admin',
-    });
-    toast({ title: 'Action rejected' });
+  /** Reject path — terminal REJECTED via the same generic endpoint. */
+  const handleRejectAction = async (actionId: string) => {
+    try {
+      await rejectGithubAction(actionId);
+      updateAiAction(actionId, {
+        status: 'REJECTED',
+        rejected_by_user_id: currentUserId,
+        rejected_by_name: user?.name || 'Admin',
+      });
+      toast({ title: 'Action rejected' });
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'GROUP_PERMISSION_DENIED') {
+        toast({ title: 'Only Owners and Admins can reject this.' });
+      } else {
+        toast({ title: 'Rejection failed', description: errorMessageOf(err) });
+      }
+      throw err;
+    }
   };
 
-  /** §164: merge is GitHub-specific and high-impact */
+  /** §164A.4 "Review latest" — re-fetch the joined action rows for the
+   *  action's project and reconcile statuses into held envelopes. */
+  const handleReviewLatest = async (actionId: string) => {
+    const current = useProjectDataStore.getState().aiActions.find((a) => a.id === actionId);
+    if (!current?.project_id) return;
+    try {
+      const rows = await fetchGithubActions(current.project_id);
+      useProjectDataStore.getState().applyGithubActionRows(rows);
+      const row = rows.find((r) => r.ai_action_id === actionId);
+      toast({
+        title: row ? `Latest status: ${row.status}` : 'Action re-reviewed',
+      });
+    } catch (err) {
+      toast({ title: 'Could not refresh the action', description: errorMessageOf(err) });
+    }
+  };
+
+  /** §164: merge is GitHub-specific and high-impact (dialog lives in the viewer) */
   const handleApproveAndMerge = () => {
-    const gh = aiActions.find((a) => a.action_kind.includes('GITHUB'));
-    if (gh) handleApproveAction(gh.id, gh.payload_hash, gh.payload_version);
-    toast({ title: 'PR merged', description: 'feat/spi-dma-driver merged into main.' });
-    closeRightPanel();
+    const gh = aiActions.find((a) => isGithubAction(a));
+    if (!gh) return;
+    void handleApproveAction(gh.id, gh.payload_hash, gh.payload_version)
+      .catch(() => undefined)
+      .finally(() => closeRightPanel());
   };
 
   /** §128: saved summary becomes a Garage artifact */
@@ -794,7 +894,9 @@ export function AppShell() {
         <ContextInspector onClose={closeRightPanel} />
       ) : rightPanelMode === 'diff' ? (
         <GitHubDiffViewer
-          action={aiActions.find((a) => a.action_kind.includes('GITHUB'))}
+          action={approvableActions.find((a) => isGithubAction(a))}
+          defaultBranch={githubConn.connection?.default_branch ?? null}
+          mergeEnabled={githubMergeAllowed}
           onClose={closeRightPanel}
           onApproveAndMerge={handleApproveAndMerge}
         />
@@ -820,22 +922,35 @@ export function AppShell() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {aiActions
+            {approvableActions
               .filter((a) => a.status !== 'SUCCEEDED' && a.status !== 'REJECTED')
-              .map((a) => (
-                <ApprovalCard
-                  key={a.id}
-                  action={a}
-                  onApprove={handleApproveAction}
-                  onReject={handleRejectAction}
-                  onReviewLatest={refreshAiAction}
-                  onViewDiff={
-                    a.action_kind.includes('GITHUB')
-                      ? () => setRightPanelMode('diff')
-                      : undefined
-                  }
-                />
-              ))}
+              .map((a) =>
+                isGithubAction(a) ? (
+                  /* §164A — GitHub is ONE specialization of the generic card */
+                  <GitHubActionCard
+                    key={a.id}
+                    action={a}
+                    onApprove={handleApproveAction}
+                    onReject={handleRejectAction}
+                    onReviewLatest={handleReviewLatest}
+                    onViewDiff={() => setRightPanelMode('diff')}
+                  />
+                ) : (
+                  <ApprovalCard
+                    key={a.id}
+                    action={a}
+                    onApprove={handleApproveAction}
+                    onReject={handleRejectAction}
+                    onReviewLatest={handleReviewLatest}
+                  />
+                ),
+              )}
+            {approvableActions.filter((a) => a.status !== 'SUCCEEDED' && a.status !== 'REJECTED')
+              .length === 0 && (
+              <p className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                Nothing is waiting for approval right now.
+              </p>
+            )}
           </div>
         </div>
       ) : activeArtifact ? (
@@ -1186,6 +1301,30 @@ export function AppShell() {
                 }}
                 onDismissCandidate={removeMemoryCandidate}
                 onAddMemory={() => toast({ title: 'Add memory', description: 'Type "Remember this" in chat.' })}
+              />
+            </ErrorBoundary>
+          )}
+
+          {activeNavSection === 'github' && (
+            <ErrorBoundary label="GitHub">
+              {/* §159 project panel — connection matrix, pending actions, PRs */}
+              <GitHubPanel
+                groupId={groupForRoute.id}
+                projectId={projectForRoute?.id ?? null}
+                githubState={githubConn}
+                githubWriteEnabled={githubWriteAllowed}
+                githubMergeEnabled={githubMergeAllowed}
+                aiActions={githubPanelActions}
+                onApproveAction={(id, hash, version) => {
+                  void handleApproveAction(id, hash, version).catch(() => undefined);
+                }}
+                onRejectAction={(id) => {
+                  void handleRejectAction(id).catch(() => undefined);
+                }}
+                onReviewLatest={(id) => {
+                  void handleReviewLatest(id);
+                }}
+                onOpenDiff={() => setRightPanelMode('diff')}
               />
             </ErrorBoundary>
           )}

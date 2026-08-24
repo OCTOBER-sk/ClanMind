@@ -6,7 +6,7 @@
 
 import type { Transport, TransportRequest, TransportResponse, TransportUploadRequest } from '@/api/transport';
 import type { DemoDataset } from './dataset';
-import type { Message } from '@/types';
+import type { Message, AiAction, AiProviderConfig } from '@/types';
 import { getDemoHub } from './wsHub';
 import {
   ATTACHMENTS_PER_MESSAGE_MAX,
@@ -102,6 +102,56 @@ function matchPath(pattern: string, path: string): Record<string, string> | null
     }
   }
   return params;
+}
+
+// ─── §78A payload hashing — mirrors packages/domain canonicalization ─────────
+
+/** Deterministic JSON canonicalization (sorted keys, no undefined). */
+function canonicalize(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+  if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalize(v)}`).join(',')}}`;
+}
+
+/** SHA-256 of the canonical form; deterministic fallback when WebCrypto is absent. */
+async function hashPayload(payload: Record<string, unknown>): Promise<string> {
+  const canonical = canonicalize(payload);
+  try {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  } catch {
+    let h = 5381;
+    let out = '';
+    for (let round = 0; round < 4; round++) {
+      for (let i = 0; i < canonical.length; i++) {
+        h = ((h << 5) + h + canonical.charCodeAt(i) + round * 7) | 0;
+      }
+      out += (h >>> 0).toString(16).padStart(8, '0');
+    }
+    return out;
+  }
+}
+
+/** §140 buildDiffPreview — identical shape to @clanmind/domain. */
+function buildDiffPreview(input: {
+  changed_files: Array<{ path: string; additions: number; deletions: number }>;
+  branch_name: string;
+  base_sha: string;
+  target_sha: string;
+}): Record<string, unknown> {
+  return {
+    changed_files: input.changed_files,
+    additions: input.changed_files.reduce((s, f) => s + f.additions, 0),
+    deletions: input.changed_files.reduce((s, f) => s + f.deletions, 0),
+    branch: input.branch_name,
+    base_sha: input.base_sha,
+    target_sha: input.target_sha,
+  };
 }
 
 let serverSequence = 1421;
@@ -319,19 +369,347 @@ export function createDemoTransport(ds: DemoDataset): Transport {
       return ok({ id: p.runId, status: 'CANCELLED' });
     }],
 
-    ['GET', '/groups/:groupId/flags', (p) => {
+    ['GET', '/groups/:groupId/flags', () =>
+      // §165A per-Group flags — the same shape the live Worker will expose.
+      ok(ds.featureFlags)],
+
+    // ── AI provider config (BE §107 handlers/ai-config.ts parity, P7) ──────
+
+    ['GET', '/groups/:groupId/ai/config', (p) => {
       void p;
-      return ok(ds.featureFlags);
+      return ok({
+        configs: ds.aiProviderConfigs.map((c) => ({
+          ...c,
+          // §63.1 — sanitized: credential_ref is namespaced, key material never.
+          credential_ref: c.credential_ref ? `secret:${c.credential_ref.replace(/^secret:/, '')}` : null,
+        })),
+        routes: ds.aiModelRoutes,
+      });
     }],
 
-    ['GET', '/github/status', () =>
-      ok({
-        connection_status: 'READ_WRITE',
-        owner_login: 'clanmind-demo',
-        repo_name: 'flight-controller',
-        default_branch: 'main',
-        last_synced_at: new Date(Date.now() - 15 * 60_000).toISOString(),
-      })],
+    ['PATCH', '/groups/:groupId/ai/config', (p, req) => {
+      void p;
+      const body = (req.body ?? {}) as { routes?: unknown };
+      const routes = Array.isArray(body.routes) ? body.routes : null;
+      if (!routes || routes.length < 1 || routes.length > 4) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid route list.');
+      }
+      const roles = routes.map((r) => (r as { role?: string }).role);
+      const primaries = roles.filter((r) => r === 'PRIMARY').length;
+      if (primaries !== 1) return fail(400, 'VALIDATION_FAILED', 'Exactly one PRIMARY route is required.');
+      if (roles.filter((r) => typeof r === 'string' && r.startsWith('FALLBACK_')).length > 3) {
+        return fail(400, 'VALIDATION_FAILED', 'At most three fallback positions.');
+      }
+      for (const entry of routes as Array<{ provider_config_id?: string; role?: string; model_id?: string }>) {
+        const cfg = ds.aiProviderConfigs.find((c) => c.id === entry.provider_config_id);
+        if (!cfg || cfg.group_id !== p.groupId) {
+          return fail(400, 'VALIDATION_FAILED', 'Unknown provider config for this Group.');
+        }
+        const existingIdx = ds.aiModelRoutes.findIndex(
+          (r) => r.role === entry.role,
+        );
+        const row = {
+          id: existingIdx >= 0 ? ds.aiModelRoutes[existingIdx]!.id : `amr_${crypto.randomUUID()}`,
+          group_id: p.groupId,
+          provider_config_id: String(entry.provider_config_id),
+          role: entry.role as 'PRIMARY' | 'FALLBACK_1' | 'FALLBACK_2' | 'FALLBACK_3',
+          model_id: String(entry.model_id),
+          priority: entry.role === 'PRIMARY' ? 0 : Number(String(entry.role).slice(-1)),
+          enabled: true,
+          created_at: new Date().toISOString(),
+        };
+        if (existingIdx >= 0) ds.aiModelRoutes[existingIdx] = row;
+        else ds.aiModelRoutes.push(row);
+      }
+      return ok({ ok: true, routes: ds.aiModelRoutes });
+    }],
+
+    ['POST', '/groups/:groupId/ai/providers/validate', (p, req) => {
+      const body = (req.body ?? {}) as { provider?: unknown; api_key?: unknown };
+      if (typeof body.provider !== 'string' || typeof body.api_key !== 'string' || body.api_key.length < 8) {
+        return fail(400, 'VALIDATION_FAILED', 'provider and api_key are required.');
+      }
+      // §64 validate-before-store. Deterministic demo rule: any key containing
+      // "invalid" is rejected exactly like a real provider auth failure.
+      if (/invalid/i.test(body.api_key)) {
+        return fail(400, 'VALIDATION_FAILED', 'Provider rejected this key.');
+      }
+      const config: AiProviderConfig = {
+        id: `apc_${crypto.randomUUID()}`,
+        group_id: p.groupId,
+        kind: 'BYOK',
+        provider: body.provider,
+        credential_ref: `secret:enc_${body.api_key.length}`,
+        key_last4: body.api_key.slice(-4).toUpperCase(),
+        enabled: true,
+        created_by: ds.currentUser.id,
+        created_at: new Date().toISOString(),
+      };
+      ds.aiProviderConfigs.push(config);
+      return ok({ config, models: demoModelsFor(body.provider) }, 201);
+    }],
+
+    ['POST', '/groups/:groupId/ai/providers/:id/models', (p) => {
+      const config = ds.aiProviderConfigs.find((c) => c.id === p.id);
+      if (!config || config.group_id !== p.groupId) {
+        return fail(404, 'NOT_FOUND', 'Provider config not found.');
+      }
+      return ok({ provider: config.provider, models: demoModelsFor(config.provider) });
+    }],
+
+    /** §158 search-provider test — DEMO-PARITY ONLY route (no BE §113
+     * endpoint exists yet; live mode 404s into an honest failure state).
+     * Recorded in INTEGRATION_NOTES as an invented demo surface. */
+    ['POST', '/groups/:groupId/search-provider/test', () =>
+      ok({ ok: true, results_sampled: 8 })],
+
+    // ── GitHub integration (BE §113 handlers/github.ts parity, P7) ─────────
+
+    ['GET', '/groups/:groupId/github/status', (p) => {
+      const connection = ds.githubConnections.find((c) => c.group_id === p.groupId) ?? null;
+      const connected =
+        !!connection && !connection.disconnected_at && connection.installation_id !== null;
+      return ok({ connected, connection });
+    }],
+
+    ['POST', '/groups/:groupId/github/connect', (p, req) => {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const installationId = Number(body.installation_id);
+      const ownerLogin = body.owner_login;
+      const repoName = body.repo_name;
+      if (
+        !Number.isInteger(installationId) ||
+        installationId <= 0 ||
+        typeof ownerLogin !== 'string' ||
+        ownerLogin.length === 0 ||
+        typeof repoName !== 'string' ||
+        repoName.length === 0
+      ) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid connection body.');
+      }
+      let connection = ds.githubConnections.find((c) => c.group_id === p.groupId);
+      const row = {
+        id: connection?.id ?? `ghconn_${crypto.randomUUID()}`,
+        group_id: p.groupId,
+        installation_id: installationId,
+        owner_login: ownerLogin,
+        repo_name: repoName,
+        repo_full_name: `${ownerLogin}/${repoName}`,
+        default_branch:
+          typeof body.default_branch === 'string' && body.default_branch.length > 0
+            ? body.default_branch
+            : null,
+        permission_mode:
+          body.permission_mode === 'READ_WRITE'
+            ? ('READ_WRITE' as const)
+            : ('READ_ONLY' as const),
+        connected_at: new Date().toISOString(),
+        disconnected_at: null,
+      };
+      if (connection) Object.assign(connection, row);
+      else ds.githubConnections.push(row);
+      getDemoHub().broadcast('github.connected', p.groupId, { repo_full_name: row.repo_full_name });
+      return ok(row, 201);
+    }],
+
+    ['POST', '/groups/:groupId/github/disconnect', (p) => {
+      const connection = ds.githubConnections.find((c) => c.group_id === p.groupId);
+      if (connection) {
+        connection.disconnected_at = new Date().toISOString();
+        connection.installation_id = null; // §142 — invalidate cached installation
+      }
+      getDemoHub().broadcast('github.disconnected', p.groupId, {});
+      return ok({ ok: true });
+    }],
+
+    ['GET', '/projects/:projectId/github/actions', (p) => {
+      const items = ds.githubActions
+        .filter((ga) => ga.project_id === p.projectId)
+        .map((ga) => {
+          // §78A.2 — status/risk join through ai_actions; payload/hash are NOT
+          // part of this list row on the real backend either.
+          const aiAction = ds.aiActions.find((a) => a.id === ga.ai_action_id);
+          return { ...ga, status: aiAction?.status ?? ga.status, risk_level: aiAction?.risk_level ?? ga.risk_level };
+        })
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return ok({ items });
+    }],
+
+    ['POST', '/projects/:projectId/github/actions', async (p, req) => {
+      const project = ds.projects.find((pr) => pr.id === p.projectId);
+      if (!project) return fail(404, 'NOT_FOUND', 'Project not found.');
+      const connection = ds.githubConnections.find((c) => c.group_id === project.group_id);
+      if (!connection || !connection.installation_id || connection.disconnected_at) {
+        return fail(409, 'CONFLICT', 'No GitHub repository is connected to this Group.');
+      }
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const actionType = body.action_type;
+      const branchName = body.branch_name;
+      const baseSha = body.base_sha;
+      const headSha = body.head_sha;
+      const changedFiles = body.changed_files;
+      if (
+        actionType !== 'create_branch' &&
+        actionType !== 'apply_patch' &&
+        actionType !== 'create_pr'
+      ) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid action body.');
+      }
+      if (
+        typeof branchName !== 'string' ||
+        branchName.length === 0 ||
+        typeof baseSha !== 'string' ||
+        typeof headSha !== 'string'
+      ) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid action body.');
+      }
+      if (
+        !Array.isArray(changedFiles) ||
+        changedFiles.length === 0 ||
+        !changedFiles.every(
+          (f) =>
+            f &&
+            typeof f === 'object' &&
+            typeof (f as Record<string, unknown>).path === 'string' &&
+            Number.isInteger((f as Record<string, unknown>).additions) &&
+            Number.isInteger((f as Record<string, unknown>).deletions),
+        )
+      ) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid action body.');
+      }
+      // §139 — the AI never writes the default branch.
+      if (connection.default_branch && branchName.trim() === connection.default_branch) {
+        return fail(
+          403,
+          'GROUP_PERMISSION_DENIED',
+          'The default branch is protected; AI work flows through a branch + PR.',
+        );
+      }
+      const files = changedFiles as Array<{ path: string; additions: number; deletions: number }>;
+      const preview = buildDiffPreview({
+        changed_files: files,
+        branch_name: branchName,
+        base_sha: baseSha,
+        target_sha: headSha,
+      });
+      const payload = {
+        ...preview,
+        repo_full_name: connection.repo_full_name,
+        installation_id: connection.installation_id,
+      };
+      const nowIso = new Date().toISOString();
+      const actionId = `act_${crypto.randomUUID()}`;
+      const action: AiAction = {
+        id: actionId,
+        group_id: project.group_id,
+        project_id: project.id,
+        action_kind: `github.${String(actionType)}`,
+        risk_level: 'HIGH',
+        payload,
+        payload_hash: await hashPayload(payload),
+        payload_version: 1,
+        status: 'WAITING_APPROVAL',
+        requested_by_user_id: ds.currentUser.id,
+        created_at: nowIso,
+        expires_at: new Date(Date.now() + 24 * 3600_000).toISOString(),
+      };
+      ds.aiActions.push(action);
+      const githubAction = {
+        id: `gha_${crypto.randomUUID()}`,
+        ai_action_id: actionId,
+        group_id: project.group_id,
+        project_id: project.id,
+        action_type: actionType as 'create_branch' | 'apply_patch' | 'create_pr',
+        branch_name: branchName,
+        target_sha: headSha,
+        pr_number: null,
+        preview_json: preview,
+        created_at: nowIso,
+        completed_at: null,
+        status: 'WAITING_APPROVAL',
+        risk_level: 'HIGH',
+      } satisfies DemoDataset['githubActions'][number];
+      ds.githubActions.push(githubAction);
+      // Fan-out carries the FULL envelope so other clients can render an
+      // approval card without a fetch-back (mirrors handlers/github.ts).
+      getDemoHub().broadcast('github.action.proposed', project.group_id, {
+        action_id: actionId,
+        github_action_id: githubAction.id,
+        action_kind: action.action_kind,
+        payload_hash: action.payload_hash,
+        payload_version: action.payload_version,
+        preview,
+      });
+      getDemoHub().approvalRequested(project.group_id, {
+        action_id: actionId,
+        action_kind: action.action_kind,
+        risk_level: action.risk_level,
+      });
+      await sleep(60);
+      return ok({ action, github_action: githubAction }, 202);
+    }],
+
+    ['POST', '/github/actions/:actionId/approve', async (p, req) => {
+      const action = ds.aiActions.find((a) => a.id === p.actionId);
+      if (!action) return fail(404, 'NOT_FOUND', 'Action not found.');
+      const member = ds.members.find((m) => m.user_id === ds.currentUser.id);
+      if (!member || (member.role !== 'OWNER' && member.role !== 'ADMIN')) {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'Only Owners/Admins can approve GitHub writes.');
+      }
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      if (
+        typeof body.displayed_payload_hash !== 'string' ||
+        typeof body.displayed_payload_version !== 'number'
+      ) {
+        return fail(400, 'VALIDATION_FAILED', 'Approval binding fields required.');
+      }
+      // §78A lifecycle — exact engine order mirrors ApprovalEngine.approve().
+      if (action.status !== 'WAITING_APPROVAL') {
+        return fail(409, 'CONFLICT', `Action is ${action.status}, not awaiting approval.`);
+      }
+      if (action.expires_at && new Date(action.expires_at).getTime() <= Date.now()) {
+        action.status = 'EXPIRED';
+        return fail(409, 'ACTION_EXPIRED', 'This action expired; a fresh proposal is required.');
+      }
+      if (
+        action.payload_hash !== body.displayed_payload_hash ||
+        action.payload_version !== body.displayed_payload_version
+      ) {
+        // §164A.2 integrity check failed server-side — the client must NOT
+        // retry with the old hash; it re-fetches and re-reviews (§164A.4).
+        return fail(
+          409,
+          'ACTION_EXPIRED',
+          'The action changed since it was displayed. Review the latest version.',
+        );
+      }
+      action.status = 'APPROVED';
+      const gaRow = ds.githubActions.find((g) => g.ai_action_id === action.id);
+      if (gaRow) gaRow.status = 'APPROVED';
+      // Transparent execution state (§79): without App credentials the action
+      // stays APPROVED for a later executor run — never silently dropped.
+      return ok({
+        executed: false,
+        reason: 'github_credentials_not_configured',
+        action,
+      });
+    }],
+
+    ['POST', '/github/actions/:actionId/reject', (p) => {
+      const action = ds.aiActions.find((a) => a.id === p.actionId);
+      if (!action) return fail(404, 'NOT_FOUND', 'Action not found.');
+      const member = ds.members.find((m) => m.user_id === ds.currentUser.id);
+      if (!member || (member.role !== 'OWNER' && member.role !== 'ADMIN')) {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'Only Owners/Admins can reject GitHub writes.');
+      }
+      if (action.status !== 'WAITING_APPROVAL' && action.status !== 'APPROVED') {
+        return fail(409, 'CONFLICT', `Action is ${action.status}.`);
+      }
+      action.status = 'REJECTED';
+      const gaRow = ds.githubActions.find((g) => g.ai_action_id === action.id);
+      if (gaRow) gaRow.status = 'REJECTED';
+      return ok({ ok: true });
+    }],
 
     // ── Artifacts (P6): BE §109 parity over the dataset. ───────────────────
 
@@ -535,4 +913,30 @@ function verifyDemoToken(attachmentId: string, token: string): boolean {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/** §64 model discovery — deterministic per-provider catalogs (ModelDescriptor shape). */
+function demoModelsFor(provider: string): Array<{ model_id: string; display_name: string; context_window: number | null }> {
+  switch (provider) {
+    case 'anthropic':
+      return [
+        { model_id: 'claude-sonnet-4-5', display_name: 'Claude Sonnet 4.5', context_window: 200_000 },
+        { model_id: 'claude-opus-4-1', display_name: 'Claude Opus 4.1', context_window: 200_000 },
+        { model_id: 'claude-haiku-4-5', display_name: 'Claude Haiku 4.5', context_window: 200_000 },
+      ];
+    case 'openai':
+      return [
+        { model_id: 'gpt-5.2', display_name: 'GPT-5.2', context_window: 400_000 },
+        { model_id: 'gpt-5.2-mini', display_name: 'GPT-5.2 mini', context_window: 400_000 },
+      ];
+    case 'google':
+      return [{ model_id: 'gemini-3-pro', display_name: 'Gemini 3 Pro', context_window: 1_000_000 }];
+    case 'openrouter':
+      return [
+        { model_id: 'anthropic/claude-sonnet-4-5', display_name: 'Claude Sonnet 4.5 (OR)', context_window: 200_000 },
+        { model_id: 'openai/gpt-5.2', display_name: 'GPT-5.2 (OR)', context_window: 400_000 },
+      ];
+    default:
+      return [];
+  }
 }

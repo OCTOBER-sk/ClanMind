@@ -27,15 +27,25 @@ import type { AiAction } from '@/types';
 
 export interface ApprovalCardProps {
   action: AiAction;
-  /** §164A.2 — submit exact payload_hash + payload_version, never a boolean */
-  onApprove: (actionId: string, payloadHash: string, payloadVersion: number) => void;
-  onReject: (actionId: string) => void;
+  /**
+   * §164A.2 — submit exact payload_hash + payload_version, never a boolean.
+   * May return a promise; the card keeps its busy state until it settles and
+   * resets (instead of sticking) when the submission fails.
+   */
+  onApprove: (actionId: string, payloadHash: string, payloadVersion: number) => void | Promise<void>;
+  onReject: (actionId: string) => void | Promise<void>;
   onReviewLatest?: (actionId: string) => void;
   onViewDiff?: () => void;
 }
 
 // ─── §164A.1 human-readable action labels ───
+// Covers BOTH vocabularies: the BE generic engine kinds (`github.apply_patch`,
+// `artifact.bulk_delete`…) and legacy FE-style kinds.
 const ACTION_LABELS: Record<string, string> = {
+  'github.apply_patch': 'Odin wants to change GitHub',
+  'github.create_branch': 'Odin wants to create a branch',
+  'github.create_pr': 'Odin wants to open a pull request',
+  'github.merge_pr': 'Odin wants to merge a pull request',
   MODIFY_GITHUB_FILES: 'Odin wants to change GitHub',
   CREATE_GITHUB_BRANCH: 'Odin wants to create a branch',
   OPEN_GITHUB_PR: 'Odin wants to open a pull request',
@@ -45,33 +55,81 @@ const ACTION_LABELS: Record<string, string> = {
   MEMORY_PURGE: 'Odin wants to archive memory entries',
 };
 
+/** Case-insensitive domain check — BE kinds are dotted-lowercase. */
+export function isGithubAction(action: Pick<AiAction, 'action_kind'>): boolean {
+  return action.action_kind.toLowerCase().includes('github');
+}
+
 function actionLabel(action_kind: string): string {
   return (
     ACTION_LABELS[action_kind] ??
-    action_kind.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase())
+    ACTION_LABELS[action_kind.toLowerCase()] ??
+    action_kind.replace(/[._]/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
   );
+}
+
+interface SummaryFile {
+  path: string;
+  additions: number;
+  deletions: number;
+}
+
+/**
+ * Tolerant file-list reader: the BE approval payload carries
+ * `changed_files:[{path,additions,deletions}]` (§140 buildDiffPreview); demo
+ * fixtures may still use `files`. A/M/D is DERIVED when not explicit.
+ */
+function readPayloadFiles(payload: Record<string, unknown>): SummaryFile[] {
+  const raw = (payload.changed_files ?? payload.files) as unknown;
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const e = entry as Record<string, unknown>;
+    if (typeof e.path !== 'string') return [];
+    return [
+      {
+        path: e.path,
+        additions: typeof e.additions === 'number' ? e.additions : 0,
+        deletions: typeof e.deletions === 'number' ? e.deletions : 0,
+      },
+    ];
+  });
+}
+
+function changeLetter(f: { additions: number; deletions: number }): 'A' | 'D' | 'M' {
+  if (f.additions > 0 && f.deletions === 0) return 'A';
+  if (f.deletions > 0 && f.additions === 0) return 'D';
+  return 'M';
 }
 
 // ─── §164A.5 payload summary renderers — driven by action.payload, never mock ───
 function PayloadSummary({ action }: { action: AiAction }) {
   const p = action.payload as Record<string, unknown>;
-  const kind = action.action_kind;
+  const kind = action.action_kind.toLowerCase();
 
-  if (kind.includes('GITHUB')) {
-    const files = (p.files as Array<{ path: string; change: string; additions?: number; deletions?: number }>) ?? [];
+  if (kind.includes('github')) {
+    const files = readPayloadFiles(p);
     return (
       <div className="font-mono text-[11px] space-y-1">
+        {typeof p.repo_full_name === 'string' && (
+          <div className="font-sans font-semibold text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+            Repo: <span className="font-mono" style={{ color: 'var(--color-text)' }}>{p.repo_full_name}</span>
+          </div>
+        )}
         {typeof p.branch === 'string' && (
           <div className="font-sans font-semibold text-xs" style={{ color: 'var(--color-text-secondary)' }}>
             Branch: <span className="font-mono" style={{ color: 'var(--color-info)' }}>{p.branch}</span>
           </div>
         )}
-        {files.map((f, i) => {
-          const Icon = f.change === 'A' ? FilePlus2 : f.change === 'D' ? FileMinus2 : FileEdit;
+        {files.map((f) => {
+          const letter = changeLetter(f);
+          const Icon = letter === 'A' ? FilePlus2 : letter === 'D' ? FileMinus2 : FileEdit;
           return (
-            <div key={i} className="flex items-center gap-1.5">
-              <Icon className="w-3 h-3" style={{ color: f.change === 'D' ? 'var(--color-danger)' : 'var(--color-success)' }} aria-hidden="true" />
+            <div key={f.path} className="flex items-center gap-1.5">
+              <Icon className="w-3 h-3 shrink-0" style={{ color: letter === 'D' ? 'var(--color-danger)' : 'var(--color-success)' }} aria-hidden="true" />
               <span className="truncate" style={{ color: 'var(--color-text)' }}>{f.path}</span>
+              <span className="ml-auto shrink-0" style={{ color: 'var(--color-success)' }}>+{f.additions}</span>
+              <span className="shrink-0" style={{ color: 'var(--color-danger)' }}>−{f.deletions}</span>
             </div>
           );
         })}
@@ -84,7 +142,7 @@ function PayloadSummary({ action }: { action: AiAction }) {
     );
   }
 
-  if (kind.includes('DELETE') || kind.includes('PURGE')) {
+  if (kind.includes('delete') || kind.includes('purge')) {
     const items = (p.items as string[]) ?? [];
     return (
       <div className="space-y-1" style={{ color: 'var(--color-text)' }}>
@@ -103,7 +161,7 @@ function PayloadSummary({ action }: { action: AiAction }) {
     );
   }
 
-  if (kind.includes('REASSIGN')) {
+  if (kind.includes('reassign')) {
     return (
       <div className="space-y-1" style={{ color: 'var(--color-text)' }}>
         <p>
@@ -129,10 +187,11 @@ function PayloadSummary({ action }: { action: AiAction }) {
 }
 
 function ActionIcon({ kind }: { kind: string }) {
-  if (kind.includes('GITHUB')) return <GitPullRequest className="w-4 h-4" style={{ color: 'var(--color-info)' }} aria-hidden="true" />;
-  if (kind.includes('DELETE')) return <Trash2 className="w-4 h-4" style={{ color: 'var(--color-danger)' }} aria-hidden="true" />;
-  if (kind.includes('REASSIGN')) return <Users className="w-4 h-4" style={{ color: 'var(--color-info)' }} aria-hidden="true" />;
-  if (kind.includes('MEMORY')) return <BookOpen className="w-4 h-4" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />;
+  const k = kind.toLowerCase();
+  if (k.includes('github')) return <GitPullRequest className="w-4 h-4" style={{ color: 'var(--color-info)' }} aria-hidden="true" />;
+  if (k.includes('delete')) return <Trash2 className="w-4 h-4" style={{ color: 'var(--color-danger)' }} aria-hidden="true" />;
+  if (k.includes('reassign')) return <Users className="w-4 h-4" style={{ color: 'var(--color-info)' }} aria-hidden="true" />;
+  if (k.includes('memory')) return <BookOpen className="w-4 h-4" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />;
   return <ShieldAlert className="w-4 h-4" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />;
 }
 
@@ -152,15 +211,19 @@ export function ApprovalCard({
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
 
-  // §164A.2 — never send `approved: true`; submit exact hash + version
+  // §164A.2 — never send `approved: true`; submit exact hash + version.
   const handleApprove = () => {
     setIsApproving(true);
-    onApprove(action.id, action.payload_hash, action.payload_version);
+    Promise.resolve(onApprove(action.id, action.payload_hash, action.payload_version))
+      .catch(() => undefined) // error surfaces via toast/status; reset busy state
+      .finally(() => setIsApproving(false));
   };
 
   const handleReject = () => {
     setIsRejecting(true);
-    onReject(action.id);
+    Promise.resolve(onReject(action.id))
+      .catch(() => undefined)
+      .finally(() => setIsRejecting(false));
   };
 
   // ─── §164A.4 EXPIRED: payload changed since the card was rendered ───
@@ -304,12 +367,20 @@ export function ApprovalCard({
         <PayloadSummary action={action} />
       </div>
 
-      {/* Request provenance (§164A.1) */}
-      {action.requested_by_user_id && (
-        <p className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
-          Requested via AI run {action.requested_by_run_id ? action.requested_by_run_id.slice(0, 8) : ''}
-        </p>
-      )}
+      {/* Request provenance + lifecycle timestamps (§164A.1) */}
+      <div className="space-y-0.5 text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+        {action.requested_by_run_id && (
+          <p>
+            Requested via AI run{' '}
+            <span className="font-mono">{action.requested_by_run_id.slice(0, 8)}</span>
+            {action.requested_by_user_id ? ' · by a teammate request' : ''}
+          </p>
+        )}
+        <p>Created {formatTimestamp(action.created_at)}</p>
+        {typeof action.expires_at === 'string' && (
+          <p>Approval window closes {formatTimestamp(action.expires_at)}</p>
+        )}
+      </div>
 
       {/* Hash & Verification Footer — §164A.2 snapshot validity */}
       <div className="flex items-center justify-between text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
@@ -320,7 +391,7 @@ export function ApprovalCard({
       {/* Actions */}
       {isActive && (
         <div className="flex items-center gap-2 pt-1">
-          {action.action_kind.includes('GITHUB') && onViewDiff && (
+          {isGithubAction(action) && onViewDiff && (
             <Button size="sm" variant="outline" onClick={onViewDiff}>
               Review Changes
             </Button>
@@ -336,4 +407,10 @@ export function ApprovalCard({
       )}
     </div>
   );
+}
+
+function formatTimestamp(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }

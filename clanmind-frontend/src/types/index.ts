@@ -166,6 +166,117 @@ export type GitHubConnectionStatus =
   | 'NEEDS_REAUTH'
   | 'DISCONNECTED';
 
+/**
+ * BE §77 `github_connections` row. The backend never returns credential
+ * material; the FE renders connection metadata only.
+ */
+export interface GithubConnection {
+  id: string;
+  group_id: string;
+  installation_id: number | null;
+  owner_login: string | null;
+  repo_name: string | null;
+  repo_full_name: string | null;
+  default_branch: string | null;
+  permission_mode: GitHubPermissionMode;
+  connected_at: string | null;
+  disconnected_at: string | null;
+}
+
+/** GET /groups/:groupId/github/status response (handlers/github.ts). */
+export interface GithubStatusResponse {
+  connected: boolean;
+  connection: GithubConnection | null;
+}
+
+/** BE §78 `action_type` vocabulary. */
+export type GithubActionType = 'create_branch' | 'apply_patch' | 'create_pr' | 'merge_pr';
+
+/**
+ * One row of GET /projects/:projectId/github/actions — a `github_actions`
+ * row with `status`/`risk_level` joined through ai_actions (BE §78/§78A.2).
+ * NOTE: the real backend join exposes only status+risk_level; payload_hash,
+ * payload_version, action_kind and payload are NOT on this row (recorded
+ * gap in INTEGRATION_NOTES) — approval cards render only for envelopes the
+ * client actually holds (§164A.2), never for partial rows.
+ */
+export interface GithubActionItem {
+  /** github_actions row id — the ai_action id rides `ai_action_id`. */
+  id: string;
+  ai_action_id: string;
+  group_id: string;
+  project_id: string | null;
+  action_type: GithubActionType | string;
+  branch_name: string | null;
+  target_sha: string | null;
+  pr_number: number | null;
+  preview_json: Record<string, unknown> | null;
+  created_at: string;
+  completed_at: string | null;
+  /** Joined from ai_actions (§78A.2). */
+  status: string;
+  risk_level: string;
+}
+
+/** POST /projects/:projectId/github/actions → 202 {action, github_action}. */
+export interface ProposeGithubActionResponse {
+  action: AiAction;
+  github_action: GithubActionItem;
+}
+
+/** POST /github/actions/:id/approve response — execution is transparent (§79). */
+export interface ApproveGithubActionResponse {
+  executed: boolean;
+  reason?: string;
+  action?: AiAction;
+}
+
+// ─── AI provider configuration (BE §31/§32/§63–§64) ─────────────────────────
+
+export interface ModelDescriptor {
+  model_id: string;
+  display_name: string;
+  context_window: number | null;
+}
+
+/**
+ * Sanitized §63.1 provider config — metadata only, NEVER credential
+ * material. `key_last4` is the only key-derived field that ever reaches
+ * the client (`sk-…9F2A` style display).
+ */
+export interface AiProviderConfig {
+  id: string;
+  group_id: string;
+  kind: 'APPLICATION' | 'BYOK';
+  provider: string;
+  credential_ref: string | null;
+  key_last4: string | null;
+  enabled: boolean;
+  created_by?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** BE §32 model route — one PRIMARY + up to three fallbacks. */
+export type AiRouteRole = 'PRIMARY' | 'FALLBACK_1' | 'FALLBACK_2' | 'FALLBACK_3';
+
+export interface AiModelRoute {
+  id: string;
+  group_id: string;
+  provider_config_id: string;
+  role: AiRouteRole;
+  model_id: string;
+  priority: number;
+  enabled: boolean;
+  created_at?: string;
+}
+
+/** GET /groups/:groupId/ai/config → sanitized configs + route slots. */
+export interface AiConfigResponse {
+  configs: AiProviderConfig[];
+  routes: AiModelRoute[];
+}
+
 // ==========================================
 // DOMAIN ENTITIES & INTERFACES
 // ==========================================

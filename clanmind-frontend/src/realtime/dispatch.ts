@@ -24,6 +24,7 @@ import { useChatStore } from '@/state/useChatStore';
 import { useArtifactStore } from '@/state/useArtifactStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useGroupStore } from '@/state/useGroupStore';
+import { useProjectDataStore } from '@/state/useProjectDataStore';
 import { useAiStreamStore } from '@/features/ai/aiStreamStore';
 import {
   useConstructionStore,
@@ -667,6 +668,49 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
         useChatStore.setState({ presenceOnlineCount: Math.max(0, Math.round(viewers)) });
       }
       void payload.state;
+      break;
+    }
+
+    // ─── §164A approval engine fan-out (P7) ─────────────────────────────────
+    //
+    // `github.action.proposed` (BE handlers/github.ts outbox payload) carries
+    // the FULL envelope: action_id, action_kind, payload_hash, payload_version
+    // and the §140 diff preview — exactly what an approval card must display
+    // and bind to (§164A.2). Projected as a WAITING_APPROVAL action.
+    case 'github.action.proposed': {
+      const actionId = typeof payload.action_id === 'string' ? payload.action_id : '';
+      const hash = typeof payload.payload_hash === 'string' ? payload.payload_hash : '';
+      const version = Number(payload.payload_version ?? 0);
+      if (!actionId || !hash || !Number.isInteger(version) || version < 1) return; // sparse stubs are ignored, never half-rendered
+      const store = useProjectDataStore.getState();
+      if (store.aiActions.some((a) => a.id === actionId)) return; // already held
+      store.upsertAiAction({
+        id: actionId,
+        group_id: event.group_id ?? '',
+        project_id: typeof payload.project_id === 'string' ? payload.project_id : undefined,
+        action_kind: String(payload.action_kind ?? 'github.action'),
+        risk_level: 'HIGH',
+        status: 'WAITING_APPROVAL',
+        payload:
+          (payload.preview as Record<string, unknown> | undefined) ?? {},
+        payload_hash: hash,
+        payload_version: version,
+        created_at: new Date().toISOString(),
+      });
+      break;
+    }
+
+    /**
+     * §114 protocol name. The §114 frame is sparse (id/kind/risk only), so it
+     * can only FLIP an already-held envelope back to active review — it never
+     * fabricates a card. Full envelopes arrive via github.action.proposed.
+     */
+    case 'approval.requested': {
+      const actionId = typeof payload.action_id === 'string' ? payload.action_id : '';
+      if (!actionId) return;
+      const store = useProjectDataStore.getState();
+      const existing = store.aiActions.find((a) => a.id === actionId);
+      if (existing) store.updateAiAction(actionId, { status: 'WAITING_APPROVAL' });
       break;
     }
 

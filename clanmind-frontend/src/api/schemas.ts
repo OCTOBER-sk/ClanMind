@@ -204,6 +204,118 @@ export const AiActionSchema = z
   })
   .passthrough();
 
+// ─── GitHub connection + actions (BE §77/§78/§113) ──────────────────────────
+
+export const GithubConnectionSchema = z
+  .object({
+    id: IdSchema,
+    group_id: IdSchema,
+    installation_id: z.number().nullable(),
+    owner_login: z.string().nullish(),
+    repo_name: z.string().nullish(),
+    repo_full_name: z.string().nullish(),
+    default_branch: z.string().nullish(),
+    permission_mode: z.string(),
+    connected_at: z.string().nullish(),
+    disconnected_at: z.string().nullish(),
+  })
+  .passthrough();
+
+export const GithubStatusResponseSchema = z
+  .object({
+    connected: z.boolean(),
+    connection: GithubConnectionSchema.nullable(),
+  })
+  .passthrough();
+
+/**
+ * github_actions row + ai_actions(status, risk_level) join (BE §78/§78A.2).
+ * The real backend does NOT include payload_hash/version/kind here — the
+ * schema mirrors that honestly; approval envelopes come from the propose
+ * response and the `github.action.proposed` fan-out instead.
+ */
+export const GithubActionItemSchema = z
+  .object({
+    id: IdSchema,
+    ai_action_id: IdSchema,
+    group_id: IdSchema,
+    project_id: z.string().nullish(),
+    action_type: z.string(),
+    branch_name: z.string().nullish(),
+    target_sha: z.string().nullish(),
+    pr_number: z.number().nullish(),
+    preview_json: z.unknown().nullish(),
+    created_at: IsoDateSchema,
+    completed_at: z.string().nullish(),
+    status: z.string(),
+    risk_level: z.string(),
+  })
+  .passthrough();
+
+export const GithubActionListSchema = z
+  .object({ items: z.array(GithubActionItemSchema).nullish() })
+  .passthrough();
+
+export const ApproveGithubActionResponseSchema = z
+  .object({
+    executed: z.boolean(),
+    reason: z.string().optional(),
+    action: AiActionSchema.nullish(),
+  })
+  .passthrough();
+
+// ─── AI provider config (BE §31/§32/§63–§64) ────────────────────────────────
+
+/** Sanitized §63.1 row — credential material never appears (key_last4 only). */
+export const AiProviderConfigSchema = z
+  .object({
+    id: IdSchema,
+    group_id: IdSchema,
+    kind: z.string(),
+    provider: z.string(),
+    credential_ref: z.string().nullable(),
+    key_last4: z.string().nullable(),
+    enabled: z.boolean(),
+    created_at: IsoDateSchema,
+  })
+  .passthrough();
+
+export const AiModelRouteSchema = z
+  .object({
+    id: IdSchema,
+    group_id: IdSchema,
+    provider_config_id: IdSchema,
+    role: z.string(),
+    model_id: z.string(),
+    priority: z.number(),
+    enabled: z.boolean(),
+    created_at: IsoDateSchema.optional(),
+  })
+  .passthrough();
+
+export const AiConfigResponseSchema = z
+  .object({
+    configs: z.array(AiProviderConfigSchema),
+    routes: z.array(AiModelRouteSchema),
+  })
+  .passthrough();
+
+export const ModelDescriptorSchema = z
+  .object({
+    model_id: z.string(),
+    display_name: z.string(),
+    context_window: z.number().nullable(),
+  })
+  .passthrough();
+
+/** POST /groups/:id/ai/providers/validate → {config(sanitized), models}. */
+export const ValidateProviderResponseSchema = z
+  .object({
+    config: AiProviderConfigSchema,
+    models: z.array(ModelDescriptorSchema).nullish(),
+  })
+  .passthrough();
+
 // ─── Tasks / Decisions / Memory (BE §47/§48/§35/§36) ────────────────────────
 
 export const TaskSchema = z

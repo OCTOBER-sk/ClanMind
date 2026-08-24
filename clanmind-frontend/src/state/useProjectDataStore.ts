@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Task, Decision, MemoryEntry, Notification, AiAction } from '@/types';
+import type { Task, Decision, MemoryEntry, Notification, AiAction, GithubActionItem } from '@/types';
 
 export interface ProjectDataState {
   tasks: Task[];
@@ -26,7 +26,15 @@ export interface ProjectDataState {
   addNotification: (notification: Notification) => void;
 
   updateAiAction: (actionId: string, updates: Partial<AiAction>) => void;
+  upsertAiAction: (action: AiAction) => void;
   refreshAiAction: (actionId: string) => void;
+  /**
+   * Reconcile §78 joined rows (github_actions ⋈ ai_actions status/risk) into
+   * the store by ai_action_id. Rows the client holds no envelope for never
+   * become cards — an Approve button without a displayed hash cannot exist
+   * (§164A.2); they only contribute to pending counts in the GitHub panel.
+   */
+  applyGithubActionRows: (rows: GithubActionItem[]) => void;
 }
 
 export const useProjectDataStore = create<ProjectDataState>((set) => ({
@@ -86,12 +94,19 @@ export const useProjectDataStore = create<ProjectDataState>((set) => ({
     })),
 
   // §164A.2/4: approve validates the exact payload snapshot; on mismatch the
-  // action is re-fetched (simulated here as EXPIRED → Review latest).
+  // action is re-fetched (EXPIRED → Review latest).
   updateAiAction: (actionId, updates) =>
     set((state) => ({
       aiActions: state.aiActions.map((a) =>
         a.id === actionId ? { ...a, ...updates } : a
       ),
+    })),
+
+  upsertAiAction: (action) =>
+    set((state) => ({
+      aiActions: state.aiActions.some((a) => a.id === action.id)
+        ? state.aiActions.map((a) => (a.id === action.id ? { ...a, ...action } : a))
+        : [action, ...state.aiActions],
     })),
 
   refreshAiAction: (actionId) =>
@@ -106,5 +121,14 @@ export const useProjectDataStore = create<ProjectDataState>((set) => ({
             }
           : a
       ),
+    })),
+
+  applyGithubActionRows: (rows) =>
+    set((state) => ({
+      aiActions: state.aiActions.map((a) => {
+        const row = rows.find((r) => r.ai_action_id === a.id);
+        if (!row) return a;
+        return { ...a, status: row.status as AiAction['status'], risk_level: row.risk_level as AiAction['risk_level'] };
+      }),
     })),
 }));

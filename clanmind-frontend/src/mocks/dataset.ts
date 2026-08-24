@@ -17,6 +17,10 @@ import type {
   AiAction,
   Artifact,
   ServerFeatureFlags,
+  GithubConnection,
+  GithubActionItem,
+  AiProviderConfig,
+  AiModelRoute,
 } from '@/types';
 
 export interface DemoDataset {
@@ -33,6 +37,14 @@ export interface DemoDataset {
   aiActions: AiAction[];
   artifacts: Artifact[];
   featureFlags: ServerFeatureFlags;
+  /** §77 — one Group = one connected repository (BE initial constraint). */
+  githubConnections: GithubConnection[];
+  /** §78 github_actions rows, joined to aiActions by ai_action_id. */
+  githubActions: GithubActionItem[];
+  /** §63/§64 BYOK provider configs (sanitized shape only). */
+  aiProviderConfigs: AiProviderConfig[];
+  /** §32 model routes (PRIMARY + fallback slots). */
+  aiModelRoutes: AiModelRoute[];
 }
 
 const HOUR = 3_600_000;
@@ -376,29 +388,44 @@ export function createDemoDataset(): DemoDataset {
       id: 'act_github_1',
       group_id: groups[0]!.id,
       project_id: projects[0]!.id,
-      action_kind: 'MODIFY_GITHUB_FILES',
+      action_kind: 'github.apply_patch',
       risk_level: 'HIGH',
       status: 'WAITING_APPROVAL',
+      // BE §140 buildDiffPreview shape — the approval payload shows the EXACT
+      // diff. `file_diffs` is a demo-only inline extension (the real backend
+      // ships per-file stats; line hunks have no endpoint yet — see
+      // INTEGRATION_NOTES P7 gap list).
       payload: {
         branch: 'feat/spi-dma-driver',
-        files: [
-          { path: 'Drivers/SPI/spi_dma.c', change: 'A', additions: 142, deletions: 0 },
-          { path: 'Drivers/SPI/spi_dma.h', change: 'A', additions: 64, deletions: 0 },
-          { path: 'Core/Src/main.c', change: 'M', additions: 12, deletions: 4 },
+        base_sha: '3f9c2ab91d7e40c1b5a2f8e60d34c7a19b2d5e88',
+        target_sha: 'c71de4f20a98b3d64e17f2c805a9b4d23e6f1a52',
+        changed_files: [
+          { path: 'Drivers/SPI/spi_dma.c', additions: 142, deletions: 0 },
+          { path: 'Drivers/SPI/spi_dma.h', additions: 64, deletions: 0 },
+          { path: 'Core/Src/main.c', additions: 12, deletions: 4 },
         ],
-        hunks: [
-          '+ #include "spi_dma.h"',
-          '+ static DMA_HandleTypeDef hdma_spi1_rx;',
-          '+ void SPI1_DMA_RX_Callback(DMA_HandleTypeDef *hdma);',
-          '+ MX_SPI1_Init() {',
-          '+   hdma_spi1_rx.Init.Mode = DMA_CIRCULAR;',
-          '+ }',
-          '~ void main() {',
-          '~   MX_SPI1_Init();',
-          '~   MX_DMA_Init();',
-          '~   HAL_SPI_Receive_DMA(&hspi1, rxBuf, 14);',
-          '-   HAL_SPI_Receive(&hspi1, rxBuf, 14, 100);',
-        ],
+        additions: 218,
+        deletions: 4,
+        file_diffs: {
+          'Drivers/SPI/spi_dma.c': [
+            '+ #include "spi_dma.h"',
+            '+ static DMA_HandleTypeDef hdma_spi1_rx;',
+            '+ void SPI1_DMA_RX_Callback(DMA_HandleTypeDef *hdma) {',
+            '+   HAL_DMA_IRQHandler(&hdma_spi1_rx);',
+            '+ }',
+            '+ HAL_StatusTypeDef SPI1_StartDmaRx(SPI_HandleTypeDef *hspi, uint8_t *buf, uint16_t len) {',
+            '+   return HAL_SPI_Receive_DMA(hspi, buf, len);',
+            '+ }',
+          ],
+          'Core/Src/main.c': [
+            '~ void main() {',
+            '~   MX_SPI1_Init();',
+            '~   MX_DMA_Init();',
+            '~   HAL_SPI_Receive_DMA(&hspi1, rxBuf, 14);',
+            '-   HAL_SPI_Receive(&hspi1, rxBuf, 14, 100);',
+            '+   osDelay(1); // 1 kHz attitude loop tick',
+          ],
+        },
       },
       payload_hash: '9f2c1ab4de7f8a01b3c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b',
       payload_version: 1,
@@ -411,7 +438,7 @@ export function createDemoDataset(): DemoDataset {
       id: 'act_bulk_delete_1',
       group_id: groups[0]!.id,
       project_id: projects[0]!.id,
-      action_kind: 'BULK_DELETE_ARTIFACTS',
+      action_kind: 'artifact.bulk_delete',
       risk_level: 'MEDIUM',
       status: 'WAITING_APPROVAL',
       payload: {
@@ -429,6 +456,70 @@ export function createDemoDataset(): DemoDataset {
       requested_by_user_id: currentUser.id,
       created_at: new Date(now - 15 * 60_000).toISOString(),
       expires_at: new Date(now + DAY).toISOString(),
+    },
+  ];
+
+  // ─── §77 github_connections — one Group = one repo; mutable via routes ────
+  const githubConnections: GithubConnection[] = [
+    {
+      id: 'ghconn_1',
+      group_id: groups[0]!.id,
+      installation_id: 4821934,
+      owner_login: 'robotics-core',
+      repo_name: 'flight-controller',
+      repo_full_name: 'robotics-core/flight-controller',
+      default_branch: 'main',
+      permission_mode: 'READ_WRITE',
+      connected_at: new Date(now - 6 * DAY).toISOString(),
+      disconnected_at: null,
+    },
+  ];
+
+  // ─── §78 github_actions rows joined to ai_actions by ai_action_id ─────────
+  const githubActions: GithubActionItem[] = [
+    {
+      id: 'gha_1',
+      ai_action_id: 'act_github_1',
+      group_id: groups[0]!.id,
+      project_id: projects[0]!.id,
+      action_type: 'apply_patch',
+      branch_name: 'feat/spi-dma-driver',
+      target_sha: 'c71de4f20a98b3d64e17f2c805a9b4d23e6f1a52',
+      pr_number: null,
+      preview_json: null,
+      created_at: new Date(now - 30 * 60_000).toISOString(),
+      completed_at: null,
+      status: 'WAITING_APPROVAL',
+      risk_level: 'HIGH',
+    },
+  ];
+
+  // ─── §63/§64 BYOK configs — sanitized metadata ONLY (never a raw key) ─────
+  const aiProviderConfigs: AiProviderConfig[] = [
+    {
+      id: 'apc_anthropic_1',
+      group_id: groups[0]!.id,
+      kind: 'BYOK',
+      provider: 'anthropic',
+      credential_ref: 'secret:enc_demo_anthropic_ref',
+      key_last4: '9F2A',
+      enabled: true,
+      created_by: currentUser.id,
+      created_at: new Date(now - 10 * DAY).toISOString(),
+      updated_at: new Date(now - 2 * DAY).toISOString(),
+    },
+  ];
+
+  const aiModelRoutes: AiModelRoute[] = [
+    {
+      id: 'amr_primary_1',
+      group_id: groups[0]!.id,
+      provider_config_id: 'apc_anthropic_1',
+      role: 'PRIMARY',
+      model_id: 'claude-sonnet-4-5',
+      priority: 0,
+      enabled: true,
+      created_at: new Date(now - 2 * DAY).toISOString(),
     },
   ];
 
@@ -572,5 +663,9 @@ export function createDemoDataset(): DemoDataset {
       offline_sync_v2: true,
       interactive_artifacts: true,
     },
+    githubConnections,
+    githubActions,
+    aiProviderConfigs,
+    aiModelRoutes,
   };
 }
