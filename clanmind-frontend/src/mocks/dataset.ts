@@ -14,7 +14,6 @@ import type {
   Decision,
   MemoryEntry,
   MemoryCandidate,
-  NotificationItem,
   AiAction,
   Artifact,
   ServerFeatureFlags,
@@ -25,6 +24,16 @@ import type {
   MeetingSession,
   MeetingCandidate,
 } from '@/types';
+import type { z } from 'zod';
+import type { ActivityEventSchema, NotificationSchema } from '@/api/schemas';
+
+/** BE §95A wire row — the dataset stores notifications in WIRE shape so the
+ * demo REST surface returns byte-identical rows to handlers/search.ts and
+ * hydration maps them through the same mapper as live responses. */
+export type DemoNotificationRow = z.infer<typeof NotificationSchema>;
+
+/** BE §98A activity_events wire row (GET /groups/:groupId/activity). */
+export type DemoActivityRow = z.infer<typeof ActivityEventSchema>;
 
 export interface DemoDataset {
   currentUser: User;
@@ -44,7 +53,10 @@ export interface DemoDataset {
   meetingSessions: MeetingSession[];
   /** §50A meeting_candidates rows. */
   meetingCandidates: MeetingCandidate[];
-  notifications: NotificationItem[];
+  /** §95A wire rows (recipient-scoped on read). */
+  notifications: DemoNotificationRow[];
+  /** §98A attention feed rows served by GET /groups/:groupId/activity. */
+  activityEvents: DemoActivityRow[];
   aiActions: AiAction[];
   artifacts: Artifact[];
   featureFlags: ServerFeatureFlags;
@@ -108,6 +120,7 @@ export function createDemoDataset(): DemoDataset {
       user_id: currentUser.id,
       group_id: groups[0]!.id,
       role: 'OWNER',
+      nickname: 'Arun',
       user: currentUser,
       joined_at: groups[0]!.created_at,
       created_at: groups[0]!.created_at,
@@ -117,6 +130,7 @@ export function createDemoDataset(): DemoDataset {
       user_id: 'user_priya_2',
       group_id: groups[0]!.id,
       role: 'ADMIN',
+      nickname: 'Priya',
       user: mkUser('user_priya_2', 'priya@clanmind.io', 'Priya Sharma'),
       joined_at: new Date(now - 55 * DAY).toISOString(),
       created_at: new Date(now - 55 * DAY).toISOString(),
@@ -126,6 +140,7 @@ export function createDemoDataset(): DemoDataset {
       user_id: 'user_marcus_3',
       group_id: groups[0]!.id,
       role: 'MEMBER',
+      nickname: 'Marcus',
       user: mkUser('user_marcus_3', 'marcus@clanmind.io', 'Marcus Vance'),
       joined_at: new Date(now - 50 * DAY).toISOString(),
       created_at: new Date(now - 50 * DAY).toISOString(),
@@ -467,28 +482,172 @@ export function createDemoDataset(): DemoDataset {
     },
   ];
 
-  const notifications: NotificationItem[] = [
+  // ─── §95A notification rows — WIRE shape, exactly what handlers/search.ts
+  // returns from GET /notifications (one row per recipient per semantic
+  // event, §143). Seeded across the §95 category set so the center, badge
+  // counts, and §171A diagnostics all exercise real shapes. `notif_priya_*`
+  // rows belong to ANOTHER recipient and must never reach this user's list.
+  const notifications: DemoNotificationRow[] = [
     {
       id: 'notif_1',
+      recipient_user_id: currentUser.id,
       group_id: groups[0]!.id,
+      project_id: projects[0]!.id,
       category: 'AI_ACTION_APPROVAL',
-      delivery_state: 'DELIVERED_REALTIME',
-      title: 'GitHub PR #4 ready for approval',
+      subject_type: 'ai_action',
+      subject_id: 'act_github_1',
+      title: 'GitHub write needs approval',
       body: 'Odin prepared feat/spi-dma-driver for review.',
-      target_route: '/group/grp_robotics_1/project/proj_flight_ctrl',
-      is_read: false,
+      delivery_state: 'DELIVERED_REALTIME',
+      read_at: null,
       created_at: new Date(now - 30 * 60_000).toISOString(),
     },
     {
       id: 'notif_2',
+      recipient_user_id: currentUser.id,
       group_id: groups[0]!.id,
-      category: 'DECISION_APPROVAL',
+      project_id: projects[0]!.id,
+      category: 'MENTION',
+      subject_type: 'message',
+      subject_id: 'msg_2',
+      title: 'You were mentioned',
+      body: 'Priya Sharma mentioned you in Flight Controller.',
       delivery_state: 'DELIVERED_REALTIME',
-      title: 'Decision #1 recorded',
+      read_at: null,
+      created_at: new Date(now - 45 * 60_000).toISOString(),
+    },
+    {
+      id: 'notif_3',
+      recipient_user_id: currentUser.id,
+      group_id: groups[0]!.id,
+      project_id: projects[0]!.id,
+      category: 'TASK_ASSIGNMENT',
+      subject_type: 'task',
+      subject_id: 'task_1',
+      title: 'You were assigned a task',
+      body: 'Configure DMA1 Stream 0 circular ring buffer for SPI1 RX.',
+      delivery_state: 'PENDING',
+      read_at: null,
+      created_at: new Date(now - 2 * HOUR).toISOString(),
+    },
+    {
+      id: 'notif_4',
+      recipient_user_id: currentUser.id,
+      group_id: groups[0]!.id,
+      project_id: projects[0]!.id,
+      category: 'DECISION_APPROVAL',
+      subject_type: 'decision',
+      subject_id: 'dec_1',
+      title: 'Decision approved',
       body: 'Adopt SPI DMA over I2C for IMU Sensor Telemetry has been approved.',
-      target_route: '/group/grp_robotics_1/project/proj_flight_ctrl',
-      is_read: false,
-      created_at: new Date(now - HOUR).toISOString(),
+      delivery_state: 'SUPPRESSED_BY_PREFERENCE',
+      read_at: null,
+      created_at: new Date(now - 3 * HOUR).toISOString(),
+    },
+    {
+      id: 'notif_5',
+      recipient_user_id: currentUser.id,
+      group_id: groups[0]!.id,
+      project_id: projects[0]!.id,
+      category: 'ARTIFACT_READY',
+      subject_type: 'artifact',
+      subject_id: 'art_diagram_1',
+      title: 'Artifact ready',
+      body: 'System Architecture Diagram v3 completed.',
+      delivery_state: 'FAILED',
+      read_at: new Date(now - 4 * HOUR).toISOString(),
+      created_at: new Date(now - 5 * HOUR).toISOString(),
+    },
+    {
+      id: 'notif_6',
+      recipient_user_id: currentUser.id,
+      group_id: groups[0]!.id,
+      project_id: null,
+      category: 'MEETING_SUMMARY',
+      subject_type: 'meeting_session',
+      subject_id: 'meet_seed_1',
+      title: 'Meeting summary ready',
+      body: 'Tuesday sync — 4 decisions captured.',
+      delivery_state: 'DELIVERED_EMAIL',
+      read_at: new Date(now - 26 * HOUR).toISOString(),
+      created_at: new Date(now - 27 * HOUR).toISOString(),
+    },
+    {
+      id: 'notif_7',
+      recipient_user_id: currentUser.id,
+      group_id: groups[1]!.id,
+      project_id: null,
+      category: 'SYSTEM',
+      subject_type: 'group_invite',
+      subject_id: 'inv_seed_1',
+      title: 'Invite sent',
+      body: null,
+      delivery_state: 'DELIVERED_REALTIME',
+      read_at: new Date(now - 20 * HOUR).toISOString(),
+      created_at: new Date(now - 20 * HOUR).toISOString(),
+    },
+    {
+      // Another recipient's row — must be filtered out of every list.
+      id: 'notif_priya_1',
+      recipient_user_id: 'user_priya_2',
+      group_id: groups[0]!.id,
+      project_id: projects[0]!.id,
+      category: 'MENTION',
+      subject_type: 'message',
+      subject_id: 'msg_3',
+      title: 'You were mentioned',
+      body: 'Arun Kumar mentioned you in Flight Controller.',
+      delivery_state: 'DELIVERED_REALTIME',
+      read_at: null,
+      created_at: new Date(now - 10 * 60_000).toISOString(),
+    },
+  ];
+
+  // ─── §98A activity_events — pre-rendered summaries, GROUP/PROJECT scoped,
+  // private events never present (BE §98A). Feeds the Activity surface's
+  // "what's happening" stream (FE §172).
+  const activityEvents: DemoActivityRow[] = [
+    {
+      id: 'act_evt_1',
+      group_id: groups[0]!.id,
+      project_id: projects[0]!.id,
+      actor_type: 'USER',
+      actor_user_id: 'user_priya_2',
+      actor_ai_id: null,
+      activity_type: 'message.created',
+      summary: 'New message',
+      subject_type: 'message',
+      subject_id: 'msg_2',
+      visibility: 'PROJECT',
+      occurred_at: new Date(now - 50 * 60_000).toISOString(),
+    },
+    {
+      id: 'act_evt_2',
+      group_id: groups[0]!.id,
+      project_id: projects[0]!.id,
+      actor_type: 'AI',
+      actor_user_id: null,
+      actor_ai_id: 'odin_ai',
+      activity_type: 'artifact.created',
+      summary: 'Artifact created',
+      subject_type: 'artifact',
+      subject_id: 'art_diagram_1',
+      visibility: 'PROJECT',
+      occurred_at: new Date(now - 5 * HOUR).toISOString(),
+    },
+    {
+      id: 'act_evt_3',
+      group_id: groups[0]!.id,
+      project_id: projects[0]!.id,
+      actor_type: 'USER',
+      actor_user_id: currentUser.id,
+      actor_ai_id: null,
+      activity_type: 'task.created',
+      summary: 'Task created',
+      subject_type: 'task',
+      subject_id: 'task_1',
+      visibility: 'PROJECT',
+      occurred_at: new Date(now - DAY).toISOString(),
     },
   ];
 
@@ -764,6 +923,7 @@ export function createDemoDataset(): DemoDataset {
     meetingSessions: [],
     meetingCandidates: [],
     notifications,
+    activityEvents,
     aiActions,
     artifacts,
     featureFlags: {

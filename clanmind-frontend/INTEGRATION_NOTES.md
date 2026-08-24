@@ -484,3 +484,82 @@ tests green (P9 adds p9Routes parity, dialogs, panel lifecycle, TopBar/
 ChatHeader flag-gating, dispatch projections); production build passes with
 the canonical purity greps still clean (`demo-token` / `installDemoMode` /
 dataset ids absent from dist/assets).
+
+---
+
+## 2026-08-24 — P10 notifications & activity (FE §36, §171–§174, §171A, §276–§278; BE §95/§95A/§98A/§143)
+
+### D24 — Endpoint parity: Notifications REST hits the REAL handlers/search.ts contract; delivery_state verbatim; OS pipeline gated end-to-end
+
+The notification surface previously rendered only client-held store rows with
+a local `is_read` flag and no server round-trip. P10 rewired it to the wire:
+
+| FE surface | Endpoint (`api/endpoints/notifications.ts`) | BE contract (real Worker) | Demo parity |
+|---|---|---|---|
+| Notification list / badge counts | `GET /notifications?limit=&unread=` → `{items: §95A[]}` | handlers/search.ts (limit clamp ≤100 default 50, recipient-scoped, `created_at DESC`, `unread=true` → `read_at IS NULL`) | identical over dataset wire rows |
+| Mark read (§277) | `POST /notifications/:id/read → {ok}` | stamps `read_at`; answers `{ok:true}` EVEN for unknown/foreign ids (UPDATE matches zero rows silently) — demo reproduces this exactly instead of inventing a 404 | identical |
+| Activity feed (§172/§98A) | `GET /groups/:groupId/activity?limit=` → `{items: §98A[]}` | membership-checked (`requireMember`) | identical incl. 403 GROUP_PERMISSION_DENIED for non-members |
+
+**Shape corrections shipped:** FE `NotificationItem` is now byte-shaped to the
+BE §95A row (`recipient_user_id`, `project_id`, `subject_type/subject_id`,
+nullable `body`, `read_at` replacing the invented `is_read`). Read state IS
+the server column; local writes are optimistic projections of the POST with
+ROLLBACK on failure (an item the server still holds unread keeps its badge).
+`target_route` is derived client-side from `(subject_type, subject_id)` per
+the §193 stable routes (message/artifact/task/decision/meeting; unknown
+subjects fall back to the Group Activity surface). The demo dataset now
+stores §95A WIRE rows and hydration maps them through the same mapper as
+live responses — demo and live stores cannot drift.
+
+**Realtime fan-out:** dispatch projects `notification.created` carrying a
+FULL validated §95A row (demo hub broadcasts it on the §143 semantic
+creation sites below), enforces §95A per-recipient targeting client-side too
+(rows addressed to another member never enter the cache; no session → no
+projection), dedupes by id, then runs the OS pipeline. The real backend has
+NO WS frame for notifications today (rows are read back via GET only;
+`delivered_realtime` is a delivery_state value, not a socket push) — when it
+gains one, the same projection consumes it unchanged. Demo semantic creation
+sites mirror the notification-worker consumer: `mention_tokens` (or @tokens
+extracted from the body, resolved against THIS Group's roster names,
+handlers/messages.ts algorithm) → MENTION; task assignment → TASK_ASSIGNMENT
+for the assignee; GitHub proposal → AI_ACTION_APPROVAL to Owners/Admins
+except the proposing actor. Self-actions never notify.
+
+**OS pipeline (FE §173/§174/§194/§278):** a row reaches the Tauri bridge only
+when ALL gates agree — category ∈ {MENTION, PRIVATE_MESSAGE,
+AI_ACTION_APPROVAL, TASK_ASSIGNMENT, SYSTEM} (§174); per-category in-app +
+client-derived desktop toggles both on for that Group (§171/§276);
+window visible (while away events accumulate into ONE aggregate
+"2 new notifications · Mention ×1, Task ×1" flushed on return, §173);
+content-hidden preview pref ships title-only bodies (§278). §194's permission
+request fires at the ONE clear moment: enabling any Desktop toggle in
+Settings. In non-Tauri contexts the bridge no-ops silently.
+
+**Preferences matrix:** Settings' §171 matrix (exact backend category ids ×
+In-app/Desktop/Email) now reads/writes through one shared storage module that
+osNotify consumes — the matrix actually drives behavior instead of decorating.
+
+**Quiet hours are SPEC-SILENT:** neither the FE nor the BE spec defines quiet
+hours/schedules anywhere (grep verified across both authority files). Nothing
+was invented; away-time noise is handled by §173 batching exactly as
+specified.
+
+**Honest gaps recorded this pass (nothing papered over):**
+1. **No notification_preferences REST route exists on the Worker** — prefs
+   are read internally by NotificationService.notify only. The §171 matrix
+   therefore stays a client-local mirror under `cm_notif_<groupId>`; until
+   GET/PATCH routes ship, the SERVER-side suppression (SUPPRESSED_BY_PREFERENCE
+   delivery_state) reflects defaults, not the user's toggles.
+2. **No WS notification frame from the real backend** (above) — live badges
+   refresh on controller fetch/staleness, not push; demo exercises the push
+   pathway so the future frame drops in without FE changes.
+3. **mention_tokens ride the REST create body but the FE composer does not
+   send them yet** — the demo route accepts both mention_tokens AND body
+   extraction (real handler algorithm); wiring composer tokens into the POST
+   body is chat-surface work, not notification-phase work.
+
+Verification: `tsc -b` clean; oxlint exit 0 (only pre-existing warnings);
+vitest 44 files / 367 tests green (P10 adds p10Routes parity ×12, dispatch
+projections ×6 incl. per-recipient gate, controller/panel/pipeline/diagnostics
+flows ×19); production build passes with purity greps clean (`demo-token`,
+`installDemoMode`, dataset ids absent from dist/assets).

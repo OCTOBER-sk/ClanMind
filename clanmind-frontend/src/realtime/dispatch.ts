@@ -29,13 +29,15 @@ import { useAiStreamStore } from '@/features/ai/aiStreamStore';
 import {
   useConstructionStore,
 } from '@/features/artifacts/constructionStore';
-import { MessageSchema, TaskSchema, DecisionSchema, MemoryEntrySchema } from '@/api/schemas';
+import { MessageSchema, TaskSchema, DecisionSchema, MemoryEntrySchema, NotificationSchema } from '@/api/schemas';
 import { mapMessageRow } from '@/api/messageRow';
 import { mapTaskRow } from '@/api/endpoints/tasks';
 import { mapDecisionRow } from '@/api/endpoints/decisions';
 import { mapMemoryRow } from '@/api/endpoints/memory';
+import { mapNotificationRow } from '@/api/endpoints/notifications';
 import { fetchMeeting } from '@/api/endpoints/meetings';
 import { useMeetingStore } from '@/state/useMeetingStore';
+import { deliverOsNotification } from '@/features/notifications/osNotify';
 import type { AiRun, Artifact, DiagramContent, Message } from '@/types';
 import type { RealtimeEvent } from '@/realtime/events';
 
@@ -829,6 +831,33 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
       const memoryId =
         firstString(payload.memory_id, (payload.memory as Record<string, unknown> | undefined)?.id) ?? '';
       if (memoryId) useProjectDataStore.getState().deleteMemory(memoryId);
+      break;
+    }
+
+    // ─── P10 notification fan-out (BE §95A row over §143 delivery) ──────────
+    //
+    // The demo hub broadcasts `notification.created` with the FULL §95A row
+    // whenever a semantic event creates one (mention / approval / assignment).
+    // The real Worker has no WS frame for notifications yet (rows are read
+    // back via GET /notifications) — recorded in INTEGRATION_NOTES D24; when
+    // it gains one, this validated projection consumes it unchanged.
+    // Honesty properties: only complete schema-valid rows project; sparse
+    // stubs fall through unknown-type tolerance, never half-render; and
+    // §95A per-recipient targeting is enforced CLIENT-SIDE too (defense in
+    // depth behind the server's audience resolution) — a row addressed to
+    // another member never enters this cache.
+    case 'notification.created': {
+      const me = useAuthStore.getState().user?.id;
+      const row = (payload.notification ?? payload) as Record<string, unknown>;
+      const parsed = NotificationSchema.safeParse(row);
+      if (!parsed.success || typeof parsed.data.id !== 'string' || !parsed.data.id) break;
+      if (!me || parsed.data.recipient_user_id !== me) break; // §55A-analog gate
+      const mapped = mapNotificationRow(parsed.data);
+      const dataStore = useProjectDataStore.getState();
+      if (dataStore.notifications.some((n) => n.id === mapped.id)) break; // dedupe
+      dataStore.upsertNotification(mapped);
+      // §174/§173/§278 — OS interruption pipeline (gates inside).
+      void deliverOsNotification(mapped);
       break;
     }
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { Activity } from 'lucide-react';
 import { Badge } from '@/design-system/components/Badge';
 import { SyncConflictCard } from './SyncConflictCard';
-import type { SyncCheckpoint, SyncOperation, SyncConflict, SyncStateStatus, SyncResolutionStrategy } from '@/types';
+import type { SyncCheckpoint, SyncOperation, SyncConflict, SyncStateStatus, SyncResolutionStrategy, Notification } from '@/types';
 
 export interface SyncDiagnosticsViewProps {
   status: SyncStateStatus;
@@ -10,6 +10,8 @@ export interface SyncDiagnosticsViewProps {
   pendingOperations: SyncOperation[];
   conflicts: SyncConflict[];
   protocolVersion?: string;
+  /** §171A — recent §95A rows; delivery_state renders VERBATIM. */
+  notifications?: Notification[];
   onResolveConflict: (conflictId: string, strategy: SyncResolutionStrategy) => void;
 }
 
@@ -20,6 +22,7 @@ export function SyncDiagnosticsView({
   pendingOperations,
   conflicts,
   protocolVersion = '2.4.0',
+  notifications = [],
   onResolveConflict,
 }: SyncDiagnosticsViewProps) {
   const metricCard = (label: string, value: React.ReactNode) => (
@@ -113,6 +116,49 @@ export function SyncDiagnosticsView({
           ))
         )}
       </div>
+
+      {/* §171A — delivery_state exposed VERBATIM: SUPPRESSED_BY_PREFERENCE
+          ("check your settings") vs FAILED ("this is a bug") is a distinction
+          only the backend knows; never re-derived client-side. */}
+      {notifications.length > 0 && (
+        <div
+          className="p-4 rounded-xl border space-y-3"
+          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+        >
+          <h3 className="font-bold flex items-center justify-between">
+            <span>Notification Delivery States</span>
+            <Badge variant="neutral" size="sm">
+              verbatim · §95A
+            </Badge>
+          </h3>
+          <div className="space-y-1.5 font-mono text-[11px]" data-testid="delivery-state-list">
+            {notifications.slice(0, 12).map((n) => (
+              <div
+                key={n.id}
+                className="flex items-center justify-between gap-3 p-2 rounded-lg border"
+                style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
+              >
+                <span className="truncate" style={{ color: 'var(--color-text)' }}>
+                  [{n.category}] {n.title}
+                </span>
+                <span
+                  className="shrink-0 font-bold"
+                  style={{
+                    color:
+                      n.delivery_state === 'FAILED'
+                        ? 'var(--color-danger)'
+                        : n.delivery_state === 'SUPPRESSED_BY_PREFERENCE'
+                          ? 'var(--color-warning)'
+                          : 'var(--color-success)',
+                  }}
+                >
+                  {n.delivery_state}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

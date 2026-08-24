@@ -684,19 +684,48 @@ export interface AiAction {
   expires_at?: string;
 }
 
+/**
+ * Canonical notification = BE §95A row + the derived §193 deep link.
+ * `read_at` is the server truth for read state (§277: mark read only when
+ * actually viewed); `target_route` is derived client-side from
+ * (subject_type, subject_id) at map time and is NOT a wire field.
+ */
 export interface NotificationItem {
   id: string;
   group_id: string;
+  project_id: string | null;
+  recipient_user_id: string;
   category: NotificationCategory;
-  delivery_state: NotificationDeliveryState;
+  subject_type: string;
+  subject_id: string;
   title: string;
-  body: string;
-  target_route: string; // Deep link route
-  is_read: boolean;
+  body: string | null;
+  /** §95A verbatim — PENDING / DELIVERED_REALTIME / DELIVERED_EMAIL / SUPPRESSED_BY_PREFERENCE / FAILED */
+  delivery_state: NotificationDeliveryState;
+  read_at: string | null;
   created_at: string;
+  /** Derived §193/§247 deep link (message/artifact/task/decision/meeting). */
+  target_route: string;
 }
 
 export type Notification = NotificationItem;
+
+/** BE §98A activity_events row (GET /groups/:groupId/activity). */
+export interface ActivityEvent {
+  id: string;
+  group_id: string;
+  project_id: string | null;
+  actor_type: 'USER' | 'AI' | 'SYSTEM' | string;
+  actor_user_id: string | null;
+  actor_ai_id: string | null;
+  activity_type: string;
+  /** Pre-rendered server-side at write time; rendered verbatim (§98A). */
+  summary: string;
+  subject_type: string;
+  subject_id: string;
+  visibility: 'GROUP' | 'PROJECT' | string;
+  occurred_at: string;
+}
 
 export interface ServerFeatureFlags {
   meeting_mode: boolean;

@@ -37,6 +37,16 @@ import {
 } from '@/features/github/useGithubConnection';
 import { ApiError } from '@/api/errors';
 import { api } from '@/api/client';
+import {
+  loadNotificationPrefs,
+  saveNotificationPrefs,
+  loadHidePreview,
+  saveHidePreview,
+  DEFAULT_CHANNELS,
+  type ChannelPrefs,
+} from '@/features/notifications/notificationPrefs';
+import { useProjectDataStore } from '@/state/useProjectDataStore';
+import { requestNotificationPermission } from '@/tauri/bridge';
 import type {
   Group,
   GroupMember,
@@ -99,13 +109,8 @@ const NOTIFICATION_CATEGORIES: Array<{
   { id: 'SYSTEM', label: 'System' },
 ];
 
-interface ChannelPrefs {
-  inApp: boolean;
-  desktop: boolean; // §171 — client-derived, not a backend column
-  email: boolean;
-}
-
-const DEFAULT_CHANNELS: ChannelPrefs = { inApp: true, desktop: true, email: false };
+// ChannelPrefs + DEFAULT_CHANNELS come from the shared §171 prefs module so
+// the Settings matrix and the OS-notification pipeline read one source.
 
 // §165A.2 skill list with risk visibility (§155)
 const BUILT_IN_SKILLS = [
@@ -262,30 +267,31 @@ export function SettingsView({
   };
 
   // ─── §171 notification preferences (client-local mirror of notification_preferences) ───
-  const [notifPrefs, setNotifPrefs] = useState<Record<NotificationCategory, ChannelPrefs>>(() => {
-    const stored = localStorage.getItem(`cm_notif_${group.id}`);
-    if (stored) {
-      try {
-        return JSON.parse(stored) as Record<NotificationCategory, ChannelPrefs>;
-      } catch {
-        /* fall through to defaults */
-      }
-    }
-    return Object.fromEntries(NOTIFICATION_CATEGORIES.map((c) => [c.id, { ...DEFAULT_CHANNELS }])) as Record<
-      NotificationCategory,
-      ChannelPrefs
-    >;
-  });
+  const [notifPrefs, setNotifPrefs] = useState<Record<NotificationCategory, ChannelPrefs>>(() =>
+    loadNotificationPrefs(group.id),
+  );
 
   useEffect(() => {
-    localStorage.setItem(`cm_notif_${group.id}`, JSON.stringify(notifPrefs));
+    saveNotificationPrefs(group.id, notifPrefs);
   }, [notifPrefs, group.id]);
+
+  // §278 — hide message content in OS notification previews.
+  const [hidePreview, setHidePreview] = useState<boolean>(() => loadHidePreview());
+  useEffect(() => {
+    saveHidePreview(hidePreview);
+  }, [hidePreview]);
 
   const updateChannel = (category: NotificationCategory, channel: keyof ChannelPrefs, value: boolean) => {
     setNotifPrefs((prev) => ({
       ...prev,
       [category]: { ...prev[category], [channel]: value },
     }));
+    // §194 — the ONE clear moment to ask for OS notification permission:
+    // the instant a user deliberately enables a Desktop channel. Never a
+    // startup prompt; silently no-ops outside Tauri.
+    if (channel === 'desktop' && value) {
+      void requestNotificationPermission();
+    }
   };
 
   // ─── §158 search-provider test states: Connecting → Searching → Results
@@ -316,6 +322,7 @@ export function SettingsView({
   // ─── Diagnostics (§285) ───
   const sync = useSyncStore();
   const { status, checkpoint, pendingOperations, conflicts } = sync;
+  const notifications = useProjectDataStore((s) => s.notifications);
 
   const navItems: Array<{ id: SettingsSection; label: string; icon: React.ReactNode }> = [
     { id: 'general', label: 'General', icon: <Settings className="w-4 h-4" /> },
@@ -898,6 +905,26 @@ export function SettingsView({
               Desktop delivery is derived client-side from in-app preference + OS permission — it is
               not a backend column (§171).
             </p>
+
+            {/* §278 — desktop notification privacy */}
+            <div
+              className="flex items-center justify-between px-4 py-3 rounded-xl border"
+              style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+            >
+              <div>
+                <h4 className="font-semibold" style={{ color: 'var(--color-text)' }}>
+                  Hide message content in previews
+                </h4>
+                <p className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
+                  OS notifications show only the title, never message content (§278).
+                </p>
+              </div>
+              <Switch
+                checked={hidePreview}
+                onCheckedChange={setHidePreview}
+                aria-label="Hide message content in previews"
+              />
+            </div>
           </div>
         )}
 
@@ -908,6 +935,7 @@ export function SettingsView({
             checkpoint={checkpoint}
             pendingOperations={pendingOperations}
             conflicts={conflicts}
+            notifications={notifications}
             onResolveConflict={(id, strategy) =>
               useSyncStore.getState().resolveConflict(id, strategy, useAuthStore.getState().user?.id ?? '')
             }

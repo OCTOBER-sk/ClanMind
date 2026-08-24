@@ -17,6 +17,7 @@ import {
 import { Avatar } from '@/design-system/components/Avatar';
 import { Tooltip } from '@/design-system/components/Tooltip';
 import { Dropdown } from '@/design-system/components/Dropdown';
+import { Popover } from '@/design-system/components/Popover';
 import { ClanMindLogo } from '@/design-system/components/ClanMindLogo';
 import type { Group, Project, User } from '@/types';
 
@@ -33,6 +34,11 @@ export interface TopBarProps {
   onOpenSearch: () => void;
   onStartMeeting: () => void;
   onOpenNotifications: () => void;
+  /**
+   * §171 notification center content — rendered inside the bell Popover when
+   * provided; without it the bell falls back to plain navigation.
+   */
+  notificationCenter?: React.ReactNode;
   onOpenProfile: () => void;
   onSignOut: () => void;
   onCreateGroup: () => void;
@@ -61,6 +67,7 @@ export function TopBar({
   onOpenSearch,
   onStartMeeting,
   onOpenNotifications,
+  notificationCenter,
   onOpenProfile,
   onSignOut,
   onCreateGroup,
@@ -240,23 +247,50 @@ export function TopBar({
           </button>
         )}
 
-        {/* Notifications */}
-        <Tooltip content="Activity">
-          <button
-            onClick={onOpenNotifications}
-            className="relative p-1.5 rounded-lg transition-colors cursor-pointer"
-            style={{ color: 'var(--color-text-secondary)' }}
-            aria-label={`Notifications${unreadNotificationsCount > 0 ? ` (${unreadNotificationsCount} unread)` : ''}`}
+        {/* Notifications (§14 top bar) — the §171 center opens in place */}
+        {notificationCenter ? (
+          <Popover
+            trigger={
+              <button
+                className="relative p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface-hover)] focus-visible:shadow-[var(--focus-ring)] outline-none"
+                style={{ color: 'var(--color-text-secondary)' }}
+                aria-label={`Notifications${unreadNotificationsCount > 0 ? ` (${unreadNotificationsCount} unread)` : ''}`}
+              >
+                <Bell className="w-4 h-4" aria-hidden="true" />
+                {/* §277 subtle unread badge on the nav surface */}
+                {unreadNotificationsCount > 0 && (
+                  <span
+                    data-testid="topbar-unread-dot"
+                    className="absolute top-1 right-1 w-2 h-2 rounded-full"
+                    style={{ background: 'var(--color-info)' }}
+                  />
+                )}
+              </button>
+            }
+            align="end"
+            side="bottom"
+            className="p-0"
           >
-            <Bell className="w-4 h-4" aria-hidden="true" />
-            {unreadNotificationsCount > 0 && (
-              <span
-                className="absolute top-1 right-1 w-2 h-2 rounded-full"
-                style={{ background: 'var(--color-info)' }}
-              />
-            )}
-          </button>
-        </Tooltip>
+            {notificationCenter}
+          </Popover>
+        ) : (
+          <Tooltip content="Activity">
+            <button
+              onClick={onOpenNotifications}
+              className="relative p-1.5 rounded-lg transition-colors cursor-pointer"
+              style={{ color: 'var(--color-text-secondary)' }}
+              aria-label={`Notifications${unreadNotificationsCount > 0 ? ` (${unreadNotificationsCount} unread)` : ''}`}
+            >
+              <Bell className="w-4 h-4" aria-hidden="true" />
+              {unreadNotificationsCount > 0 && (
+                <span
+                  className="absolute top-1 right-1 w-2 h-2 rounded-full"
+                  style={{ background: 'var(--color-info)' }}
+                />
+              )}
+            </button>
+          </Tooltip>
+        )}
 
         {/* §272 Profile */}
         <Dropdown

@@ -58,6 +58,7 @@ export function clearDomainStores(): void {
     memories: [],
     memoryCandidates: [],
     notifications: [],
+    activityEvents: [],
     aiActions: [],
   });
 

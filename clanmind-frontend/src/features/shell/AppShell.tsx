@@ -60,6 +60,8 @@ import { useMemoryController } from '@/features/memory/useMemoryController';
 import { TeamView } from '@/features/team/TeamView';
 import { SettingsView } from '@/features/settings/SettingsView';
 import { ActivityView } from '@/features/notifications/ActivityView';
+import { NotificationCenterPanel } from '@/features/notifications/NotificationCenterPanel';
+import { useNotificationsController } from '@/features/notifications/useNotificationsController';
 import { CreateGroupDialog } from '@/features/groups/CreateGroupDialog';
 import { JoinGroupDialog } from '@/features/groups/JoinGroupDialog';
 import { CommandPalette } from '@/design-system/components/CommandPalette';
@@ -239,6 +241,8 @@ export function AppShell() {
   const tasksCtl = useTasksController(activeProjectId);
   const decisionsCtl = useDecisionsController(activeProjectId);
   const memoryCtl = useMemoryController(groupForRoute?.id, activeProjectId);
+  // P10 — §95A notifications + §98A activity feed for the signed-in user.
+  const notifCtl = useNotificationsController(groupForRoute?.id);
 
   /** §120 — one ordinal derivation shared by views and the command palette. */
   const decisionLabels = useMemo(() => {
@@ -901,7 +905,7 @@ export function AppShell() {
   }
 
   const currentUserId = user.id;
-  const unreadActivityCount = notifications.filter((n) => !n.is_read).length;
+  const unreadActivityCount = notifications.filter((n) => n.read_at == null).length;
   // §20 — the signed-in member's role in this Group (drives LeftNav affordances)
   const myRole: GroupRole =
     members.find((m) => m.user_id === currentUserId)?.role ?? 'MEMBER';
@@ -1140,6 +1144,23 @@ export function AppShell() {
         onOpenSearch={() => setCommandPaletteOpen(true)}
         onStartMeeting={() => setStartDialogOpen(true)}
         onOpenNotifications={() => navigateToSection('activity')}
+        notificationCenter={
+          <NotificationCenterPanel
+            notifications={notifCtl.notifications}
+            unreadCount={notifCtl.unreadCount}
+            isLoading={notifCtl.isLoading}
+            error={notifCtl.error}
+            isMutating={notifCtl.isMutating}
+            onRefresh={() => void notifCtl.refresh()}
+            onMarkAllRead={() => void notifCtl.markAllRead()}
+            onOpenNotification={(n) => {
+              // §277 — mark read when actually viewed, then §177/§247 deep link.
+              if (n.read_at == null) void notifCtl.markRead(n.id);
+              handleDeepLink(n.target_route);
+            }}
+            onViewAllActivity={() => navigateToSection('activity')}
+          />
+        }
         onOpenProfile={() => navigateToSection('settings')}
         onSignOut={() => {
           // P1 — end the session; this account's device-local state is kept
@@ -1487,7 +1508,10 @@ export function AppShell() {
 
           {activeNavSection === 'activity' && (
             <ErrorBoundary label="Activity">
-              <ActivityView onNavigate={handleDeepLink} />
+              <ActivityView
+                onNavigate={handleDeepLink}
+                onMarkRead={(id) => void notifCtl.markRead(id)}
+              />
             </ErrorBoundary>
           )}
 

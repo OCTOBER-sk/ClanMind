@@ -5,7 +5,7 @@
  */
 
 import type { Transport, TransportRequest, TransportResponse, TransportUploadRequest } from '@/api/transport';
-import type { DemoDataset } from './dataset';
+import type { DemoDataset, DemoNotificationRow } from './dataset';
 import type {
   Message,
   AiAction,
@@ -160,6 +160,47 @@ function buildDiffPreview(input: {
 }
 
 let serverSequence = 1421;
+
+/**
+ * BE §143 semantic notification insert — mirrors NotificationService.notify
+ * + the notification-worker outbox consumer: exactly ONE §95A row per
+ * recipient per semantic event, `delivered_realtime` → DELIVERED_REALTIME,
+ * and a `notification.created` fan-out carrying the FULL row so every room
+ * member's dispatch can project it without a fetch-back.
+ */
+function insertDemoNotification(
+  ds: DemoDataset,
+  input: {
+    recipients: string[];
+    group_id: string;
+    project_id?: string | null;
+    category: DemoNotificationRow['category'];
+    subject_type: string;
+    subject_id: string;
+    title: string;
+    body?: string | null;
+  },
+): void {
+  const nowIso = new Date().toISOString();
+  for (const recipient of new Set(input.recipients)) {
+    const row: DemoNotificationRow = {
+      id: `notif_${crypto.randomUUID()}`,
+      recipient_user_id: recipient,
+      group_id: input.group_id,
+      project_id: input.project_id ?? null,
+      category: input.category,
+      subject_type: input.subject_type,
+      subject_id: input.subject_id,
+      title: input.title,
+      body: input.body ?? null,
+      delivery_state: 'DELIVERED_REALTIME',
+      read_at: null,
+      created_at: nowIso,
+    };
+    ds.notifications.push(row);
+    getDemoHub().broadcast('notification.created', input.group_id, { notification: row });
+  }
+}
 
 /**
  * BE §39 wire shape for history reads (GET /messages). The dataset stores
@@ -325,6 +366,37 @@ export function createDemoTransport(ds: DemoDataset): Transport {
       for (const attachmentId of attachmentIds) {
         const obj = demoObjects.get(attachmentId);
         if (obj && !obj.messageId) obj.messageId = message.id;
+      }
+      // §143/§14.1 semantic rule — mirrors handlers/messages.ts: raw
+      // `mention_tokens` win, else tokens are extracted from the body
+      // (@word syntax, deduped), then resolved against THIS Group's member
+      // display names — never trusting names outside the roster. One
+      // MENTION notification row per mentioned teammate (§143).
+      const rawTokens = Array.isArray(body.mention_tokens)
+        ? (body.mention_tokens as unknown[]).filter(
+            (t): t is string => typeof t === 'string' && t.length > 0,
+          )
+        : [...new Set((String(body.body ?? '').match(/@([A-Za-z0-9_.-]{1,60})/g) ?? []).map((m) => m.slice(1)))];
+      const mentionedIds = new Set<string>();
+      for (const token of rawTokens) {
+        const member = ds.members.find(
+          (m) =>
+            m.group_id === p.groupId &&
+            (m.user.name === token || (m.nickname ?? '') === token),
+        );
+        if (member && member.user_id !== ds.currentUser.id) mentionedIds.add(member.user_id);
+      }
+      if (mentionedIds.size > 0) {
+        insertDemoNotification(ds, {
+          recipients: [...mentionedIds],
+          group_id: p.groupId,
+          project_id: (body.project_id as string | null) ?? null,
+          category: 'MENTION',
+          subject_type: 'message',
+          subject_id: message.id,
+          title: 'You were mentioned',
+          body: `${ds.currentUser.name}: ${String(body.body ?? '').slice(0, 120)}`,
+        });
       }
       getDemoHub().messageCreated(message);
       await sleep(80);
@@ -635,6 +707,26 @@ export function createDemoTransport(ds: DemoDataset): Transport {
         risk_level: 'HIGH',
       } satisfies DemoDataset['githubActions'][number];
       ds.githubActions.push(githubAction);
+      // §143 — approval requests notify the Group's Owners/Admins (the
+      // approver audience), never the requesting actor themselves.
+      const approverIds = ds.members
+        .filter(
+          (m) =>
+            m.group_id === project.group_id &&
+            m.user_id !== ds.currentUser.id &&
+            (m.role === 'OWNER' || m.role === 'ADMIN'),
+        )
+        .map((m) => m.user_id);
+      insertDemoNotification(ds, {
+        recipients: approverIds,
+        group_id: project.group_id,
+        project_id: project.id,
+        category: 'AI_ACTION_APPROVAL',
+        subject_type: 'ai_action',
+        subject_id: actionId,
+        title: 'GitHub write needs approval',
+        body: `Odin proposed ${String(actionType)} on ${connection.repo_full_name ?? 'the connected repository'}.`,
+      });
       // Fan-out carries the FULL envelope so other clients can render an
       // approval card without a fetch-back (mirrors handlers/github.ts).
       getDemoHub().broadcast('github.action.proposed', project.group_id, {
@@ -816,6 +908,20 @@ export function createDemoTransport(ds: DemoDataset): Transport {
         completed_at: null,
       };
       ds.tasks.push(task);
+      // §143 — assigning a task to a teammate creates a TASK_ASSIGNMENT
+      // notification for that recipient only (§174 important category).
+      if (ownerUserId && ownerUserId !== ds.currentUser.id) {
+        insertDemoNotification(ds, {
+          recipients: [ownerUserId],
+          group_id: project.group_id,
+          project_id: project.id,
+          category: 'TASK_ASSIGNMENT',
+          subject_type: 'task',
+          subject_id: task.id,
+          title: 'You were assigned a task',
+          body: task.title,
+        });
+      }
       getDemoHub().broadcast('task.created', project.group_id, { task });
       return ok(task, 201);
     }],
@@ -1318,6 +1424,50 @@ export function createDemoTransport(ds: DemoDataset): Transport {
       ds.memories.push(memory);
       getDemoHub().broadcast('memory.approved', groupId, { memory });
       return ok(memory, 201);
+    }],
+
+    // ── Notifications (P10): BE §95A handlers/search.ts parity ─────────────
+
+    // GET /notifications?limit=&unread= — recipient-scoped, created_at DESC,
+    // limit clamped ≤100 exactly like the real handler.
+    ['GET', '/notifications', (_p, req, ds) => {
+      const rawLimit = Number(req.query?.limit ?? 50) || 50;
+      const limit = Math.min(rawLimit, 100);
+      const unreadOnly = req.query?.unread === 'true';
+      const items = ds.notifications
+        .filter((n) => n.recipient_user_id === ds.currentUser.id)
+        .filter((n) => (unreadOnly ? n.read_at == null : true))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, limit);
+      return ok({ items });
+    }],
+
+    // POST /notifications/:id/read — stamps read_at. The real handler answers
+    // {ok:true} even for unknown/foreign ids (UPDATE matches zero rows), so
+    // demo parity keeps that exact behavior instead of inventing a 404.
+    ['POST', '/notifications/:notificationId/read', (p, _req, ds) => {
+      void p;
+      void _req;
+      const row = ds.notifications.find(
+        (n) => n.id === p.notificationId && n.recipient_user_id === ds.currentUser.id,
+      );
+      if (row && row.read_at == null) row.read_at = new Date().toISOString();
+      return ok({ ok: true });
+    }],
+
+    // GET /groups/:groupId/activity — §98A feed; membership-checked like
+    // handlers/search.ts requireMember (403 GROUP_PERMISSION_DENIED).
+    ['GET', '/groups/:groupId/activity', (p, req, ds) => {
+      if (!ds.members.some((m) => m.user_id === ds.currentUser.id && m.group_id === p.groupId)) {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'You are not a member of this Group.');
+      }
+      const rawLimit = Number(req.query?.limit ?? 50) || 50;
+      const limit = Math.min(rawLimit, 100);
+      const items = [...ds.activityEvents]
+        .filter((e) => e.group_id === p.groupId)
+        .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))
+        .slice(0, limit);
+      return ok({ items });
     }],
 
     // ── Attachments (P4): BE §43 rows, §81 validation, §84 signing. ────────

@@ -5,6 +5,7 @@ import type {
   MemoryEntry,
   MemoryCandidate,
   Notification,
+  ActivityEvent,
   AiAction,
   GithubActionItem,
 } from '@/types';
@@ -20,7 +21,10 @@ export interface ProjectDataState {
   decisions: Decision[];
   memories: MemoryEntry[];
   memoryCandidates: MemoryCandidate[];
+  /** §95A canonical rows (read state = server `read_at`, §277). */
   notifications: Notification[];
+  /** §98A attention feed (GET /groups/:groupId/activity). */
+  activityEvents: ActivityEvent[];
   /** §164A — generalized approval engine: any HIGH/CRITICAL AI action */
   aiActions: AiAction[];
 
@@ -38,9 +42,13 @@ export interface ProjectDataState {
   upsertMemoryCandidate: (candidate: MemoryCandidate) => void;
   removeMemoryCandidate: (candidateId: string) => void;
 
+  /** Replace the recipient's notification list from a validated fetch. */
+  setNotifications: (rows: Notification[]) => void;
+  /** Merge one §95A row (realtime fan-out / optimistic reconcile), newest first, deduped by id. */
+  upsertNotification: (row: Notification) => void;
+  setActivityEvents: (events: ActivityEvent[]) => void;
   markNotificationAsRead: (notificationId: string) => void;
   clearAllNotifications: () => void;
-  addNotification: (notification: Notification) => void;
 
   updateAiAction: (actionId: string, updates: Partial<AiAction>) => void;
   upsertAiAction: (action: AiAction) => void;
@@ -60,6 +68,7 @@ export const useProjectDataStore = create<ProjectDataState>((set) => ({
   memories: [],
   memoryCandidates: [],
   notifications: [],
+  activityEvents: [],
   aiActions: [],
 
   setTasks: (tasks) => set({ tasks }),
@@ -101,19 +110,32 @@ export const useProjectDataStore = create<ProjectDataState>((set) => ({
       memoryCandidates: state.memoryCandidates.filter((c) => c.id !== candidateId),
     })),
 
+  setNotifications: (rows) =>
+    set(() => ({
+      notifications: [...rows].sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    })),
+  upsertNotification: (row) =>
+    set((state) => ({
+      notifications: state.notifications.some((n) => n.id === row.id)
+        ? state.notifications.map((n) => (n.id === row.id ? row : n))
+        : [row, ...state.notifications].sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    })),
+  setActivityEvents: (events) => set({ activityEvents: events }),
+  // §277 — read state IS the server's read_at; local writes are optimistic
+  // projections of POST /notifications/:id/read and reconcile on refetch.
   markNotificationAsRead: (notificationId) =>
     set((state) => ({
       notifications: state.notifications.map((n) =>
-        n.id === notificationId ? { ...n, is_read: true } : n
+        n.id === notificationId && n.read_at == null
+          ? { ...n, read_at: new Date().toISOString() }
+          : n
       ),
     })),
   clearAllNotifications: () =>
     set((state) => ({
-      notifications: state.notifications.map((n) => ({ ...n, is_read: true })),
-    })),
-  addNotification: (notification) =>
-    set((state) => ({
-      notifications: [notification, ...state.notifications],
+      notifications: state.notifications.map((n) =>
+        n.read_at == null ? { ...n, read_at: new Date().toISOString() } : n
+      ),
     })),
 
   // §164A.2/4: approve validates the exact payload snapshot; on mismatch the

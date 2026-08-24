@@ -458,11 +458,19 @@ export const MeetingDetailSchema = z
 
 // ─── Notifications (BE §95A) ────────────────────────────────────────────────
 
+/**
+ * BE §95A `notifications` row — exact wire shape returned by the real
+ * Worker (handlers/search.ts GET /api/v1/notifications and the
+ * notification-worker outbox consumer). Categories/delivery states are the
+ * verbatim §95/§95A enums; unknown values flow through as strings into
+ * generalized rendering instead of crashing.
+ */
 export const NotificationSchema = z
   .object({
     id: IdSchema,
     recipient_user_id: IdSchema,
     group_id: IdSchema,
+    project_id: IdSchema.nullish(),
     category: z.string(),
     subject_type: z.string(),
     subject_id: IdSchema,
@@ -472,6 +480,37 @@ export const NotificationSchema = z
     read_at: z.string().nullish(),
     created_at: IsoDateSchema,
   })
+  .passthrough();
+
+/** GET /notifications → { items } (real handler always wraps in {items}). */
+export const NotificationListSchema = z
+  .object({ items: z.array(NotificationSchema).nullish() })
+  .passthrough();
+
+/**
+ * BE §98A `activity_events` row — GET /groups/:groupId/activity. Summaries
+ * are pre-rendered server-side at write time; the client renders them
+ * verbatim and never re-derives them.
+ */
+export const ActivityEventSchema = z
+  .object({
+    id: IdSchema,
+    group_id: IdSchema,
+    project_id: IdSchema.nullish(),
+    actor_type: z.string(),
+    actor_user_id: IdSchema.nullish(),
+    actor_ai_id: IdSchema.nullish(),
+    activity_type: z.string(),
+    summary: z.string(),
+    subject_type: z.string(),
+    subject_id: IdSchema,
+    visibility: z.string(),
+    occurred_at: IsoDateSchema,
+  })
+  .passthrough();
+
+export const ActivityListSchema = z
+  .object({ items: z.array(ActivityEventSchema).nullish() })
   .passthrough();
 
 // ─── Protocol / flags (BE §165/§166) ────────────────────────────────────────

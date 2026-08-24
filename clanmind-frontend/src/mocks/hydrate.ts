@@ -8,6 +8,7 @@ import { useGroupStore } from '@/state/useGroupStore';
 import { useChatStore } from '@/state/useChatStore';
 import { useProjectDataStore } from '@/state/useProjectDataStore';
 import { useArtifactStore } from '@/state/useArtifactStore';
+import { mapNotificationRow } from '@/api/endpoints/notifications';
 import type { DemoDataset } from './dataset';
 
 export function applyDemoHydration(ds: DemoDataset): void {
@@ -37,7 +38,9 @@ export function applyDemoHydration(ds: DemoDataset): void {
     decisions: [...ds.decisions],
     memories: [...ds.memories],
     memoryCandidates: [...ds.memoryCandidates],
-    notifications: [...ds.notifications],
+    // §95A wire rows map through the SAME mapper the live path uses —
+    // demo and live stores can never drift apart in shape.
+    notifications: ds.notifications.map(mapNotificationRow),
     aiActions: ds.aiActions.map((a) => ({ ...a })),
   });
 

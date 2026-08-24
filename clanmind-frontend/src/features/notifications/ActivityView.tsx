@@ -1,45 +1,31 @@
 import React from 'react';
-import { Bell, MessageSquare, GitPullRequest, AlertCircle } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { useProjectDataStore } from '@/state/useProjectDataStore';
-import type { NotificationCategory } from '@/types';
+import {
+  notificationCategoryIcon,
+  notificationCategoryLabel,
+} from './notificationDisplay';
 
 /**
- * §172 Activity — the user attention view: mentions, replies, reactions,
- * approvals, task assignments, key AI events. §277 read state.
+ * §172 Activity — the user attention view backed by BOTH feeds:
+ *   • §95A notifications ("For you": mentions, approvals, assignments…)
+ *   • §98A group activity events (summaries rendered verbatim)
  *
+ * §277 read state: unread items carry a subtle badge; opening one marks it
+ * read through the controller (server POST /notifications/:id/read).
  * Notification categories map 1:1 to backend identifiers (§171).
  */
-const categoryLabel: Record<NotificationCategory, string> = {
-  MENTION: 'Mention',
-  PRIVATE_MESSAGE: 'Private',
-  AI_RESPONSE: 'AI',
-  AI_ACTION_APPROVAL: 'Approval',
-  TASK_ASSIGNMENT: 'Task',
-  DECISION_APPROVAL: 'Decision',
-  ARTIFACT_READY: 'Artifact',
-  GITHUB_EVENT: 'GitHub',
-  MEETING_SUMMARY: 'Meeting',
-  PROACTIVE_AI: 'Odin suggestion',
-  SYSTEM: 'System',
-};
-
-function categoryIcon(category: NotificationCategory) {
-  if (category === 'GITHUB_EVENT') return <GitPullRequest className="w-3.5 h-3.5" aria-hidden="true" />;
-  if (category === 'SYSTEM' || category === 'PROACTIVE_AI')
-    return <AlertCircle className="w-3.5 h-3.5" aria-hidden="true" />;
-  if (category === 'MENTION' || category === 'PRIVATE_MESSAGE')
-    return <MessageSquare className="w-3.5 h-3.5" aria-hidden="true" />;
-  return <Bell className="w-3.5 h-3.5" aria-hidden="true" />;
-}
 
 export interface ActivityViewProps {
   onNavigate: (route: string) => void;
+  /** Controller-backed mark-read (optimistic + server POST). */
+  onMarkRead: (notificationId: string) => void;
 }
 
-export function ActivityView({ onNavigate }: ActivityViewProps) {
-  const { notifications, markNotificationAsRead } = useProjectDataStore();
+export function ActivityView({ onNavigate, onMarkRead }: ActivityViewProps) {
+  const { notifications, activityEvents } = useProjectDataStore();
 
-  const unread = notifications.filter((n) => !n.is_read).length;
+  const unread = notifications.filter((n) => n.read_at == null).length;
 
   return (
     <div className="h-full flex flex-col min-h-0" style={{ background: 'var(--color-background)' }}>
@@ -66,47 +52,79 @@ export function ActivityView({ onNavigate }: ActivityViewProps) {
           </div>
         )}
 
-        {notifications.map((n) => (
-          <button
-            key={n.id}
-            onClick={() => {
-              if (!n.is_read) markNotificationAsRead(n.id);
-              onNavigate(n.target_route);
-            }}
-            className="w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-xl border transition-colors cursor-pointer"
-            style={{
-              borderColor: 'var(--color-border)',
-              background: n.is_read ? 'transparent' : 'var(--color-info-bg)',
-            }}
-          >
-            <span
-              className="mt-0.5 shrink-0"
-              style={{ color: n.is_read ? 'var(--color-text-tertiary)' : 'var(--color-info)' }}
+        {notifications.map((n) => {
+          const isUnread = n.read_at == null;
+          return (
+            <button
+              key={n.id}
+              onClick={() => {
+                if (isUnread) onMarkRead(n.id);
+                onNavigate(n.target_route);
+              }}
+              aria-label={`${n.title}${isUnread ? ' (unread)' : ''}`}
+              className="w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-xl border transition-colors cursor-pointer focus-visible:shadow-[var(--focus-ring)] outline-none"
+              style={{
+                borderColor: isUnread ? 'var(--color-info)' : 'var(--color-border)',
+                background: isUnread ? 'var(--color-info-bg)' : 'transparent',
+                opacity: isUnread ? 1 : 0.75,
+              }}
             >
-              {categoryIcon(n.category)}
-            </span>
-            <span className="flex-1 min-w-0">
-              <span className="block text-xs font-semibold truncate" style={{ color: 'var(--color-text)' }}>
-                {n.title}
-              </span>
-              {n.body && (
-                <span className="block text-xs mt-0.5 line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>
-                  {n.body}
-                </span>
-              )}
-              <span className="block text-[10px] mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
-                {categoryLabel[n.category]} · {new Date(n.created_at).toLocaleString()}
-              </span>
-            </span>
-            {!n.is_read && (
               <span
-                className="mt-1.5 w-2 h-2 rounded-full shrink-0"
-                style={{ background: 'var(--color-info)' }}
-                aria-label="Unread"
-              />
-            )}
-          </button>
-        ))}
+                className="mt-0.5 shrink-0"
+                style={{ color: isUnread ? 'var(--color-info)' : 'var(--color-text-tertiary)' }}
+              >
+                {notificationCategoryIcon(n.category)}
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-xs font-semibold truncate" style={{ color: 'var(--color-text)' }}>
+                  {n.title}
+                </span>
+                {n.body && (
+                  <span className="block text-xs mt-0.5 line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>
+                    {n.body}
+                  </span>
+                )}
+                <span className="block text-[10px] mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
+                  {notificationCategoryLabel(n.category)} · {new Date(n.created_at).toLocaleString()}
+                </span>
+              </span>
+              {/* §277 subtle unread badge */}
+              {isUnread && (
+                <span
+                  className="mt-1.5 w-2 h-2 rounded-full shrink-0"
+                  style={{ background: 'var(--color-info)' }}
+                  aria-label="Unread"
+                />
+              )}
+            </button>
+          );
+        })}
+
+        {/* §172/§98A — the Group attention stream (pre-rendered summaries) */}
+        {activityEvents.length > 0 && (
+          <section className="pt-3">
+            <h2
+              className="text-[10px] font-bold uppercase tracking-wider mb-2"
+              style={{ color: 'var(--color-text-tertiary)' }}
+            >
+              Group activity
+            </h2>
+            <ul className="space-y-1">
+              {activityEvents.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs"
+                  style={{ background: 'var(--color-surface-raised)', color: 'var(--color-text-secondary)' }}
+                >
+                  <span className="truncate flex-1">{e.summary}</span>
+                  <span className="text-[10px] shrink-0" style={{ color: 'var(--color-text-tertiary)' }}>
+                    {new Date(e.occurred_at).toLocaleTimeString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </div>
   );
