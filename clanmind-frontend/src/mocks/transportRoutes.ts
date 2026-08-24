@@ -5,7 +5,7 @@
  */
 
 import type { Transport, TransportRequest, TransportResponse, TransportUploadRequest } from '@/api/transport';
-import type { DemoDataset, DemoNotificationRow } from './dataset';
+import type { DemoDataset, DemoNotificationRow, DemoSyncConflictRow } from './dataset';
 import type {
   Message,
   AiAction,
@@ -1471,6 +1471,182 @@ export function createDemoTransport(ds: DemoDataset): Transport {
     }],
 
     // ── Attachments (P4): BE §43 rows, §81 validation, §84 signing. ────────
+
+    // ── Sync (P11): offline queue reconciliation, BE §20 protocol + §20A
+    // row shapes. DEMO-PARITY surface — the real Worker has the §20A tables
+    // but NO sync routes yet (backend audit H3); live mode answers the
+    // honest 404 until Zeus ships them (INTEGRATION_NOTES D25). Conflict ids
+    // are deterministic (`sc_<client_operation_id>`) so the client engine's
+    // locally-mirrored row and the broadcast row dedupe to one.
+
+    // POST /groups/:groupId/sync/operations — "push local operations"
+    // (BE §20). Validates + applies each queued write IN ORDER and answers
+    // per-operation acks: APPLIED (+ result_reference) / REJECTED /
+    // CONFLICT (+ full §20A sync_conflicts row).
+    ['POST', '/groups/:groupId/sync/operations', (p, req) => {
+      if (!ds.members.some((m) => m.user_id === ds.currentUser.id && m.group_id === p.groupId)) {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'You are not a member of this Group.');
+      }
+      const body = (req.body ?? {}) as { operations?: unknown };
+      const ops = body.operations;
+      if (!Array.isArray(ops) || ops.length === 0 || ops.length > 100) {
+        return fail(400, 'VALIDATION_FAILED', 'operations must be a non-empty array (max 100).');
+      }
+      const group = ds.groups.find((g) => g.id === p.groupId);
+      if (!group) return fail(404, 'NOT_FOUND', 'Group not found.');
+
+      const results: Array<Record<string, unknown>> = [];
+      for (const raw of ops) {
+        const op = (raw ?? {}) as Record<string, unknown>;
+        const clientId = op.client_operation_id;
+        const operationType = op.operation_type;
+        if (typeof clientId !== 'string' || clientId.length < 8 || typeof operationType !== 'string') {
+          return fail(
+            400,
+            'VALIDATION_FAILED',
+            'Each operation requires client_operation_id (≥8 chars) and operation_type.',
+          );
+        }
+        const entityId = typeof op.entity_id === 'string' ? op.entity_id : '';
+
+        if (operationType === 'message.create') {
+          // §19 idempotency — the same client_operation_id replays as the
+          // SAME logical message, never a duplicate.
+          const existing = ds.messages.find((m) => m.client_message_id === clientId);
+          if (existing) {
+            results.push({ client_operation_id: clientId, status: 'APPLIED', result_reference: existing.id });
+            continue;
+          }
+          const payload = (op.payload ?? {}) as Record<string, unknown>;
+          const nowIso = new Date().toISOString();
+          const message = {
+            id: `msg_sync_${clientId}`,
+            client_message_id: clientId,
+            group_id: p.groupId,
+            project_id: typeof payload.project_id === 'string' ? payload.project_id : null,
+            sender_type: 'USER',
+            sender_id: ds.currentUser.id,
+            sender_name: ds.currentUser.name,
+            body: typeof payload.body === 'string' ? payload.body : '',
+            visibility: typeof payload.visibility === 'string' ? payload.visibility : 'GROUP',
+            recipient_id: typeof payload.recipient_id === 'string' ? payload.recipient_id : undefined,
+            pinned: false,
+            edited: false,
+            deleted: false,
+            attachments: [],
+            reactions: [],
+            created_at: nowIso,
+            updated_at: nowIso,
+          } as Message;
+          ds.messages.push(message);
+          getDemoHub().messageCreated({ ...message, id: message.id, group_id: p.groupId });
+          results.push({ client_operation_id: clientId, status: 'APPLIED', result_reference: message.id });
+          continue;
+        }
+
+        if (operationType === 'task.update') {
+          // §21.2 optimistic concurrency — stale expected_version records a
+          // version_mismatch conflict row instead of overwriting.
+          const task = ds.tasks.find((t) => t.id === entityId);
+          if (!task) {
+            results.push({
+              client_operation_id: clientId,
+              status: 'REJECTED',
+              error_message: 'Task not found — it may have been deleted while you were offline.',
+            });
+            continue;
+          }
+          const payload = (op.payload ?? {}) as Record<string, unknown>;
+          const expectedVersion = Number(payload.expected_version);
+          const patch = (payload.patch ?? {}) as Record<string, unknown>;
+          if (!Number.isInteger(expectedVersion)) {
+            results.push({
+              client_operation_id: clientId,
+              status: 'REJECTED',
+              error_message: 'expected_version is required for task.update.',
+            });
+            continue;
+          }
+          if (task.version !== expectedVersion) {
+            const conflict = {
+              id: `sc_${clientId}`,
+              group_id: p.groupId,
+              entity_type: 'task',
+              entity_id: task.id,
+              conflict_type: 'version_mismatch' as const,
+              local_payload: { client_operation_id: clientId, patch },
+              server_payload: { title: task.title, status: task.status, version: task.version },
+              resolution_strategy: null,
+              resolved_by: null,
+              resolved_at: null,
+              created_at: new Date().toISOString(),
+            };
+            ds.syncConflicts.push(conflict);
+            getDemoHub().broadcast('sync.conflict.detected', p.groupId, { conflict });
+            results.push({ client_operation_id: clientId, status: 'CONFLICT', conflict });
+            continue;
+          }
+          if (typeof patch.title === 'string') task.title = patch.title;
+          if (patch.status !== undefined) task.status = patch.status as typeof task.status;
+          if (patch.priority !== undefined) task.priority = patch.priority as typeof task.priority;
+          if (patch.description !== undefined) task.description = patch.description as string | null;
+          if (patch.owner_user_id !== undefined) task.owner_user_id = patch.owner_user_id as string | null;
+          if (patch.due_at !== undefined) task.due_at = patch.due_at as string | null;
+          task.version = expectedVersion + 1;
+          task.updated_at = new Date().toISOString();
+          getDemoHub().broadcast(
+            'task.updated',
+            ds.projects.find((pr) => pr.id === task.project_id)?.group_id ?? p.groupId,
+            { task },
+          );
+          results.push({ client_operation_id: clientId, status: 'APPLIED', result_reference: task.id });
+          continue;
+        }
+
+        // The demo server refuses operations it cannot process yet — the
+        // honest REJECTED path (§186A.2), never silent success.
+        results.push({
+          client_operation_id: clientId,
+          status: 'REJECTED',
+          error_message: `Unsupported operation_type '${operationType}' on this backend.`,
+        });
+      }
+      return ok({ results });
+    }],
+
+    // GET /groups/:groupId/sync/conflicts — unresolved §20A rows for the Group.
+    ['GET', '/groups/:groupId/sync/conflicts', (p) => {
+      if (!ds.members.some((m) => m.user_id === ds.currentUser.id && m.group_id === p.groupId)) {
+        return fail(403, 'GROUP_PERMISSION_DENIED', 'You are not a member of this Group.');
+      }
+      const items = ds.syncConflicts.filter(
+        (c) => c.group_id === p.groupId && c.resolved_at == null,
+      );
+      return ok({ items });
+    }],
+
+    // POST /sync/conflicts/:id/resolve — §186A.4 write-back through the SAME
+    // row (resolution_strategy / resolved_by / resolved_at).
+    ['POST', '/sync/conflicts/:conflictId/resolve', (p, req) => {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const strategy = body.resolution_strategy;
+      const VALID = ['server_wins', 'client_wins', 'merged', 'manual'];
+      if (typeof strategy !== 'string' || !VALID.includes(strategy)) {
+        return fail(400, 'VALIDATION_FAILED', `resolution_strategy must be one of ${VALID.join(', ')}.`);
+      }
+      const conflict = ds.syncConflicts.find((c) => c.id === p.conflictId);
+      if (!conflict) return fail(404, 'NOT_FOUND', 'Conflict not found.');
+      if (conflict.resolved_at != null) {
+        return fail(409, 'CONFLICT', 'This conflict has already been resolved.');
+      }
+      conflict.resolution_strategy = strategy as DemoSyncConflictRow['resolution_strategy'];
+      conflict.resolved_by =
+        typeof body.resolved_by === 'string' ? body.resolved_by : ds.currentUser.id;
+      conflict.resolved_at = new Date().toISOString();
+      getDemoHub().broadcast('sync.conflict.resolved', conflict.group_id, { conflict });
+      return ok({ conflict });
+    }],
+
 
     // §84 — mint a short-lived signed URL after "authorization".
     ['POST', '/attachments/:attachmentId/sign', (p) => {

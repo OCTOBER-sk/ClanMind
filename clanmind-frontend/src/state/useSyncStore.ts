@@ -11,7 +11,13 @@ export type SyncStateStatus = 'connected' | 'reconnecting' | 'offline' | 'syncin
 
 export interface SyncState {
   status: SyncStateStatus;
+  /**
+   * §186A.1 — "Syncing N changes…" derives from the count of local
+   * sync_operations rows still in PENDING status, never from the total
+   * queue length (REJECTED/CONFLICT rows are parked, not in flight).
+   */
   pendingOperationsCount: number;
+  /** Every non-dismissed queued operation, any §186A.2 status. */
   pendingOperations: SyncOperation[];
   conflicts: SyncConflict[];
   activeConflict: SyncConflict | null;
@@ -27,9 +33,17 @@ export interface SyncState {
 
   setStatus: (status: SyncStateStatus) => void;
   setPendingOperations: (ops: SyncOperation[]) => void;
+  /** Idempotent by client_operation_id — re-enqueueing a retry is a no-op. */
   addOperation: (op: SyncOperation) => void;
   removeOperation: (clientOperationId: string) => void;
+  updateOperation: (
+    clientOperationId: string,
+    patch: Partial<Pick<SyncOperation, 'status' | 'error_message' | 'result_reference'>>,
+  ) => void;
+  /** §186A.2 — REJECTED rows stay visible until dismissed, never silently dropped. */
+  dismissOperation: (clientOperationId: string) => void;
   setConflicts: (conflicts: SyncConflict[]) => void;
+  upsertConflict: (conflict: SyncConflict) => void;
   setActiveConflict: (conflict: SyncConflict | null) => void;
   resolveConflict: (
     conflictId: string,
@@ -40,6 +54,11 @@ export interface SyncState {
   setProtocolMismatch: (mismatch: SyncState['protocolMismatch']) => void;
   setRecommendedUpdate: (update: { available: boolean; version?: string }) => void;
   dismissRecommendedUpdate: () => void;
+}
+
+/** §186A.1 — only PENDING rows count as changes still syncing. */
+function countPending(ops: SyncOperation[]): number {
+  return ops.filter((o) => o.status === 'PENDING').length;
 }
 
 export const useSyncStore = create<SyncState>()(
@@ -60,24 +79,62 @@ export const useSyncStore = create<SyncState>()(
       setPendingOperations: (pendingOperations) =>
         set({
           pendingOperations,
-          pendingOperationsCount: pendingOperations.length,
+          pendingOperationsCount: countPending(pendingOperations),
         }),
       addOperation: (op) =>
-        set((state) => ({
-          pendingOperations: [...state.pendingOperations, op],
-          pendingOperationsCount: state.pendingOperations.length + 1,
-        })),
+        set((state) => {
+          if (
+            state.pendingOperations.some(
+              (o) => o.client_operation_id === op.client_operation_id,
+            )
+          ) {
+            return state;
+          }
+          const nextOps = [...state.pendingOperations, op];
+          return {
+            pendingOperations: nextOps,
+            pendingOperationsCount: countPending(nextOps),
+          };
+        }),
       removeOperation: (clientOperationId) =>
         set((state) => {
           const nextOps = state.pendingOperations.filter(
-            (o) => o.client_operation_id !== clientOperationId
+            (o) => o.client_operation_id !== clientOperationId,
           );
           return {
             pendingOperations: nextOps,
-            pendingOperationsCount: nextOps.length,
+            pendingOperationsCount: countPending(nextOps),
+          };
+        }),
+      updateOperation: (clientOperationId, patch) =>
+        set((state) => {
+          const nextOps = state.pendingOperations.map((o) =>
+            o.client_operation_id === clientOperationId ? { ...o, ...patch } : o,
+          );
+          return {
+            pendingOperations: nextOps,
+            pendingOperationsCount: countPending(nextOps),
+          };
+        }),
+      dismissOperation: (clientOperationId) =>
+        set((state) => {
+          const nextOps = state.pendingOperations.filter(
+            (o) => o.client_operation_id !== clientOperationId,
+          );
+          return {
+            pendingOperations: nextOps,
+            pendingOperationsCount: countPending(nextOps),
           };
         }),
       setConflicts: (conflicts) => set({ conflicts }),
+      upsertConflict: (conflict) =>
+        set((state) => {
+          const existing = state.conflicts.find((c) => c.id === conflict.id);
+          const conflicts = existing
+            ? state.conflicts.map((c) => (c.id === conflict.id ? { ...c, ...conflict } : c))
+            : [...state.conflicts, conflict];
+          return { conflicts };
+        }),
       setActiveConflict: (activeConflict) => set({ activeConflict }),
       // §186A.4: resolution writes back through the same conflict row
       // (resolution_strategy / resolved_by / resolved_at), not a new operation.

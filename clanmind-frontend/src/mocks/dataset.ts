@@ -35,6 +35,21 @@ export type DemoNotificationRow = z.infer<typeof NotificationSchema>;
 /** BE §98A activity_events wire row (GET /groups/:groupId/activity). */
 export type DemoActivityRow = z.infer<typeof ActivityEventSchema>;
 
+/** BE §20A sync_conflicts wire row (demo sync surface, see D25). */
+export interface DemoSyncConflictRow {
+  id: string;
+  group_id: string;
+  entity_type: string;
+  entity_id: string;
+  conflict_type: 'version_mismatch' | 'concurrent_edit' | 'deleted_upstream';
+  local_payload: Record<string, unknown>;
+  server_payload: Record<string, unknown>;
+  resolution_strategy: 'server_wins' | 'client_wins' | 'merged' | 'manual' | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+}
+
 export interface DemoDataset {
   currentUser: User;
   groups: Group[];
@@ -57,6 +72,8 @@ export interface DemoDataset {
   notifications: DemoNotificationRow[];
   /** §98A attention feed rows served by GET /groups/:groupId/activity. */
   activityEvents: DemoActivityRow[];
+  /** §20A sync_conflicts rows created by the demo sync surface (P11). */
+  syncConflicts: DemoSyncConflictRow[];
   aiActions: AiAction[];
   artifacts: Artifact[];
   featureFlags: ServerFeatureFlags;
@@ -924,6 +941,9 @@ export function createDemoDataset(): DemoDataset {
     meetingCandidates: [],
     notifications,
     activityEvents,
+    // §20A — conflicts appear only through real replay attempts against the
+    // demo sync surface; no fixtures.
+    syncConflicts: [],
     aiActions,
     artifacts,
     featureFlags: {

@@ -19,6 +19,7 @@ import { api } from '@/api/client';
 import { ApiError } from '@/api/errors';
 import { env } from '@/config/env';
 import { useAuthStore } from '@/state/useAuthStore';
+import { setOutboxAccount, hydrateOutbox } from '@/sync/outbox';
 import { clearAccountLocalState } from './accountState';
 import type { User } from '@/types';
 
@@ -167,6 +168,11 @@ export async function establishSession(identity: AuthIdentity): Promise<void> {
     name: identity.name,
     created_at: prev?.id === identity.id ? prev.created_at : new Date().toISOString(),
   });
+  // P11 — point the durable outbox mirror at THIS account and restore any
+  // operations queued by a previous session (§186A.2 durability: a restart
+  // or sign-in cycle must never silently drop user work).
+  setOutboxAccount(identity.id);
+  await hydrateOutbox();
 }
 
 /**

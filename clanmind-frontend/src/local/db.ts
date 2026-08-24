@@ -8,6 +8,8 @@
 
 import { openDB, deleteDB, type IDBPDatabase } from 'idb';
 
+export type { IDBPDatabase };
+
 export interface CachedMessageRecord {
   id: string;
   group_id: string;

@@ -21,6 +21,7 @@ import { Input } from '@/design-system/components/Input';
 import { Dialog } from '@/design-system/components/Dialog';
 import { cn } from '@/design-system/utils';
 import { SyncDiagnosticsView } from '@/features/sync/SyncDiagnosticsView';
+import { resolveConflictThroughSync } from '@/sync/outbox';
 import { useSyncStore } from '@/state/useSyncStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import {
@@ -937,7 +938,10 @@ export function SettingsView({
             conflicts={conflicts}
             notifications={notifications}
             onResolveConflict={(id, strategy) =>
-              useSyncStore.getState().resolveConflict(id, strategy, useAuthStore.getState().user?.id ?? '')
+              void resolveConflictThroughSync(id, strategy, useAuthStore.getState().user?.id ?? '')
+            }
+            onDismissOperation={(clientOperationId) =>
+              useSyncStore.getState().dismissOperation(clientOperationId)
             }
           />
         )}

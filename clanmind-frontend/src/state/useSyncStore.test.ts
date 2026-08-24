@@ -9,7 +9,7 @@ function conflict(): SyncConflict {
     entity_type: 'task',
     entity_id: 't1',
     conflict_type: 'version_mismatch',
-    client_payload: { a: 1 },
+    local_payload: { a: 1 },
     server_payload: { a: 2 },
   };
 }

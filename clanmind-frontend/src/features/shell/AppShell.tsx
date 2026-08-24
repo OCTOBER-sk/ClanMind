@@ -48,6 +48,7 @@ import { ContextInspector } from '@/features/artifacts/ContextInspector';
 import { ResearchDrawer } from '@/features/ai/ResearchDrawer';
 import { SyncConflictCard } from '@/features/sync/SyncConflictCard';
 import { SyncBanner } from '@/features/sync/SyncBanner';
+import { resolveConflictThroughSync } from '@/sync/outbox';
 import { GarageView } from '@/features/garage/GarageView';
 import { ProjectOverview } from '@/features/projects/ProjectOverview';
 import { TasksView } from '@/features/tasks/TasksView';
@@ -115,7 +116,6 @@ export function AppShell() {
     typingUsers,
     presenceOnlineCount,
     lastReadMessageIdByScope,
-    pendingMessages,
     setComposerText,
     updateMessage,
     deleteMessage,
@@ -126,7 +126,6 @@ export function AppShell() {
     saveDraft,
     loadDraft,
     markScopeRead,
-    confirmPendingMessage,
   } = useChatStore();
 
   const {
@@ -165,10 +164,8 @@ export function AppShell() {
   const {
     status: syncStatus,
     conflicts,
-    resolveConflict,
     protocolMismatch,
     recommendedUpdate,
-    removeOperation: removeSyncOperation,
     setRecommendedUpdate,
     dismissRecommendedUpdate,
   } = useSyncStore();
@@ -502,18 +499,12 @@ export function AppShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeKey]);
 
-  // ─── §183/§186A.2: when connectivity returns, acknowledge queued messages ───
-  useEffect(() => {
-    if (syncStatus === 'connected' && pendingMessages.length > 0) {
-      const t = setTimeout(() => {
-        pendingMessages.forEach((p) => {
-          confirmPendingMessage(p.clientMessageId);
-          removeSyncOperation(p.clientMessageId);
-        });
-      }, 800);
-      return () => clearTimeout(t);
-    }
-  }, [syncStatus, pendingMessages, confirmPendingMessage, removeSyncOperation]);
+  // ─── §183/§186A.2 offline replay ─────────────────────────────────────────
+  // The P3-era timer that "confirmed" queued messages without sending them
+  // is GONE: reconciliation now happens only when the P11 outbox actually
+  // replays each queued operation against the server and the real ack lands
+  // (src/sync/outbox.replayPendingOperations, triggered by the connectivity
+  // layer's offline→connected transition). Nothing here may fake a delivery.
 
   // ─── §195 Window state persistence ───
   useEffect(() => {
@@ -1195,7 +1186,9 @@ export function AppShell() {
         />
       )}
 
-      {/* Sync Conflict Notification Banner if any (§186) */}
+      {/* Sync Conflict Notification Banner if any (§186) — resolution writes
+          back through the SAME conflict row and re-drives the blocked queue
+          operation (§186A.4, src/sync/outbox). */}
       {conflicts.length > 0 && (
         <div
           className="px-4 py-2 border-b"
@@ -1203,7 +1196,9 @@ export function AppShell() {
         >
           <SyncConflictCard
             conflict={conflicts[0]!}
-            onResolve={(id, strategy) => resolveConflict(id, strategy, currentUserId)}
+            onResolve={(id, strategy) =>
+              void resolveConflictThroughSync(id, strategy, currentUserId)
+            }
           />
         </div>
       )}

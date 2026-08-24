@@ -11,7 +11,7 @@ function makeConflict(conflict_type: SyncConflict['conflict_type']): SyncConflic
     entity_type: 'task',
     entity_id: 'task_1',
     conflict_type,
-    client_payload: { title: 'Local title' },
+    local_payload: { title: 'Local title' },
     server_payload: { title: 'Remote title' },
   };
 }

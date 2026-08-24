@@ -25,6 +25,8 @@ import { useArtifactStore } from '@/state/useArtifactStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useGroupStore } from '@/state/useGroupStore';
 import { useProjectDataStore } from '@/state/useProjectDataStore';
+import { useSyncStore } from '@/state/useSyncStore';
+import { SyncConflictSchema } from '@/api/endpoints/sync';
 import { useAiStreamStore } from '@/features/ai/aiStreamStore';
 import {
   useConstructionStore,
@@ -897,6 +899,70 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
         .finally(() => {
           useMeetingStore.getState().finishEnding();
         });
+      break;
+    }
+
+    // ─── BE §18 Sync taxonomy (P11) ────────────────────────────────────────
+    // Server-side sync lifecycle events. `connected`/`reconciled` are
+    // telemetry: they stamp the §186A.1 checkpoint's last_synced_at.
+    case 'sync.client.connected':
+    case 'sync.client.reconciled': {
+      const { checkpoint, setCheckpoint } = useSyncStore.getState();
+      if (checkpoint) {
+        setCheckpoint({ ...checkpoint, last_synced_at: new Date().toISOString() });
+      }
+      break;
+    }
+
+    // A conflict was recorded against a queued write. Only surface it when
+    // it blocks an operation THIS client actually holds (the §20A row's
+    // payload carries the originating client_operation_id) or when this
+    // device's engine already created the row locally — another member's
+    // conflict never opens our §186 card.
+    case 'sync.conflict.detected': {
+      const parsed = SyncConflictSchema.safeParse(payload.conflict ?? payload);
+      if (!parsed.success) break;
+      const row = parsed.data;
+      const opClientId =
+        typeof row.local_payload.client_operation_id === 'string'
+          ? row.local_payload.client_operation_id
+          : null;
+      const sync = useSyncStore.getState();
+      const ours =
+        (opClientId !== null &&
+          sync.pendingOperations.some((o) => o.client_operation_id === opClientId)) ||
+        sync.conflicts.some((c) => c.id === row.id);
+      if (!ours) break;
+      sync.upsertConflict({
+        id: row.id,
+        group_id: row.group_id,
+        entity_type: row.entity_type,
+        entity_id: row.entity_id,
+        conflict_type: row.conflict_type,
+        local_payload: row.local_payload,
+        server_payload: row.server_payload,
+        ...(row.resolution_strategy ? { resolution_strategy: row.resolution_strategy } : {}),
+        ...(row.resolved_by ? { resolved_by: row.resolved_by } : {}),
+        ...(row.resolved_at ? { resolved_at: row.resolved_at } : {}),
+        ...(row.created_at ? { created_at: row.created_at } : {}),
+        ...(opClientId ? { sync_operation_id: opClientId } : {}),
+      });
+      break;
+    }
+
+    // Someone (usually this device, via resolveConflictThroughSync) resolved
+    // a conflict — mirror the resolution onto the local row we hold.
+    case 'sync.conflict.resolved': {
+      const parsed = SyncConflictSchema.safeParse(payload.conflict ?? payload);
+      if (!parsed.success) break;
+      const row = parsed.data;
+      const held = useSyncStore.getState().conflicts.find((c) => c.id === row.id);
+      if (!held || !row.resolution_strategy) break;
+      useSyncStore.getState().resolveConflict(
+        row.id,
+        row.resolution_strategy,
+        row.resolved_by ?? 'server',
+      );
       break;
     }
 

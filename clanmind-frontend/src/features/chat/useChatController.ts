@@ -16,6 +16,7 @@ import { useGroupStore } from '@/state/useGroupStore';
 import { useChatStore } from '@/state/useChatStore';
 import { useArtifactStore } from '@/state/useArtifactStore';
 import { useSyncStore } from '@/state/useSyncStore';
+import { enqueueSyncOperation } from '@/sync/outbox';
 import { getDemoRuntime } from '@/mocks/runtime';
 import { cancelRunLocally } from '@/realtime/dispatch';
 import type { AiRun, Message, MessageAttachment, MessageVisibility } from '@/types';
@@ -244,27 +245,37 @@ export function useChatController() {
       chat.clearComposerAttachments();
 
       if (offline) {
-        // §183 — queue with a local pending bubble; replay happens in P11.
+        // §183 — queue with a local pending bubble; the P11 outbox replays it
+        // in order on reconnect, reusing this EXACT client_operation_id.
         chat.addPendingMessage({
           clientMessageId: clientOperationId,
           body: newMsg.body,
           attachmentIds: newMsg.attachments.map((a) => a.id),
           createdAt: newMsg.created_at,
         });
-        useSyncStore.getState().addOperation({
+        // Payload mirrors the delivered-path POST body field-for-field so
+        // replay is byte-identical to a live send (D9 contract).
+        void enqueueSyncOperation({
           id: `op_${clientOperationId}`,
           client_operation_id: clientOperationId,
           group_id: newMsg.group_id,
+          operation_type: 'message.create',
           entity_type: 'message',
           entity_id: newMsg.id,
           action: 'CREATE',
-          payload: { body: newMsg.body, visibility: newMsg.visibility },
+          payload: {
+            project_id: newMsg.project_id ?? null,
+            body: newMsg.body,
+            reply_to_id: newMsg.reply_to_message_id ?? null,
+            visibility: newMsg.visibility,
+            recipient_id: newMsg.recipient_id ?? null,
+            attachment_ids: uploadedIds,
+          },
           status: 'PENDING',
           created_at: newMsg.created_at,
         });
         return;
       }
-
       // Delivered path — server persists first, echo arrives via socket
       // (deduped by id); the REST result reconciles the local copy.
       // Body mirrors handlers/messages.ts sendMessageBody exactly:

@@ -67,6 +67,7 @@ describe('P1 session lifecycle', () => {
       id: 'op_1',
       client_operation_id: 'op_1',
       group_id: 'g1',
+      operation_type: 'message.create',
       entity_type: 'message',
       entity_id: 'm1',
       action: 'CREATE',

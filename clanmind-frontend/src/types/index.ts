@@ -143,6 +143,13 @@ export type SyncOperationStatus = 'PENDING' | 'APPLIED' | 'REJECTED' | 'CONFLICT
 export type SyncConflictType = 'version_mismatch' | 'concurrent_edit' | 'deleted_upstream';
 export type SyncResolutionStrategy = 'server_wins' | 'client_wins' | 'merged' | 'manual';
 
+/**
+ * BE §20A `sync_operations.operation_type` — dotted write identities. The
+ * column is free-form text on the wire; these are the canonical values the
+ * offline queue produces today (§186A.2 "every offline-capable write").
+ */
+export type SyncOperationType = 'message.create' | 'task.update';
+
 export type PresenceState = 'ONLINE' | 'IDLE' | 'AWAY' | 'OFFLINE';
 
 export type MainNavSection =
@@ -745,28 +752,46 @@ export interface SyncCheckpoint {
   last_synced_at: string;
 }
 
+/**
+ * Local mirror of a BE §20A `sync_operations` row (§186A.2). The client
+ * persists these durably per account and replays them in creation order on
+ * reconnect, ALWAYS reusing the identical `client_operation_id` (§19
+ * idempotency — minting a new id would turn a retry into a duplicate write).
+ */
 export interface SyncOperation {
   id: string;
+  /** §19/§20A — the idempotency identity, stable across every retry. */
   client_operation_id: string;
   group_id: string;
+  /** BE §20A — dotted write identity ('message.create', 'task.update', …). */
+  operation_type: SyncOperationType | (string & {});
   entity_type: string;
   entity_id: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE';
   payload: Record<string, unknown>;
   status: SyncOperationStatus;
+  /** BE §20A — id of the resulting row (message/task/…) once applied. */
+  result_reference?: string | null;
   error_message?: string;
   created_at: string;
 }
 
+/**
+ * Local mirror of a BE §20A `sync_conflicts` row. `conflict_type` drives the
+ * §186A.3 card copy; resolution writes back through the SAME row (§186A.4).
+ */
 export interface SyncConflict {
   id: string;
   group_id: string;
   entity_type: string;
   entity_id: string;
   conflict_type: SyncConflictType;
-  client_payload: Record<string, unknown>;
+  local_payload: Record<string, unknown>;
   server_payload: Record<string, unknown>;
   resolution_strategy?: SyncResolutionStrategy;
   resolved_by?: string;
   resolved_at?: string;
+  /** The queued operation this conflict blocks (replays after resolution). */
+  sync_operation_id?: string;
+  created_at?: string;
 }

@@ -70,7 +70,7 @@ export function SyncConflictCard({ conflict, onResolve }: SyncConflictCardProps)
               className="overflow-x-auto p-2 rounded"
               style={{ background: 'var(--color-surface)', color: 'var(--color-text)' }}
             >
-              {JSON.stringify(conflict.client_payload, null, 2)}
+              {JSON.stringify(conflict.local_payload, null, 2)}
             </pre>
           </div>
           <div>

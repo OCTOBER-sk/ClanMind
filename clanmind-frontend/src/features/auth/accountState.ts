@@ -73,8 +73,9 @@ export function clearDomainStores(): void {
   });
 
   // Sync queue/checkpoint/conflicts belong to the account's data plane.
-  // The durable idb mirror arrives in P11; clearing here is the honest
-  // account-switch semantic until then.
+  // The durable IndexedDB mirror dies with the account DB below
+  // (wipeAccountDb); queued operations for the SAME account signing back in
+  // survive logout (FE §197) because that path never runs this wipe.
   useSyncStore.setState({
     status: 'connected',
     pendingOperationsCount: 0,

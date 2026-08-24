@@ -15,6 +15,8 @@ interface HubConnection {
   socket: RealtimeSocketLike;
   groups: Set<string>;
   open: boolean;
+  /** BE §18 — set when hello carried a prior checkpoint (a reconnect). */
+  resumedFrom?: { device_id: string; last_server_sequence: number };
 }
 
 export interface AiRunRequestMeta {
@@ -191,12 +193,24 @@ export class DemoRealtimeHub {
           event_type: 'connection.ready',
           payload: { ...this.versionMeta, protocol_version: Math.min(requestedProtocol, this.versionMeta.protocol_version) },
         });
+        // BE §18 — a hello carrying a prior checkpoint IS a reconnect; the
+        // room publishes the sync lifecycle event once the group room is
+        // joined (room.subscribe below — hello precedes subscribe).
+        const resumed = Number(frameData.last_server_sequence ?? 0);
+        const deviceId = typeof frameData.device_id === 'string' ? frameData.device_id : '';
+        if (resumed > 0 && deviceId) {
+          conn.resumedFrom = { device_id: deviceId, last_server_sequence: resumed };
+        }
         break;
       }
       case 'room.subscribe': {
         const groupId = String(frameData.group_id ?? '');
         if (groupId && conn.open) {
           conn.groups.add(groupId);
+          // Deferred reconnect announcement (§18 Sync taxonomy).
+          if (conn.resumedFrom) {
+            this.broadcast('sync.client.connected', groupId, conn.resumedFrom);
+          }
           this.broadcast('presence.updated', groupId, {
             state: 'ONLINE',
             viewers_online: 1 + (this.clients.size - 1),
@@ -218,6 +232,20 @@ export class DemoRealtimeHub {
         const ring = this.envelopeRingByGroup.get(groupId) ?? [];
         const events = ring.filter((e) => typeof e.sequence === 'number' && (e.sequence as number) >= from);
         this.deliverRaw(conn, JSON.stringify({ type: 'sync.events', from_sequence: from, events }));
+        break;
+      }
+      case 'sync.ack': {
+        // §20.2 tail — the client acknowledging an applied sequence closes
+        // its reconciliation cycle; the room publishes `reconciled` (§18).
+        const groupId = String(frameData.group_id ?? '');
+        const upTo = Number(frameData.up_to_sequence ?? 0);
+        if (!groupId || !Number.isFinite(upTo)) break;
+        this.broadcast('sync.client.reconciled', groupId, {
+          up_to_sequence: upTo,
+          ...(typeof frameData.client_operation_id === 'string'
+            ? { client_operation_id: frameData.client_operation_id }
+            : {}),
+        });
         break;
       }
       default:
