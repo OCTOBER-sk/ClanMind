@@ -227,15 +227,40 @@ export interface Project {
   updated_at: string;
 }
 
+/**
+ * §48 — composer chip upload lifecycle. Orthogonal to the nine-value
+ * FileSyncState transfer axis (§212): a chip is `uploaded` while its file may
+ * still be INDEXING for AI context (§127, "Preparing for Odin…").
+ */
+export type AttachmentUploadState =
+  | 'selected'
+  | 'uploading'
+  | 'uploaded'
+  | 'failed'
+  | 'cancelled';
+
 export interface Attachment {
   id: string;
   file_name: string;
   file_size: number;
   mime_type: string;
-  file_url: string;
+  /** Small local thumbnail source for images (§49); absent for other files. */
+  file_url?: string;
   sync_state: FileSyncState;
-  index_state: FileIndexState;
+  /** §127/§212 index axis — meaningful once the bytes have transferred. */
+  index_state?: FileIndexState;
   upload_progress?: number; // 0..100
+  /** §48 lifecycle driver for the composer chip rendering. */
+  upload_state: AttachmentUploadState;
+  /** BE §43 row id once the server has stored the object. */
+  server_attachment_id?: string;
+  /** §51 — failures stay visible with Retry/Remove; never silently dropped. */
+  error_message?: string;
+  /**
+   * Runtime-only source handle so §51 Retry can re-upload without re-picking.
+   * Deliberately not serializable and never sent anywhere by itself.
+   */
+  file?: File;
 }
 
 export interface Reaction {

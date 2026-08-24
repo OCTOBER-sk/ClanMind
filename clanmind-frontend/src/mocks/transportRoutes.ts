@@ -4,10 +4,15 @@
  * realistic latency and the BE §102 error envelope on unknown routes.
  */
 
-import type { Transport, TransportRequest, TransportResponse } from '@/api/transport';
+import type { Transport, TransportRequest, TransportResponse, TransportUploadRequest } from '@/api/transport';
 import type { DemoDataset } from './dataset';
 import type { Message } from '@/types';
 import { getDemoHub } from './wsHub';
+import {
+  ATTACHMENTS_PER_MESSAGE_MAX,
+  ATTACHMENT_MAX_BYTES,
+  SIGNED_URL_LIFETIME_SECONDS,
+} from '@/config/limits';
 
 type Handler = (
   params: Record<string, string>,
@@ -85,7 +90,7 @@ export function expireDemoSession(): void {
   sessionExpired = true;
 }
 
-function requireSession(req: TransportRequest): TransportResponse | null {
+function requireSession(req: Pick<TransportRequest, 'path'>): TransportResponse | null {
   if (!sessionExpired) return null;
   const path = req.path.split('?')[0]!.replace(/^\/api\/v1/, '');
   if (path.startsWith('/auth/')) return null;
@@ -195,6 +200,15 @@ export function createDemoTransport(ds: DemoDataset): Transport {
         deleted_at: null,
       };
       cursorBase.push(message as never);
+      // §122 — the message transaction inserts attachment links. The FE sends
+      // BE §43 row ids of uploaded chips; link them in the demo object store.
+      const attachmentIds = Array.isArray(body.attachment_ids)
+        ? (body.attachment_ids as string[])
+        : [];
+      for (const attachmentId of attachmentIds) {
+        const obj = demoObjects.get(attachmentId);
+        if (obj && !obj.messageId) obj.messageId = message.id;
+      }
       getDemoHub().messageCreated(message);
       await sleep(80);
       return ok(message, 201);
@@ -256,6 +270,34 @@ export function createDemoTransport(ds: DemoDataset): Transport {
         default_branch: 'main',
         last_synced_at: new Date(Date.now() - 15 * 60_000).toISOString(),
       })],
+
+    // ── Attachments (P4): BE §43 rows, §81 validation, §84 signing. ────────
+
+    // §84 — mint a short-lived signed URL after "authorization".
+    ['POST', '/attachments/:attachmentId/sign', (p) => {
+      if (!demoObjects.has(p.attachmentId)) return fail(404, 'NOT_FOUND', 'File not found.');
+      return ok({
+        attachment_id: p.attachmentId,
+        url: `/api/v1/attachments/${p.attachmentId}/download?token=${signDemoToken(p.attachmentId)}`,
+        expires_in_seconds: SIGNED_URL_LIFETIME_SECONDS,
+      });
+    }],
+
+    // Binary serving lands with the P6 file viewer; until then the demo
+    // answers with the object metadata it stores for the signed round-trip.
+    ['GET', '/attachments/:attachmentId/download', (p, req) => {
+      const token = new URLSearchParams(req.path.split('?')[1] ?? '').get('token');
+      if (!token || !verifyDemoToken(p.attachmentId, token)) {
+        return fail(403, 'FORBIDDEN', 'This link is invalid or has expired.');
+      }
+      const obj = demoObjects.get(p.attachmentId);
+      if (!obj) return fail(404, 'NOT_FOUND', 'File not found.');
+      return ok({
+        id: p.attachmentId,
+        mime_type: obj.contentType,
+        byte_size: obj.byteSize,
+      });
+    }],
   ];
 
   return {
@@ -279,7 +321,103 @@ export function createDemoTransport(ds: DemoDataset): Transport {
       }
       return fail(404, 'NOT_FOUND', `No demo handler for ${req.method} ${pathOnly}`);
     },
+
+    /**
+     * Multipart upload (BE §43/§104) — the only demo path needing the
+     * `upload` capability. Simulates §50-style progress ticks, enforces the
+     * §178 limits exactly like handlers/attachments.ts (mirroring its
+     * VALIDATION_FAILED messages), and stores the object for §84 signing.
+     *
+     * Deterministic failure injection for E2E (bible P4 exit): a filename
+     * starting with `fail` aborts mid-transfer with a BE §102 envelope.
+     */
+    async upload(req: TransportUploadRequest): Promise<TransportResponse> {
+      await sleep(60);
+
+      const gate = requireSession({ path: req.path });
+      if (gate) return gate;
+
+      const pathOnly = req.path.split('?')[0]!.replace(/^\/api\/v1/, '');
+      const params = matchPath('/groups/:groupId/attachments', pathOnly);
+      if (!params) return fail(404, 'NOT_FOUND', `No demo upload handler for ${req.path}`);
+
+      if (!ds.groups.some((g) => g.id === params.groupId)) {
+        return fail(404, 'NOT_FOUND', 'Group not found.');
+      }
+
+      const file = req.form.get('file');
+      if (!(file instanceof File)) {
+        return fail(400, 'VALIDATION_FAILED', "multipart 'file' field is required.");
+      }
+
+      // §178 limits — same messages as packages/domain validateUpload.
+      if (file.size > ATTACHMENT_MAX_BYTES) {
+        return fail(400, 'VALIDATION_FAILED', 'File exceeds the size limit.');
+      }
+      const messageId = (req.form.get('message_id') as string | null) ?? null;
+      const linkedCount = messageId
+        ? [...demoObjects.values()].filter((o) => o.messageId === messageId).length
+        : 0;
+      if (linkedCount >= ATTACHMENTS_PER_MESSAGE_MAX) {
+        return fail(400, 'VALIDATION_FAILED', 'Too many attachments for one message.');
+      }
+
+      // Progress ticks — ~450ms of realistic transfer before the row lands.
+      const steps = [0.06, 0.18, 0.34, 0.52, 0.71, 0.88, 1];
+      for (const fraction of steps) {
+        await sleep(file.name.startsWith('fail') ? 45 : 65);
+        if (req.signal?.aborted) return fail(499, 'CANCELLED', 'Upload cancelled.');
+        req.onProgress?.(fraction);
+        if (file.name.startsWith('fail') && fraction >= 0.52) {
+          // §51 exercise: storage-side failure AFTER bytes started moving.
+          return fail(500, 'INTERNAL', 'Simulated storage failure.');
+        }
+      }
+
+      const id = `att_${crypto.randomUUID()}`;
+      const projectId = (req.form.get('project_id') as string | null) ?? null;
+      const row = {
+        id,
+        group_id: params.groupId,
+        project_id: projectId,
+        owner_user_id: ds.currentUser.id,
+        object_ref: `groups/${params.groupId}/objects/${id}/1`,
+        object_storage: 'R2',
+        mime_type: file.type || 'application/octet-stream',
+        byte_size: file.size,
+        checksum: null,
+        original_name: file.name || 'unnamed',
+        status: 'SYNCED',
+        created_at: new Date().toISOString(),
+        deleted_at: null,
+      };
+      demoObjects.set(id, {
+        contentType: row.mime_type,
+        byteSize: row.byte_size,
+        messageId,
+      });
+      return ok(row, 201);
+    },
   };
+}
+
+/** Stored objects backing §84 sign/download round-trips in demo mode. */
+const demoObjects = new Map<string, { contentType: string; byteSize: number; messageId: string | null }>();
+
+/** Deterministic demo HMAC stand-in: token binds attachment id + expiry (§84 shape). */
+function signDemoToken(attachmentId: string): string {
+  const expiresAt = Date.now() + SIGNED_URL_LIFETIME_SECONDS * 1000;
+  return `demo.${attachmentId}.${expiresAt}`;
+}
+
+function verifyDemoToken(attachmentId: string, token: string): boolean {
+  const parts = token.split('.');
+  return (
+    parts.length === 3 &&
+    parts[0] === 'demo' &&
+    parts[1] === attachmentId &&
+    Number(parts[2]) > Date.now()
+  );
 }
 
 function sleep(ms: number): Promise<void> {

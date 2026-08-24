@@ -8,6 +8,8 @@ import {
   AtSign,
   WifiOff,
   CheckCircle2,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/design-system/utils';
 import { AttachmentTray } from './AttachmentTray';
@@ -31,8 +33,16 @@ export interface ComposerProps {
   onChangeText: (text: string) => void;
   onSend: () => void;
   attachments: Attachment[];
-  onAddAttachment: (attachment: Attachment) => void;
+  /**
+   * §47/§52/§53 — files enter via native picker, drag-drop or paste; the
+   * upload controller owns validation, progress and failure (FE §48–51).
+   */
+  onAddFiles: (files: File[]) => void;
   onRemoveAttachment: (id: string) => void;
+  /** §51 — retry a failed chip. */
+  onRetryAttachment?: (id: string) => void;
+  /** §50 — cancel an in-flight upload. */
+  onCancelAttachment?: (id: string) => void;
   replyTarget: { messageId: string; senderName: string; preview: string } | null;
   onClearReplyTarget: () => void;
   visibility: MessageVisibility;
@@ -61,17 +71,15 @@ export interface ComposerProps {
 const MENTION_PICKER_WIDTH = 288;
 const MENTION_PICKER_HEIGHT = 224;
 
-function makeAttachmentId(): string {
-  return `att_${Date.now()}_${typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
-}
-
 export function Composer({
   text,
   onChangeText,
   onSend,
   attachments,
-  onAddAttachment,
+  onAddFiles,
   onRemoveAttachment,
+  onRetryAttachment,
+  onCancelAttachment,
   replyTarget,
   onClearReplyTarget,
   visibility,
@@ -94,7 +102,9 @@ export function Composer({
   const [commandQuery, setCommandQuery] = useState('');
   /** §55 — a `/private` command is waiting for the recipient choice. */
   const [awaitingRecipient, setAwaitingRecipient] = useState(false);
+  /** §52 — drag depth counter so child enter/leave doesn't flicker the overlay. */
   const [isDragOver, setIsDragOver] = useState(false);
+  const dragDepthRef = useRef(0);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -158,6 +168,21 @@ export function Composer({
     if (!textarea) return;
     caretPosRef.current = textarea.selectionStart ?? 0;
   };
+
+  // §45/§58 — send enabled only with content AND an intact private selection.
+  // §48/§50/§51 — sending also waits until every chip resolves so uploads are
+  // never silently dropped. Offline is the exception: §183 keeps `selected`
+  // chips queued WITH their message until replay (P11).
+  const hasUploadInFlight = attachments.some((a) =>
+    isOffline ? a.upload_state === 'uploading' : a.upload_state === 'uploading' || a.upload_state === 'selected',
+  );
+  const hasFailedUpload = attachments.some((a) => a.upload_state === 'failed');
+  const canSend =
+    (text.trim().length > 0 || attachments.length > 0) &&
+    !isSending &&
+    !privateSendBlocked &&
+    !hasUploadInFlight &&
+    !hasFailedUpload;
 
   // §44 / §63: Enter send, Shift+Enter newline; ↑↓ Enter Esc in pickers
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -229,7 +254,7 @@ export function Composer({
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if ((text.trim() || attachments.length > 0) && !isSending && !privateSendBlocked) {
+      if (canSend) {
         onSend();
         setShowMentions(false);
         setShowCommands(false);
@@ -317,18 +342,10 @@ export function Composer({
   }, []);
 
   const addFiles = (files: FileList | File[]) => {
-    Array.from(files).forEach((file) => {
-      const attachment: Attachment = {
-        id: makeAttachmentId(),
-        file_name: file.name,
-        file_size: file.size,
-        mime_type: file.type || 'application/octet-stream',
-        file_url: URL.createObjectURL(file),
-        sync_state: 'QUEUED',
-        index_state: 'INDEXING',
-      };
-      onAddAttachment(attachment);
-    });
+    if (files.length === 0) return;
+    // §47/§52/§53 — the upload controller (validation, progress, failure)
+    // lives in the feature layer; the composer only routes file entry.
+    onAddFiles(Array.from(files));
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -337,7 +354,35 @@ export function Composer({
     e.target.value = '';
   };
 
-  // §53: paste — image/copied file → attachment, text → text. Never auto-send.
+  /** §52 — only real file drags show the overlay; text/URL drags do not. */
+  const hasFiles = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer?.types ?? []).includes('Files');
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!hasFiles(e)) return;
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files);
+    }
+  };
+
+  // §53: paste — image/copied file → attachment, text and URLs → text.
+  // Never auto-sends; the pasted content waits in the composer.
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     if (e.clipboardData.files.length > 0) {
       e.preventDefault();
@@ -345,26 +390,17 @@ export function Composer({
     }
   };
 
-  // §45/§58 — send enabled only with content AND an intact private selection.
-  const canSend =
-    (text.trim().length > 0 || attachments.length > 0) && !isSending && !privateSendBlocked;
-
   const recipientLabel = visibility === 'PRIVATE_AI' ? aiName : privateRecipientName || '';
 
   return (
     <div
+      onDragEnter={handleDragEnter}
       onDragOver={(e) => {
+        if (!hasFiles(e)) return;
         e.preventDefault();
-        setIsDragOver(true);
       }}
-      onDragLeave={() => setIsDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setIsDragOver(false);
-        if (e.dataTransfer.files.length > 0) {
-          addFiles(e.dataTransfer.files);
-        }
-      }}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       className={cn(
         'relative border rounded-xl transition-all shadow-[var(--shadow-sm)] mx-4 mb-4',
         isDragOver
@@ -484,8 +520,13 @@ export function Composer({
         </div>
       )}
 
-      {/* §48 Attachment Chips */}
-      <AttachmentTray attachments={attachments} onRemove={onRemoveAttachment} />
+      {/* §48 chips — states, progress, retry/remove (§49–51) */}
+      <AttachmentTray
+        attachments={attachments}
+        onRemove={onRemoveAttachment}
+        onRetry={onRetryAttachment}
+        onCancel={onCancelAttachment}
+      />
 
       {/* §7/§218: accessible textarea + status live region */}
       <textarea
@@ -585,6 +626,28 @@ export function Composer({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* §48/§50/§51 — why send is waiting on attachment chips */}
+          {hasUploadInFlight && (
+            <span
+              data-testid="upload-send-hint"
+              className="inline-flex items-center gap-1 text-[10px] font-medium"
+              style={{ color: 'var(--color-info)' }}
+            >
+              <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+              Finishing upload…
+            </span>
+          )}
+          {!hasUploadInFlight && hasFailedUpload && (
+            <span
+              data-testid="failed-upload-hint"
+              className="inline-flex items-center gap-1 text-[10px] font-medium"
+              style={{ color: 'var(--color-danger)' }}
+            >
+              <AlertCircle className="w-3 h-3" aria-hidden="true" />
+              Resolve the failed file first
+            </span>
+          )}
+
           {/* §183 offline composer status */}
           {isOffline && (
             <span
@@ -614,7 +677,11 @@ export function Composer({
             title={
               privateSendBlocked
                 ? 'Choose a valid private recipient before sending'
-                : undefined
+                : hasUploadInFlight
+                  ? 'Finishing upload…'
+                  : hasFailedUpload
+                    ? 'Resolve the failed file first'
+                    : undefined
             }
             className={cn(
               'inline-flex items-center justify-center p-2 rounded-lg transition-all select-none',
@@ -634,6 +701,8 @@ export function Composer({
         {isSending ? 'Sending message' : ''}
         {isOffline ? 'You are offline. Messages will queue.' : ''}
         {privateSendBlocked ? 'Private mode needs a valid recipient. Sending is disabled.' : ''}
+        {hasUploadInFlight ? 'Uploading files. Send waits until uploads finish.' : ''}
+        {hasFailedUpload ? 'A file failed to upload. Retry or remove it to send.' : ''}
       </span>
     </div>
   );

@@ -11,7 +11,14 @@
  */
 
 import { z } from 'zod';
-import { getActiveTransport, createFetchTransport, TimeoutError, type Transport, type TransportRequest } from './transport';
+import {
+  getActiveTransport,
+  createFetchTransport,
+  TimeoutError,
+  type Transport,
+  type TransportRequest,
+  type TransportUploadRequest,
+} from './transport';
 import { ApiError, NetworkError, isTransientFailure } from './errors';
 import { ErrorEnvelopeSchema } from './schemas';
 
@@ -163,6 +170,67 @@ export async function request<T = unknown>(
   }
 }
 
+export interface UploadOptions<TSchema extends z.ZodTypeAny = z.ZodTypeAny> {
+  form: FormData;
+  signal?: AbortSignal;
+  /** 0..100 — surfaced straight from transport progress events. */
+  onProgress?: (percent: number) => void;
+  idempotencyKey?: string;
+  /** When provided, a successful response body is runtime-validated into T. */
+  schema?: TSchema;
+}
+
+/**
+ * Multipart upload path (attachments, BE §43/§104). Never retried
+ * automatically: bytes-in-flight belong to the caller, who decides between
+ * §51 Retry and Remove. Cancellation (AbortedError) propagates untouched.
+ */
+export async function requestUpload<T = unknown>(
+  path: string,
+  opts: UploadOptions,
+): Promise<T> {
+  const active = getActiveTransport(transport ?? createFetchTransport({ baseUrl: '/', getToken: tokenProvider }));
+  if (typeof active.upload !== 'function') {
+    throw new ApiError({
+      code: 'INTERNAL',
+      message: 'Active transport does not support multipart uploads.',
+      status: 0,
+    });
+  }
+
+  const res = await active.upload({
+    path,
+    form: opts.form,
+    signal: opts.signal,
+    idempotencyKey: opts.idempotencyKey ?? `op_${crypto.randomUUID()}`,
+    onProgress: opts.onProgress ? (fraction) => opts.onProgress?.(Math.round(fraction * 100)) : undefined,
+  } satisfies TransportUploadRequest);
+
+  if (!res.ok) {
+    const apiErr = extractApiError(res.status, res.json);
+    if (apiErr.status === 401 && !path.startsWith('/auth/')) {
+      unauthorizedHandler?.(apiErr);
+    }
+    throw apiErr;
+  }
+
+  if (opts.schema) {
+    const parsed = opts.schema.safeParse(res.json);
+    if (!parsed.success) {
+      throw new ApiError({
+        code: 'CONTRACT_VIOLATION',
+        message: `Upload response failed schema validation: ${parsed.error.issues
+          .map((i) => `${i.path.join('.')}: ${i.message}`)
+          .join('; ')}`,
+        status: res.status,
+        details: parsed.error,
+      });
+    }
+    return parsed.data as T;
+  }
+  return res.json as T;
+}
+
 export const api = {
   get: <T>(path: string, opts?: RequestOptions) => request<T>(path, { ...opts, method: 'GET' }),
   post: <T>(path: string, body?: unknown, opts?: RequestOptions & { schema?: z.ZodType<T> }) =>
@@ -186,4 +254,7 @@ export const api = {
       method: 'DELETE',
       idempotencyKey: opts?.idempotencyKey ?? `op_${crypto.randomUUID()}`,
     }),
+  /** Multipart upload with progress (attachments, BE §43). */
+  upload: <T>(path: string, opts: UploadOptions & { schema?: z.ZodType<T> }) =>
+    requestUpload<T>(path, opts),
 };

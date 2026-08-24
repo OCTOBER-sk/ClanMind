@@ -6,9 +6,10 @@ import { Avatar } from '@/design-system/components/Avatar';
 import { MessageActions } from './MessageActions';
 import { AiToolTimeline } from '@/features/ai/AiToolTimeline';
 import { AiQuotaCard } from '@/features/ai/AiQuotaCard';
-import { Pin, Reply, Check, Copy, Sparkles, Clock, RotateCcw, Globe } from 'lucide-react';
+import { Pin, Reply, Check, Copy, Sparkles, Clock, RotateCcw, Globe, FileText } from 'lucide-react';
 import { Button } from '@/design-system/components/Button';
 import { copyToClipboard } from '@/tauri/bridge';
+import { formatBytes } from '@/config/limits';
 import type { Message, AiRun, GroupRole } from '@/types';
 
 export interface MessageRowProps {
@@ -369,6 +370,52 @@ function MessageRowInner({
           </div>
         )}
 
+        {/* §23/§49 — attachments: compact chips, never huge cards.
+            Own uploads keep their local thumbnail URL; received files show
+            a typed glyph until the §84 signed-URL viewer lands (P6). */}
+        {message.attachments.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {message.attachments.map((file) => (
+              <span
+                key={file.id}
+                className="inline-flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 max-w-[220px]"
+                style={{
+                  borderColor: 'var(--color-border)',
+                  background: 'var(--color-surface)',
+                }}
+                title={`${file.file_name} · ${formatBytes(file.file_size)}`}
+              >
+                {file.file_url && file.mime_type.startsWith('image/') ? (
+                  <img
+                    src={file.file_url}
+                    alt=""
+                    className="h-6 w-6 rounded object-cover shrink-0"
+                    loading="lazy"
+                  />
+                ) : (
+                  <FileText
+                    className="h-3 w-3 shrink-0"
+                    style={{ color: 'var(--color-text-tertiary)' }}
+                    aria-hidden="true"
+                  />
+                )}
+                <span
+                  className="truncate text-[10px] font-medium"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  {file.file_name}
+                </span>
+                <span
+                  className="shrink-0 text-[10px]"
+                  style={{ color: 'var(--color-text-tertiary)' }}
+                >
+                  {formatBytes(file.file_size)}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* ── AI metadata (§133, §141, §142, §143) ── */}
         {isAi && aiRun && !isStreaming && (
           <div className="mt-2 space-y-1.5">
@@ -479,6 +526,7 @@ export const MessageRow = React.memo(
     prev.message.id === next.message.id &&
     prev.message.body === next.message.body &&
     prev.message.reactions === next.message.reactions &&
+    prev.message.attachments === next.message.attachments &&
     prev.message.pinned === next.message.pinned &&
     prev.message.edited === next.message.edited &&
     prev.message.deleted === next.message.deleted &&

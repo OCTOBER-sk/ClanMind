@@ -105,8 +105,8 @@ export class NetworkError extends Error {
 
 /** The request was aborted by the caller (user cancel / timeout). Never retried. */
 export class AbortedError extends Error {
-  constructor() {
-    super('Request aborted');
+  constructor(message = 'Request aborted') {
+    super(message);
     this.name = 'AbortedError';
   }
 }

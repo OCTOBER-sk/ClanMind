@@ -201,3 +201,41 @@ Related open items observed during this pass (backend stream):
   notify-stubs; live store projections for Tasks/Decisions/GitHub remain
   phase P7/P8 work (vocabulary itself is consumed by the shared dispatch's
   unknown-type tolerance).
+
+---
+
+## 2026-08-24 — P4 uploads & attachments (FE §47–§53; BE §43/§81–84/§127)
+
+### D16 — Attachment wiring: upload is live-ready; message↔attachment LINK has a backend gap
+FE now uploads through the REAL Worker contract: `POST
+/api/v1/groups/:groupId/attachments` (multipart field `file`, optional
+`project_id`), response validated against the exact §43 row
+(`AttachmentRowSchema`; worker answers `status:"SYNCED"`). Transport gained an
+optional `upload()` capability (XHR — the only browser API with upload
+progress) with BE §19 Idempotency-Key + X-Request-Id headers, no timeout, and
+abort → `AbortedError`. Demo `transportRoutes.upload()` reproduces the same
+route incl. §178 limits with handlers' own VALIDATION_FAILED messages,
+§50-style progress ticks, and a deterministic failure injection (filename
+starting with `fail`) for E2E per bible P4 exit. §84 sign + download demo
+routes exist (`demo.<id>.<expiry>` token stand-in); binary byte-serving lands
+with the P6 viewer.
+
+Two contract gaps recorded for the backend stream — nothing papered over:
+1. **Linking.** The Worker only inserts `message_attachments` when
+   `message_id` rides the UPLOAD form; but a composer cannot know the server
+   message id before `POST /messages`. The FE therefore sends
+   `attachment_ids: [§43 ids…]` in the message POST body (BE §122 puts link
+   inserts inside the message transaction, so this matches the spec's intent).
+   Today's Worker zod strips unknown body keys silently → live sends store
+   objects WITHOUT links until the backend accepts `attachment_ids` (or offers
+   a link endpoint). Demo implements §122 fully (links on message POST).
+2. **Index axis.** BE §127 INDEXING/READY/FAILED/STALE/DELETED is not exposed
+   by any endpoint/event yet. Live chips therefore hold `index_state:
+   INDEXING` after transfer ("Uploaded · Preparing for Odin…", FE §50) and
+   never fake READY; demo flips to READY deterministically behind the runtime
+   seam. When the backend exposes the axis (event or GET), the chip consumes
+   it verbatim.
+
+Client pre-flight limits mirror BE §178 from one config site
+(`src/config/limits.ts`: 25 MB/file, 10/message) and exist for UX rejection
+only (§236 toast, never silent); the server remains authoritative.

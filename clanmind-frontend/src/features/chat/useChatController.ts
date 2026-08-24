@@ -17,7 +17,7 @@ import { useChatStore } from '@/state/useChatStore';
 import { useArtifactStore } from '@/state/useArtifactStore';
 import { useSyncStore } from '@/state/useSyncStore';
 import { getDemoRuntime } from '@/mocks/runtime';
-import type { AiRun, Message } from '@/types';
+import type { AiRun, Message, MessageAttachment } from '@/types';
 
 function targetsAi(text: string): boolean {
   const t = text.toLowerCase();
@@ -58,6 +58,18 @@ export function useChatController() {
       if (!user || !activeGroup) return;
       if (!chat.composerText.trim() && chat.composerAttachments.length === 0) return;
 
+      // §48/§50/§51 — never let a message silently lose an in-flight or failed
+      // upload. The composer UI gates Send; this is the controller-side twin.
+      // §183 exception: offline `selected` chips ride the queued message (P11).
+      const offlineNow = syncStatus === 'offline' || syncStatus === 'reconnecting';
+      const unsettled = chat.composerAttachments.some((a) =>
+        offlineNow
+          ? a.upload_state === 'uploading'
+          : a.upload_state === 'uploading' || a.upload_state === 'selected',
+      );
+      const failedUpload = chat.composerAttachments.some((a) => a.upload_state === 'failed');
+      if (unsettled || failedUpload) return;
+
       // §58 — a private send requires an intact recipient selection. A
       // stale/cleared selection must NEVER degrade into a public send.
       const { members } = useGroupStore.getState();
@@ -77,6 +89,23 @@ export function useChatController() {
 
       const offline = syncStatus === 'offline' || syncStatus === 'reconnecting';
 
+      // Chips → message attachments. Uploaded chips carry their BE §43 server
+      // id so the backend can insert §122 `message_attachments` links.
+      const sentAttachments: MessageAttachment[] = chat.composerAttachments.map((a) => ({
+        id: a.id,
+        file_name: a.file_name,
+        file_size: a.file_size,
+        mime_type: a.mime_type,
+        ...(a.file_url ? { file_url: a.file_url } : {}),
+        sync_state: a.sync_state === 'SYNCED' ? 'SYNCED' : 'QUEUED',
+        ...(a.index_state ? { index_state: a.index_state } : {}),
+        upload_state: a.upload_state,
+        ...(a.server_attachment_id ? { server_attachment_id: a.server_attachment_id } : {}),
+      }));
+      const uploadedIds = chat.composerAttachments
+        .map((a) => a.server_attachment_id)
+        .filter((id): id is string => Boolean(id));
+
       const newMsg: Message = {
         id: messageId,
         client_message_id: clientOperationId,
@@ -93,7 +122,7 @@ export function useChatController() {
         pinned: false,
         edited: false,
         deleted: false,
-        attachments: [...chat.composerAttachments],
+        attachments: sentAttachments,
         reactions: [],
         is_pending: offline,
         is_failed: false,
@@ -104,6 +133,7 @@ export function useChatController() {
       chat.addMessage(newMsg);
       chat.setComposerText('');
       chat.setReplyTarget(null);
+      chat.clearComposerAttachments();
 
       if (offline) {
         // §183 — queue with a local pending bubble; replay happens in P11.
@@ -132,6 +162,9 @@ export function useChatController() {
       // Body mirrors handlers/messages.ts sendMessageBody exactly:
       // private scope rides `private_to` ("ai" | teammate id, §2.4), replies
       // use `reply_to_id`; mention tokens are resolved server-side.
+      // `attachment_ids` carries BE §43 row ids for the §122 transactional
+      // `message_attachments` insert — see INTEGRATION_NOTES D16 for the
+      // live-backend gap (accepted by demo; stripped by today's Worker zod).
       const isPrivateAi = newMsg.visibility === 'PRIVATE_AI';
       const isPrivatePair = newMsg.visibility === 'PRIVATE_PAIR';
       void api
@@ -140,6 +173,7 @@ export function useChatController() {
           client_message_id: clientOperationId,
           body: newMsg.body,
           reply_to_id: newMsg.reply_to_message_id ?? null,
+          ...(uploadedIds.length > 0 ? { attachment_ids: uploadedIds } : {}),
           ...(isPrivateAi ? { private_to: 'ai' as const } : {}),
           ...(isPrivatePair && newMsg.recipient_id ? { private_to: newMsg.recipient_id } : {}),
         })

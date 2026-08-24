@@ -1,11 +1,14 @@
 /**
  * Transport layer — the ONLY place raw network I/O happens for REST.
  *
- * The default transport is `fetch`. In demo mode (VITE_DEMO_MODE=1) a
+ * The default transport is `fetch` (JSON) + XHR (multipart uploads, the only
+ * browser API with upload progress). In demo mode (VITE_DEMO_MODE=1) a
  * deterministic in-process transport override is installed (src/mocks) that
  * implements the same backend contracts, so the entire app runs end-to-end
  * without a live deployment and production bundles contain zero mock code.
  */
+
+import { AbortedError, NetworkError } from './errors';
 
 export interface TransportRequest {
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
@@ -25,8 +28,30 @@ export interface TransportResponse {
   json: unknown;
 }
 
+/**
+ * Multipart binary upload (attachments, BE §43/§104) with progress + abort.
+ * A separate capability from `send` because browsers only expose UPLOAD
+ * progress through XHR — fetch cannot report bytes sent. No timeout applies:
+ * large transfers must not be killed mid-flight; cancellation is explicit.
+ */
+export interface TransportUploadRequest {
+  path: string;
+  form: FormData;
+  /** 0..1, driven by XHR upload progress events. */
+  onProgress?: (fraction: number) => void;
+  signal?: AbortSignal;
+  /** BE §19 — uploads are state-changing and carry the identity too. */
+  idempotencyKey?: string;
+}
+
 export interface Transport {
   send(req: TransportRequest): Promise<TransportResponse>;
+  /**
+   * Optional capability — implemented by the fetch transport (live) and the
+   * demo transport alike. Callers go through `api.upload` which throws a
+   * typed error when a custom transport lacks it.
+   */
+  upload?(req: TransportUploadRequest): Promise<TransportResponse>;
 }
 
 /** Our own timeout fired; classified as transient (BE §121). */
@@ -113,5 +138,90 @@ export function createFetchTransport(opts: FetchTransportOptions): Transport {
         req.signal?.removeEventListener('abort', onExternalAbort);
       }
     },
+
+    async upload(req: TransportUploadRequest): Promise<TransportResponse> {
+      const url = new URL(`${opts.baseUrl}${req.path}`, window.location.origin);
+      const headers: Record<string, string> = {};
+      const token = await opts.getToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (req.idempotencyKey) {
+        headers['Idempotency-Key'] = req.idempotencyKey;
+        headers['X-Client-Operation-Id'] = req.idempotencyKey;
+      }
+      // Correlation id per BE §101.
+      headers['X-Request-Id'] = `req_${crypto.randomUUID()}`;
+      return xhrUpload(url.toString(), req, headers);
+    },
   };
+}
+
+/**
+ * Pure response shaping for XHR uploads so the mapping is unit-testable
+ * without a real network stack.
+ */
+export function parseUploadResponse(status: number, responseText: string | null): TransportResponse {
+  let json: unknown = null;
+  if (responseText) {
+    try {
+      json = JSON.parse(responseText) as unknown;
+    } catch {
+      json = null;
+    }
+  }
+  return { status, ok: status >= 200 && status < 300, json };
+}
+
+/**
+ * Browser upload progress requires XMLHttpRequest (fetch cannot report bytes
+ * sent). Abort maps to `AbortedError` — caller-requested cancellation is never
+ * retried or surfaced as a failure (§48 cancelled state).
+ */
+export function xhrUpload(
+  url: string,
+  req: TransportUploadRequest,
+  headers: Record<string, string>,
+): Promise<TransportResponse> {
+  return new Promise<TransportResponse>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    for (const [name, value] of Object.entries(headers)) {
+      // Let the browser set Content-Type — it owns the multipart boundary.
+      if (name.toLowerCase() !== 'content-type') xhr.setRequestHeader(name, value);
+    }
+
+    let settled = false;
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      xhr.abort();
+      req.signal?.removeEventListener('abort', onAbort);
+      reject(new AbortedError('Upload cancelled'));
+    };
+
+    xhr.upload.onprogress = (e: ProgressEvent) => {
+      if (e.lengthComputable && e.total > 0) req.onProgress?.(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      if (settled) return;
+      settled = true;
+      req.signal?.removeEventListener('abort', onAbort);
+      resolve(parseUploadResponse(xhr.status, xhr.responseText));
+    };
+    xhr.onerror = () => {
+      if (settled) return;
+      settled = true;
+      req.signal?.removeEventListener('abort', onAbort);
+      reject(new NetworkError(new Error('Upload failed — the network connection was interrupted.')));
+    };
+    xhr.onabort = () => {
+      if (!settled) {
+        settled = true;
+        req.signal?.removeEventListener('abort', onAbort);
+        reject(new AbortedError('Upload cancelled'));
+      }
+    };
+
+    req.signal?.addEventListener('abort', onAbort, { once: true });
+    xhr.send(req.form);
+  });
 }

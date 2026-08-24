@@ -8,6 +8,7 @@ import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog';
 import { MessageList } from '@/features/chat/MessageList';
 import { Composer } from '@/features/chat/Composer';
 import { useChatController } from '@/features/chat/useChatController';
+import { useAttachmentUploads } from '@/features/chat/useAttachmentUploads';
 import { useChatMessages } from '@/features/chat/useChatMessages';
 import {
   mergeMessages,
@@ -93,8 +94,6 @@ export function AppShell() {
     deleteMessage,
     addReaction,
     setReplyTarget,
-    addComposerAttachment,
-    removeComposerAttachment,
     setVisibility,
     setProjectFilterId,
     saveDraft,
@@ -270,6 +269,8 @@ export function AppShell() {
   const { sendMessage, retryMessage, sendThreadReply } = useChatController();
   const handleSendMessage = useCallback(() => sendMessage(), [sendMessage]);
   const handleRetryMessage = retryMessage;
+  /** P4 §47–§53 — upload lifecycle controller for composer chips. */
+  const attachmentUploads = useAttachmentUploads();
   const handleSendThreadReply = useCallback(
     (rootId: string, body: string) => sendThreadReply(rootId, body),
     [sendThreadReply],
@@ -1017,8 +1018,10 @@ export function AppShell() {
                   onChangeText={setComposerText}
                   onSend={() => handleSendMessage()}
                   attachments={composerAttachments}
-                  onAddAttachment={addComposerAttachment}
-                  onRemoveAttachment={removeComposerAttachment}
+                  onAddFiles={attachmentUploads.addFiles}
+                  onRemoveAttachment={attachmentUploads.removeAttachment}
+                  onRetryAttachment={attachmentUploads.retryAttachment}
+                  onCancelAttachment={attachmentUploads.cancelAttachment}
                   replyTarget={replyTarget}
                   onClearReplyTarget={() => setReplyTarget(null)}
                   visibility={visibility}

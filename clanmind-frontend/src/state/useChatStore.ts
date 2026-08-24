@@ -45,6 +45,10 @@ export interface ChatState {
   ) => void;
   addComposerAttachment: (attachment: MessageAttachment) => void;
   removeComposerAttachment: (attachmentId: string) => void;
+  /** §48 — patch one chip's upload lifecycle (progress, state, server id). */
+  updateComposerAttachment: (attachmentId: string, patch: Partial<MessageAttachment>) => void;
+  /** Clear the whole tray after a send (chips become message attachments). */
+  clearComposerAttachments: () => void;
   addMessage: (message: Message) => void;
   updateMessage: (id: string, updates: Partial<Message>) => void;
   deleteMessage: (id: string) => void;
@@ -102,6 +106,13 @@ export const useChatStore = create<ChatState>()(
         (a) => a.id !== attachmentId
       ),
     })),
+  updateComposerAttachment: (attachmentId, patch) =>
+    set((state) => ({
+      composerAttachments: state.composerAttachments.map((a) =>
+        a.id === attachmentId ? { ...a, ...patch } : a
+      ),
+    })),
+  clearComposerAttachments: () => set({ composerAttachments: [] }),
   addMessage: (message) =>
     set((state) => ({
       messages: [...state.messages, message],

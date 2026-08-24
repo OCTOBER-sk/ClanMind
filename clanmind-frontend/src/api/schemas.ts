@@ -95,18 +95,30 @@ export const ProjectSchema = z
 
 // ─── Messages (BE §11/§39) ──────────────────────────────────────────────────
 
-export const AttachmentSchema = z
+/**
+ * BE §43 `attachments` wire row — the exact shape the Worker returns from
+ * POST /groups/:groupId/attachments (status "SYNCED" on insert today; the
+ * §127 index axis rides separately once the backend exposes it).
+ */
+export const AttachmentRowSchema = z
   .object({
     id: IdSchema,
-    file_name: z.string(),
-    byte_size: z.number(),
-    mime_type: z.string(),
+    group_id: IdSchema,
+    project_id: z.string().nullish(),
+    owner_user_id: IdSchema,
     object_ref: z.string(),
+    object_storage: z.string(),
+    mime_type: z.string(),
+    byte_size: z.number().int().nonnegative(),
+    checksum: z.string().nullish(),
+    original_name: z.string(),
     status: z.string(),
-    sync_state: z.string().optional(),
-    index_state: z.string().optional(),
+    created_at: IsoDateSchema,
+    deleted_at: z.string().nullish(),
   })
   .passthrough();
+
+export type AttachmentRow = z.infer<typeof AttachmentRowSchema>;
 
 export const ReactionSchema = z
   .object({
