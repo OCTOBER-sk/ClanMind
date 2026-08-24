@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MessageRow } from './MessageRow';
 import { ChatHeader } from './ChatHeader';
+import { AiStreamAnnouncer } from '@/features/ai/AiStreamAnnouncer';
 import { ArrowDown, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/design-system/utils';
 import { Button } from '@/design-system/components/Button';
@@ -38,6 +39,8 @@ export interface MessageListProps {
   onOpenSearch?: () => void;
   onStartMeeting?: () => void;
   onRetry?: (messageId: string) => void;
+  /** §138/§139 — Retry / Regenerate an AI response as a NEW run */
+  onRegenerate?: (messageId: string) => void;
   canModerate?: boolean;
   /** §141 — role drives whether the quota card offers "Open AI settings" */
   userRole?: GroupRole;
@@ -88,6 +91,7 @@ export function MessageList({
   onOpenSearch,
   onStartMeeting,
   onRetry,
+  onRegenerate,
   canModerate = false,
   userRole = 'MEMBER',
   onOpenSettings,
@@ -257,6 +261,29 @@ export function MessageList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalSize]);
 
+  // ── §136 Auto-Scroll During AI ────────────────────────────────────────────
+  // While Odin streams, the ACTIVE message grows without changing the list
+  // count. Follow it ONLY while the user is near the bottom: the instant they
+  // scroll away the viewport stops moving (§325 #6 — never move scroll while
+  // reading), `Jump to latest` appears, and following resumes automatically
+  // when they return to the bottom.
+  const streamingIds = useMemo(() => new Set(streamingMessageIds), [streamingMessageIds]);
+  const hasActiveStream = streamingIds.size > 0 || aiWorking;
+  useEffect(() => {
+    if (!hasActiveStream) return;
+    let raf = 0;
+    const step = () => {
+      const el = containerRef.current;
+      // checkIfNearBottom reads live layout each frame: user intent wins.
+      if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 120) {
+        el.scrollTop = el.scrollHeight; // instant — no smooth lag mid-stream
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [hasActiveStream]);
+
   const renderTypingText = () => {
     if (typingUsers.length === 0) return null;
     const names = typingUsers.map((u) => (typeof u === 'string' ? u : u.user_name));
@@ -265,12 +292,13 @@ export function MessageList({
     return 'Several teammates are typing…';
   };
 
-  const streamingIds = useMemo(() => new Set(streamingMessageIds), [streamingMessageIds]);
-
   // §39: draw the unread divider after the last-read message
   const unreadDividerIndex = lastReadMessageId
     ? messages.findIndex((m) => m.id === lastReadMessageId) + 1
     : -1;
+
+  /** §218 announcer mounts only while AI runs are in flight or settling. */
+  const aiRunCount = Object.keys(aiRunsByMessage).length;
 
   const renderRow = (message: Message, index: number) => {
     const prevMessage = index > 0 ? messages[index - 1] : undefined;
@@ -305,6 +333,7 @@ export function MessageList({
           aiName={aiName}
           isStreaming={streamingIds.has(message.id)}
           onRetry={onRetry}
+          onRegenerate={onRegenerate}
           canModerate={canModerate}
           userRole={userRole}
           onOpenSettings={onOpenSettings}
@@ -326,6 +355,10 @@ export function MessageList({
 
   return (
     <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
+      {/* §218 — lifecycle-only announcements (started/completed/failed);
+          mounted only while AI runs exist so the live region isn't noise */}
+      {aiRunCount > 0 && <AiStreamAnnouncer aiName={aiName} runsByMessage={aiRunsByMessage} />}
+
       <ChatHeader
         groupName={groupName}
         aiName={aiName}

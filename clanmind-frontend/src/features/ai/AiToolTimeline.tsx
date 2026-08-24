@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -23,11 +23,22 @@ export function AiToolTimeline({
   onDenyTool,
 }: AiToolTimelineProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  /** Once the user toggles manually, auto-collapse stands down (§325 #8). */
+  const userToggledRef = useRef(false);
+
+  const completedCount = (toolCalls ?? []).filter((t) => t.status === 'SUCCEEDED').length;
+  const isAllDone =
+    (toolCalls ?? []).length > 0 &&
+    completedCount === toolCalls.length &&
+    toolCalls.every((t) => t.status !== 'EXECUTING' && t.status !== 'PENDING');
+
+  // §133 — "Collapse automatically after completion": the live activity card
+  // folds itself away when the run settles, unless the user took control.
+  useEffect(() => {
+    if (isAllDone && !userToggledRef.current) setIsExpanded(false);
+  }, [isAllDone]);
 
   if (!toolCalls || toolCalls.length === 0) return null;
-
-  const completedCount = toolCalls.filter((t) => t.status === 'SUCCEEDED').length;
-  const isAllDone = completedCount === toolCalls.length;
 
   const renderStatusIcon = (status: AiToolCallStatus) => {
     switch (status) {
@@ -50,7 +61,10 @@ export function AiToolTimeline({
     <div className="my-2 rounded-lg border border-[var(--color-border)] bg-gray-50/70 dark:bg-gray-900/60 overflow-hidden text-xs">
       {/* Collapsible Header */}
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => {
+          userToggledRef.current = true;
+          setIsExpanded(!isExpanded);
+        }}
         className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-gray-100/60 dark:hover:bg-gray-800/40 transition-colors cursor-pointer select-none"
       >
         <div className="flex items-center gap-2 font-semibold text-[var(--color-text-secondary)] text-[11px]">

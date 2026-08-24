@@ -8,6 +8,11 @@ import type { RealtimeSocketLike } from '@/realtime/connection';
 
 export interface DemoAiRunOptions {
   messageId: string;
+  /**
+   * Run id minted by the caller so cancel-by-id (§137 REST mirror) and
+   * shell.ai_run_id stay consistent with the emitted event stream.
+   */
+  runId?: string;
   groupId: string;
   projectId?: string | null;
   prompt: string;

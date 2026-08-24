@@ -29,6 +29,12 @@ export interface ArtifactState {
   toggleArtifactPin: (artifactId: string) => void;
   toggleArtifactContext: (artifactId: string) => void;
   addArtifact: (artifact: Artifact) => void;
+  /**
+   * §139 — upsert for live artifact events: a known artifact id receives the
+   * incoming versions as NEW VERSIONS (append + current_version bump), an
+   * unknown id is added fresh. Never overwrites existing version history.
+   */
+  mergeArtifactVersion: (artifact: Artifact) => void;
   openArtifactPanel: (artifact: Artifact) => void;
   closeRightPanel: () => void;
   /** Track a live AI run for an artifact */
@@ -99,6 +105,37 @@ export const useArtifactStore = create<ArtifactState>((set) => ({
       activeVersionNumber: artifact.current_version,
       rightPanelMode: 'artifact',
     })),
+
+  mergeArtifactVersion: (incoming) =>
+    set((state) => {
+      const existing = state.artifacts.find((a) => a.id === incoming.id);
+      if (!existing) return { artifacts: [incoming, ...state.artifacts] };
+
+      // Append only versions the store has never seen (idempotent replays).
+      const known = new Set(existing.versions.map((v) => v.version_number));
+      const fresh = incoming.versions.filter((v) => !known.has(v.version_number));
+      if (fresh.length === 0 && incoming.current_version <= existing.current_version) {
+        return {};
+      }
+      const mergedVersions =
+        fresh.length > 0 ? [...existing.versions, ...fresh] : existing.versions;
+      const currentVersion = Math.max(existing.current_version, incoming.current_version);
+      const merged: Artifact = {
+        ...existing,
+        versions: mergedVersions,
+        current_version: currentVersion,
+        updated_at: incoming.updated_at ?? existing.updated_at,
+      };
+      return {
+        artifacts: state.artifacts.map((a) => (a.id === incoming.id ? merged : a)),
+        // Keep the open panel on this artifact without yanking the user's
+        // version selection (§325 #6 — never move what the user is reading).
+        activeArtifact:
+          state.activeArtifact?.id === merged.id
+            ? { ...state.activeArtifact, ...merged, current_version: currentVersion }
+            : state.activeArtifact,
+      };
+    }),
 
   openArtifactPanel: (artifact) =>
     set({

@@ -6,6 +6,8 @@ import { Avatar } from '@/design-system/components/Avatar';
 import { MessageActions } from './MessageActions';
 import { AiToolTimeline } from '@/features/ai/AiToolTimeline';
 import { AiQuotaCard } from '@/features/ai/AiQuotaCard';
+import { AiErrorCard, AiStoppedStrip } from '@/features/ai/AiErrorCard';
+import { useAiStreamStore } from '@/features/ai/aiStreamStore';
 import { Pin, Reply, Check, Copy, Sparkles, Clock, RotateCcw, Globe, FileText } from 'lucide-react';
 import { Button } from '@/design-system/components/Button';
 import { copyToClipboard } from '@/tauri/bridge';
@@ -20,10 +22,12 @@ export interface MessageRowProps {
   aiRun?: AiRun;
   /** §129 — the Group's configured AI name */
   aiName?: string;
-  /** §134A STREAMING — animated cursor + live region announcements */
+  /** §134A STREAMING — animated cursor + §218 lifecycle announcements */
   isStreaming?: boolean;
   /** §184/§245 — retry a failed message */
   onRetry?: (messageId: string) => void;
+  /** §138/§139 — Retry / Regenerate: start a NEW run, keep the old response */
+  onRegenerate?: (messageId: string) => void;
   canModerate?: boolean;
   /** §141 — role drives whether the quota card offers "Open AI settings" */
   userRole?: GroupRole;
@@ -47,6 +51,7 @@ function MessageRowInner({
   aiName = 'Odin',
   isStreaming = false,
   onRetry,
+  onRegenerate,
   canModerate = false,
   userRole = 'MEMBER',
   onOpenSettings,
@@ -64,7 +69,18 @@ function MessageRowInner({
   const [editText, setEditText] = useState(message.body);
   const [copiedCodeIndex, setCopiedCodeIndex] = useState<number | null>(null);
 
+  // §135/§203 — mid-stream text lives in the dedicated stream store; this row
+  // subscribes per message id, so a batch re-renders ONLY this bubble. The
+  // chat-store body stays empty until the terminal event commits it once.
+  const streamedBody = useAiStreamStore((s) => s.bodiesByMessage[message.id]);
+  const displayBody =
+    isStreaming && typeof streamedBody === 'string' && streamedBody !== ''
+      ? streamedBody
+      : message.body;
+
   const isAi = message.sender_type === 'AI';
+  const runFailed = aiRun?.status === 'FAILED' || message.is_failed === true;
+  const runCancelled = aiRun?.status === 'CANCELLED';
 
   const handleSaveEdit = () => {
     // §31: save only when text actually changed
@@ -112,13 +128,10 @@ function MessageRowInner({
         !isConsecutive ? 'mt-2.5 pt-2' : 'mt-0.5',
         message.pinned && 'bg-[var(--color-warning-bg)]/60'
       )}
-      aria-live={isStreaming ? 'polite' : undefined}
+      // §218 — NO aria-live here: streamed tokens must never be announced.
+      // Lifecycle announcements come from AiStreamAnnouncer only.
+      data-streaming={isStreaming || undefined}
     >
-      {/* §218: streaming announcements */}
-      {isStreaming && (
-        <span className="sr-only">{isAi ? 'Odin started' : 'Message is streaming'}</span>
-      )}
-
       {/* Action Toolbar on Hover (§25) */}
       {!isEditing && (
         <MessageActions
@@ -271,8 +284,8 @@ function MessageRowInner({
           <div
             className={cn(
               'text-xs leading-relaxed selectable-text',
-              isStreaming && !message.body && 'odin-working rounded-md px-1.5 py-0.5 -ml-1.5',
-              isStreaming && message.body && 'streaming-cursor'
+              isStreaming && !displayBody && 'odin-working rounded-md px-1.5 py-0.5 -ml-1.5',
+              isStreaming && displayBody && 'streaming-cursor'
             )}
             style={{ color: 'var(--color-text)' }}
           >
@@ -365,7 +378,7 @@ function MessageRowInner({
                 },
               }}
             >
-              {message.body}
+              {displayBody}
             </ReactMarkdown>
           </div>
         )}
@@ -416,20 +429,57 @@ function MessageRowInner({
           </div>
         )}
 
-        {/* ── AI metadata (§133, §141, §142, §143) ── */}
-        {isAi && aiRun && !isStreaming && (
+        {/* ── AI metadata (§133, §140, §141, §142, §143) ──
+            Tool timeline renders DURING and AFTER the run (§133); terminal
+            cards render only once the run has settled. */}
+        {isAi && aiRun && (
           <div className="mt-2 space-y-1.5">
-            {/* §141 quota exhaustion — exact error contract */}
-            {aiRun.error_code === 'APPLICATION_AI_QUOTA_EXHAUSTED' && (
+            {/* §133 — live tool timeline; collapses after completion */}
+            {aiRun.tool_calls && aiRun.tool_calls.length > 0 && (
+              <AiToolTimeline toolCalls={aiRun.tool_calls} />
+            )}
+
+            {/* §141 quota exhaustion — exact error contract, its own card */}
+            {aiRun.status === 'FAILED' && aiRun.error_code === 'APPLICATION_AI_QUOTA_EXHAUSTED' && (
               <AiQuotaCard
                 canContinueWithByok={aiRun.can_continue_with_byok ?? false}
                 userRole={userRole}
                 onOpenSettings={onOpenSettings ?? (() => {})}
               />
             )}
-            {aiRun.tool_calls && aiRun.tool_calls.length > 0 && (
-              <AiToolTimeline toolCalls={aiRun.tool_calls} />
+
+            {/* §137/§134A CANCELLED — partial content preserved above */}
+            {runCancelled && !runFailed && (
+              <AiStoppedStrip
+                aiName={aiName}
+                hasPartial={displayBody.length > 0}
+                onRetry={onRegenerate ? () => onRegenerate(message.id) : undefined}
+              />
             )}
+
+            {/* §140 — provider reason + Retry / Try fallback (non-quota) */}
+            {aiRun.status === 'FAILED' &&
+              aiRun.error_code !== 'APPLICATION_AI_QUOTA_EXHAUSTED' &&
+              onRegenerate && (
+                <AiErrorCard
+                  aiName={aiName}
+                  errorCode={aiRun.error_code}
+                  errorMessage={aiRun.error_message}
+                  onRetry={() => onRegenerate(message.id)}
+                  onTryFallback={() => onRegenerate(message.id)}
+                />
+              )}
+            {/* §139 — completed responses offer Regenerate: new run, previous
+                response preserved. Visible, not hover-gated (§325 #8). */}
+            {isAi && aiRun.status === 'COMPLETED' && onRegenerate && !isStreaming && (
+              <div>
+                <Button size="sm" variant="ghost" onClick={() => onRegenerate(message.id)}>
+                  <RotateCcw className="w-3 h-3 mr-1" aria-hidden="true" />
+                  Regenerate
+                </Button>
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium">
               {aiRun.sources && aiRun.sources.length > 0 && (
                 <span
@@ -440,10 +490,13 @@ function MessageRowInner({
                   Web research · {aiRun.sources.length} sources
                 </span>
               )}
+              {/* §142 — subtle fallback model indicator from AI response
+                  metadata; deliberately calm secondary color, never an alarm */}
               {aiRun.is_fallback && (
                 <span
                   className="inline-flex items-center px-1.5 py-0.5 rounded"
-                  style={{ color: 'var(--color-warning)' }}
+                  style={{ color: 'var(--color-text-tertiary)' }}
+                  title={`Served by fallback model${aiRun.model_used ? ` (${aiRun.model_used})` : ''}`}
                 >
                   {aiName} · fallback model
                 </span>
@@ -451,7 +504,7 @@ function MessageRowInner({
               {aiRun.is_byok && (
                 <span
                   className="inline-flex items-center px-1.5 py-0.5 rounded"
-                  style={{ color: 'var(--color-text-secondary)' }}
+                  style={{ color: 'var(--color-text-tertiary)' }}
                 >
                   {aiName} · BYOK
                 </span>
@@ -461,7 +514,7 @@ function MessageRowInner({
         )}
 
         {/* §245 failed message — never discard, keep text, offer Retry */}
-        {failed && onRetry && (
+        {!isAi && runFailed && onRetry && (
           <div className="mt-1.5 flex items-center gap-2">
             <Button size="sm" variant="ghost" onClick={() => onRetry(message.id)}>
               <RotateCcw className="w-3 h-3 mr-1" aria-hidden="true" />
@@ -519,7 +572,9 @@ function MessageRowInner({
   );
 }
 
-// §203: only the active streaming message should re-render on each delta.
+// §203: only the active streaming message should re-render on each stream
+// batch. Streamed deltas bypass props entirely (stream-store subscription),
+// so this comparator keeps every OTHER row inert while one bubble updates.
 export const MessageRow = React.memo(
   MessageRowInner,
   (prev, next) =>
@@ -536,5 +591,11 @@ export const MessageRow = React.memo(
     prev.isConsecutive === next.isConsecutive &&
     prev.aiName === next.aiName &&
     prev.aiRun?.status === next.aiRun?.status &&
-    prev.aiRun?.tool_calls?.length === next.aiRun?.tool_calls?.length
+    prev.aiRun?.tool_calls?.length === next.aiRun?.tool_calls?.length &&
+    prev.aiRun?.error_code === next.aiRun?.error_code &&
+    prev.aiRun?.error_message === next.aiRun?.error_message &&
+    prev.aiRun?.is_fallback === next.aiRun?.is_fallback &&
+    prev.aiRun?.model_used === next.aiRun?.model_used &&
+    prev.aiRun?.sources?.length === next.aiRun?.sources?.length &&
+    prev.onRegenerate === next.onRegenerate
 );

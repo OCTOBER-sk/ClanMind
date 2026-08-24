@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Loader2,
   AlertCircle,
+  Square,
 } from 'lucide-react';
 import { cn } from '@/design-system/utils';
 import { AttachmentTray } from './AttachmentTray';
@@ -62,6 +63,13 @@ export interface ComposerProps {
   aiName: string;
   activeProjectName?: string;
   isSending?: boolean;
+  /**
+   * §137 — an AI run is active in this conversation. While true the send
+   * control becomes Stop, so cancelling never hides behind hover (§325 #8).
+   */
+  isAiResponding?: boolean;
+  /** §137 — stop the active run; partial content is preserved. */
+  onStopAi?: () => void;
   /** §165A.2 — slash commands gated by per-Group flags */
   featureFlags?: Partial<ServerFeatureFlags>;
   /** §183 offline-aware composer */
@@ -91,6 +99,8 @@ export function Composer({
   aiName,
   activeProjectName,
   isSending = false,
+  isAiResponding = false,
+  onStopAi,
   featureFlags = {},
   syncStatus = 'connected',
 }: ComposerProps) {
@@ -668,37 +678,54 @@ export function Composer({
             </span>
           )}
 
-          {/* §45 Send button — disabled also guards §58 stale selections */}
-          <button
-            type="button"
-            disabled={!canSend}
-            onClick={onSend}
-            aria-label="Send message"
-            title={
-              privateSendBlocked
-                ? 'Choose a valid private recipient before sending'
-                : hasUploadInFlight
-                  ? 'Finishing upload…'
-                  : hasFailedUpload
-                    ? 'Resolve the failed file first'
-                    : undefined
-            }
-            className={cn(
-              'inline-flex items-center justify-center p-2 rounded-lg transition-all select-none',
-              canSend
-                ? 'bg-[var(--color-primary)] text-[var(--color-primary-fg)] hover:opacity-90 active:scale-95 cursor-pointer'
-                : 'cursor-not-allowed opacity-40'
-            )}
-            style={!canSend ? { background: 'var(--color-surface-hover)' } : undefined}
-          >
-            <Send className="w-4 h-4" aria-hidden="true" />
-          </button>
+          {/* §45 Send — becomes §137 Stop while an AI run is active */}
+          {isAiResponding && onStopAi ? (
+            <button
+              type="button"
+              onClick={onStopAi}
+              aria-label="Stop generating"
+              title="Stop generating"
+              className={cn(
+                'inline-flex items-center justify-center p-2 rounded-lg transition-all select-none cursor-pointer',
+                'border bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)] active:scale-95'
+              )}
+              style={{ borderColor: 'var(--color-border-strong)', color: 'var(--color-text)' }}
+            >
+              <Square className="w-3.5 h-3.5 fill-current" aria-hidden="true" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={!canSend}
+              onClick={onSend}
+              aria-label="Send message"
+              title={
+                privateSendBlocked
+                  ? 'Choose a valid private recipient before sending'
+                  : hasUploadInFlight
+                    ? 'Finishing upload…'
+                    : hasFailedUpload
+                      ? 'Resolve the failed file first'
+                      : undefined
+              }
+              className={cn(
+                'inline-flex items-center justify-center p-2 rounded-lg transition-all select-none',
+                canSend
+                  ? 'bg-[var(--color-primary)] text-[var(--color-primary-fg)] hover:opacity-90 active:scale-95 cursor-pointer'
+                  : 'cursor-not-allowed opacity-40'
+              )}
+              style={!canSend ? { background: 'var(--color-surface-hover)' } : undefined}
+            >
+              <Send className="w-4 h-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* §218/§7: composer status live region */}
+      {/* §218/§7: composer status live region — aggregate states only */}
       <span className="sr-only" role="status" aria-live="polite">
         {isSending ? 'Sending message' : ''}
+        {isAiResponding ? `${aiName} is responding. You can stop generating.` : ''}
         {isOffline ? 'You are offline. Messages will queue.' : ''}
         {privateSendBlocked ? 'Private mode needs a valid recipient. Sending is disabled.' : ''}
         {hasUploadInFlight ? 'Uploading files. Send waits until uploads finish.' : ''}

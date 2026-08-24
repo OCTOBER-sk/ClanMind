@@ -17,7 +17,8 @@ import { useChatStore } from '@/state/useChatStore';
 import { useArtifactStore } from '@/state/useArtifactStore';
 import { useSyncStore } from '@/state/useSyncStore';
 import { getDemoRuntime } from '@/mocks/runtime';
-import type { AiRun, Message, MessageAttachment } from '@/types';
+import { cancelRunLocally } from '@/realtime/dispatch';
+import type { AiRun, Message, MessageAttachment, MessageVisibility } from '@/types';
 
 function targetsAi(text: string): boolean {
   const t = text.toLowerCase();
@@ -44,6 +45,113 @@ export interface SendMessageInput {
   existingMessageId?: string;
   /** §186A.2 — never mint a new operation id for a retry. */
   existingClientOperationId?: string;
+}
+
+/**
+ * §134/§138/§139 — start ONE AI run for `prompt` as a brand-new shell message.
+ * Every entry point (fresh @odin send, Retry, Regenerate) comes through here,
+ * which is what guarantees each attempt is a NEW run and the previous
+ * response bubble is never overwritten.
+ *
+ * The run row is registered QUEUED before any socket event arrives: it pins
+ * the prompt (Retry/Regenerate read it back), and gives the first early
+ * delta an anchor bubble in the stream store.
+ */
+function spawnAiRun(input: {
+  groupId: string;
+  projectId?: string;
+  visibility: MessageVisibility;
+  prompt: string;
+}): void {
+  const { activeGroup } = useGroupStore.getState();
+  const aiName = activeGroup?.ai_name || 'Odin';
+  const aiShellId = `msg_ai_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const runId = `run_${aiShellId}`;
+
+  const shell: Message = {
+    id: aiShellId,
+    group_id: input.groupId,
+    project_id: input.projectId,
+    sender_type: 'AI',
+    sender_id: 'odin_ai',
+    sender_name: aiName,
+    body: '',
+    visibility: input.visibility,
+    pinned: false,
+    edited: false,
+    deleted: false,
+    attachments: [],
+    reactions: [],
+    ai_run_id: runId,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  useChatStore.getState().addMessage(shell);
+
+  useArtifactStore.getState().setAiRunByMessage(aiShellId, {
+    id: runId,
+    group_id: input.groupId,
+    ...(input.projectId ? { project_id: input.projectId } : {}),
+    status: 'QUEUED',
+    mode: 'ASSIST',
+    prompt: input.prompt,
+    tool_calls: [],
+    sources: [],
+    created_artifacts: [],
+    created_at: new Date().toISOString(),
+  });
+
+  const runtime = getDemoRuntime();
+  if (runtime) {
+    // Demo hub — deterministic §134A timeline over the real socket pipeline.
+    runtime.simulateAiRun({
+      messageId: aiShellId,
+      runId,
+      groupId: input.groupId,
+      projectId: input.projectId ?? null,
+      prompt: input.prompt,
+      aiName,
+    });
+    return;
+  }
+
+  // LIVE — REST is the canonical start path (BE §106; WS ai.run answers
+  // NOT_AVAILABLE_ON_WS). Streaming deltas reach the room via the realtime
+  // port and are projected (batched, §135) by dispatchRealtimeEvent.
+  void api
+    .post<{ run_id?: string }>(`/groups/${input.groupId}/ai/runs`, {
+      message: input.prompt,
+      project_id: input.projectId ?? null,
+      mode: 'ASSIST',
+    })
+    .then((res) => {
+      if (typeof res?.run_id !== 'string') return;
+      // Lazy — keeps the live runtime out of non-live chunks.
+      void import('@/live/liveRuntime').then((m) => m.bindRunId(res.run_id!, aiShellId));
+    })
+    .catch((err: unknown) => {
+      // §94 quota contract → AiQuotaCard BYOK branch on the failed shell.
+      const exhaustion = quotaExhaustionOf(err);
+      const failedRun: Partial<AiRun> = {
+        id: runId,
+        group_id: input.groupId,
+        status: 'FAILED',
+        mode: 'ASSIST',
+        prompt: input.prompt,
+        error_code:
+          err instanceof ApiError && err.code === 'APPLICATION_AI_QUOTA_EXHAUSTED'
+            ? 'APPLICATION_AI_QUOTA_EXHAUSTED'
+            : 'RUN_START_FAILED',
+        ...(exhaustion ? { can_continue_with_byok: exhaustion.canContinueWithByok } : {}),
+        completed_at: new Date().toISOString(),
+      };
+      useArtifactStore.getState().setAiRunByMessage(aiShellId, failedRun as AiRun);
+      if (!exhaustion) {
+        useChatStore.getState().updateMessage(aiShellId, {
+          body: "I couldn't start that run. The request failed before reaching the model.",
+        });
+      }
+    });
 }
 
 export function useChatController() {
@@ -192,87 +300,44 @@ export function useChatController() {
       // through the same socket pipeline in BOTH modes (D2).
       if (targetsAi(newMsg.body)) {
         const runtime = getDemoRuntime();
-        const aiShellId = `msg_ai_${Date.now()}`;
-        const aiName = activeGroup.ai_name || 'Odin';
-        const shell: Message = {
-          id: aiShellId,
-          group_id: activeGroup.id,
-          project_id: activeProject?.id,
-          sender_type: 'AI',
-          sender_id: 'odin_ai',
-          sender_name: aiName,
-          body: '',
-          visibility: newMsg.visibility,
-          pinned: false,
-          edited: false,
-          deleted: false,
-          attachments: [],
-          reactions: [],
-          ai_run_id: `run_${aiShellId}`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        useChatStore.getState().addMessage(shell);
-
-        if (runtime) {
-          // Demo hub — deterministic §134A timeline.
-          // §141 — typing "quota" exercises the exact quota error contract.
-          if (/quota/i.test(newMsg.body)) {
-            setTimeout(() => {
-              useChatStore.getState().updateMessage(aiShellId, {
-                body: 'Application AI quota reached for this Group.',
-              });
-              runtime.applyQuotaState(aiShellId, /byok/i.test(newMsg.body));
-            }, 900);
-            return;
-          }
-          runtime.simulateAiRun({
-            messageId: aiShellId,
-            groupId: activeGroup.id,
-            projectId: activeProject?.id ?? null,
-            prompt: newMsg.body,
-            aiName,
-          });
+        // §141 — DEMO-ONLY seam: typing "quota" exercises the exact quota
+        // error contract. Live sends go to the real run start unmodified.
+        if (runtime && /quota/i.test(newMsg.body)) {
+          const aiShellId = `msg_ai_${Date.now()}`;
+          const aiName = activeGroup.ai_name || 'Odin';
+          const quotaShell: Message = {
+            id: aiShellId,
+            group_id: activeGroup.id,
+            project_id: activeProject?.id,
+            sender_type: 'AI',
+            sender_id: 'odin_ai',
+            sender_name: aiName,
+            body: '',
+            visibility: newMsg.visibility,
+            pinned: false,
+            edited: false,
+            deleted: false,
+            attachments: [],
+            reactions: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          useChatStore.getState().addMessage(quotaShell);
+          setTimeout(() => {
+            useChatStore.getState().updateMessage(aiShellId, {
+              body: 'Application AI quota reached for this Group.',
+            });
+            runtime.applyQuotaState(aiShellId, /byok/i.test(newMsg.body));
+          }, 900);
           return;
         }
-
-        // LIVE — REST is the canonical start path (BE §106; WS ai.run answers
-        // NOT_AVAILABLE_ON_WS). Streaming deltas reach the room via the
-        // realtime port and are projected by dispatchRealtimeEvent.
-        void api
-          .post<{ run_id?: string }>(`/groups/${activeGroup.id}/ai/runs`, {
-            message: aiPromptOf(newMsg.body),
-            project_id: activeProject?.id ?? null,
-            mode: 'ASSIST',
-          })
-          .then((res) => {
-            if (typeof res?.run_id !== 'string') return;
-            // Lazy — keeps the live runtime out of non-live chunks.
-            void import('@/live/liveRuntime').then((m) => m.bindRunId(res.run_id!, aiShellId));
-          })
-          .catch((err: unknown) => {
-            // §94 quota contract → AiQuotaCard BYOK branch on the failed shell.
-            const exhaustion = quotaExhaustionOf(err);
-            const failedRun: Partial<AiRun> = {
-              id: `run_${aiShellId}`,
-              group_id: activeGroup.id,
-              status: 'FAILED',
-              mode: 'ASSIST',
-              prompt: newMsg.body,
-              error_code:
-                err instanceof ApiError && err.code === 'APPLICATION_AI_QUOTA_EXHAUSTED'
-                  ? 'APPLICATION_AI_QUOTA_EXHAUSTED'
-                  : 'RUN_START_FAILED',
-              ...(exhaustion ? { can_continue_with_byok: exhaustion.canContinueWithByok } : {}),
-              completed_at: new Date().toISOString(),
-            };
-            useArtifactStore.getState().setAiRunByMessage(aiShellId, failedRun as AiRun);
-            if (!exhaustion) {
-              useChatStore.getState().updateMessage(aiShellId, {
-                body: "I couldn't start that run. The request failed before reaching the model.",
-              });
-            }
-          });
+        // The run prompt is the request itself — trigger token stripped (BE §115).
+        spawnAiRun({
+          groupId: activeGroup.id,
+          projectId: activeProject?.id,
+          visibility: newMsg.visibility,
+          prompt: aiPromptOf(newMsg.body),
+        });
       }
     },
     [user],
@@ -370,6 +435,48 @@ export function useChatController() {
     [user],
   );
 
+  /**
+   * §137 — Stop an active AI run. Cancel is a REST concern (BE §106
+   * POST /ai/runs/:runId/cancel; the WS ai.cancel frame answers
+   * NOT_AVAILABLE_ON_WS on the real room). The demo transport mirrors the
+   * same route, so ONE code path serves both modes. Local terminal state is
+   * applied optimistically so Stop never waits on the network: partial
+   * content is preserved (§134A CANCELLED), and the server's own status
+   * frame re-enters through dispatch idempotently.
+   */
+  const stopAiRun = useCallback((messageId: string): void => {
+    const run = useArtifactStore.getState().aiRunsByMessage[messageId];
+    if (!run) return;
+    const runId = run.id;
+    if (runId && runId !== 'run_pending') {
+      void api.post(`/ai/runs/${encodeURIComponent(runId)}/cancel`, {}).catch(() => {
+        // Optimistic state already applied; server truth lands via socket or not at all.
+      });
+    }
+    cancelRunLocally(messageId);
+  }, []);
+
+  /**
+   * §138/§139/§140 — Retry / Regenerate / Try fallback all start a NEW run
+   * for the same prompt. The previous response bubble stays exactly as it is
+   * (never overwritten); any artifact output becomes a new version through
+   * the §139 merge path in dispatch. Model routing authority stays with the
+   * server's §61 fallback chain — the client never dictates providers.
+   */
+  const retryAiResponse = useCallback((sourceMessageId: string): void => {
+    const source = useChatStore.getState().messages.find((m) => m.id === sourceMessageId);
+    if (!source) return;
+    const sourceRun = useArtifactStore.getState().aiRunsByMessage[sourceMessageId];
+    const prompt = sourceRun?.prompt?.trim() || aiPromptOf(source.body);
+    if (!prompt) return;
+    spawnAiRun({
+      groupId: source.group_id,
+      projectId: source.project_id,
+      visibility: source.visibility,
+      prompt,
+    });
+  }, []);
+
   /** §141 quota-failure injection surface (demo mode only). */
   const simulateQuotaError = useCallback(
     (messageId: string, canContinueWithByok: boolean): void => {
@@ -378,5 +485,5 @@ export function useChatController() {
     [],
   );
 
-  return { sendMessage, retryMessage, sendThreadReply, simulateQuotaError };
+  return { sendMessage, retryMessage, sendThreadReply, simulateQuotaError, stopAiRun, retryAiResponse };
 }

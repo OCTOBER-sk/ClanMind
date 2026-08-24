@@ -266,7 +266,8 @@ export function AppShell() {
 
   // ─── Chat pipeline (refactor R1) — send/retry/AI-trigger live in the
   // chat controller; the shell only wires UI events to it. ───────────────────
-  const { sendMessage, retryMessage, sendThreadReply } = useChatController();
+  const { sendMessage, retryMessage, sendThreadReply, stopAiRun, retryAiResponse } =
+    useChatController();
   const handleSendMessage = useCallback(() => sendMessage(), [sendMessage]);
   const handleRetryMessage = retryMessage;
   /** P4 §47–§53 — upload lifecycle controller for composer chips. */
@@ -322,6 +323,27 @@ export function AppShell() {
         : [],
     [allMessages, chatScope],
   );
+
+  // ─── §137 — the active AI run in THIS conversation scope drives the
+  // composer's Stop control; Stop always targets the most recent run. ────────
+  const activeAiMessageId = useMemo(() => {
+    for (let i = scopedMessages.length - 1; i >= 0; i -= 1) {
+      const run = aiRunsByMessage[scopedMessages[i]!.id];
+      if (
+        run &&
+        (run.status === 'QUEUED' ||
+          run.status === 'RUNNING' ||
+          run.status === 'WAITING_TOOL' ||
+          run.status === 'STREAMING')
+      ) {
+        return scopedMessages[i]!.id;
+      }
+    }
+    return null;
+  }, [scopedMessages, aiRunsByMessage]);
+  const handleStopAi = useCallback(() => {
+    if (activeAiMessageId) stopAiRun(activeAiMessageId);
+  }, [activeAiMessageId, stopAiRun]);
 
   // ─── §190 drafts: persist per account:group:project scope; restore on switch ───
   const scopeKey = `${user?.id ?? 'anon'}:${groupForRoute?.id ?? 'none'}:${projectForRoute?.id ?? 'group'}`;
@@ -985,6 +1007,7 @@ export function AppShell() {
                   onOpenSearch={() => setCommandPaletteOpen(true)}
                   onStartMeeting={() => setStartDialogOpen(true)}
                   onRetry={handleRetryMessage}
+                  onRegenerate={retryAiResponse}
                   canModerate={members.find((m) => m.user_id === currentUserId)?.role === 'OWNER' || members.find((m) => m.user_id === currentUserId)?.role === 'ADMIN'}
                   userRole={members.find((m) => m.user_id === currentUserId)?.role ?? 'MEMBER'}
                   onOpenSettings={() => navigateToSection('settings')}
@@ -1032,6 +1055,8 @@ export function AppShell() {
                   members={members}
                   aiName={activeGroup?.ai_name || 'Odin'}
                   activeProjectName={activeProject?.name}
+                  isAiResponding={activeAiMessageId != null}
+                  onStopAi={handleStopAi}
                   featureFlags={featureFlags}
                   syncStatus={syncStatus}
                 />

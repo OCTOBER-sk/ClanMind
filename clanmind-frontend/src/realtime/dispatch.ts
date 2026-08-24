@@ -13,12 +13,18 @@
  *      ai.response.delta, ai.response.completed, ai.response.failed
  *
  * Unknown event types are ignored until their phase lands (FE §200 pattern).
+ *
+ * P5 streaming contract (FE §134/§135/§203): ai.delta frames are coalesced
+ * into a dedicated stream store at a render-friendly cadence — the chat store
+ * receives each AI response body exactly once per terminal event, and only
+ * the active AI bubble re-renders during a stream.
  */
 
 import { useChatStore } from '@/state/useChatStore';
 import { useArtifactStore } from '@/state/useArtifactStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useGroupStore } from '@/state/useGroupStore';
+import { useAiStreamStore } from '@/features/ai/aiStreamStore';
 import { MessageSchema } from '@/api/schemas';
 import { mapMessageRow } from '@/api/messageRow';
 import type { AiRun, Artifact, Message } from '@/types';
@@ -32,8 +38,44 @@ const runsByMessage = new Map<string, { run: AiRun; streamedBody: string; artifa
  */
 const messageByRun = new Map<string, string>();
 
+function baseRun(): AiRun {
+  return {
+    id: 'run_pending',
+    group_id: '',
+    status: 'QUEUED',
+    mode: 'ASSIST',
+    prompt: '',
+    tool_calls: [],
+    sources: [],
+    created_artifacts: [],
+    created_at: new Date().toISOString(),
+  };
+}
+
+/** Create this message's run entry if no event has established it yet. */
+interface RunEntry {
+  run: AiRun;
+  streamedBody: string;
+  artifactOpened: boolean;
+}
+function ensureRunEntry(messageId: string): RunEntry {
+  let entry = runsByMessage.get(messageId);
+  if (!entry) {
+    entry = { run: baseRun(), streamedBody: '', artifactOpened: false };
+    runsByMessage.set(messageId, entry);
+  }
+  return entry;
+}
+
 export function bindRunToMessage(runId: string, messageId: string): void {
   messageByRun.set(runId, messageId);
+  // Replay any deltas that arrived before the REST start response bound this
+  // run — the buffered prefix must render, not wait for completion.
+  const orphan = orphanStreams.get(runId);
+  if (orphan) {
+    orphanStreams.delete(runId);
+    for (const delta of orphan.deltas) streamDelta(runId, messageId, delta);
+  }
 }
 
 function resolveMessageId(payload: Record<string, unknown>): string {
@@ -45,27 +87,47 @@ function resolveMessageId(payload: Record<string, unknown>): string {
 
 function upsertRun(messageId: string, patch: Partial<AiRun>): void {
   const store = useArtifactStore.getState();
-  const current = runsByMessage.get(messageId);
-  const base: AiRun =
-    current?.run ??
-    ({
-      id: 'run_pending',
-      group_id: '',
-      status: 'QUEUED',
-      mode: 'ASSIST',
-      prompt: '',
-      tool_calls: [],
-      sources: [],
-      created_artifacts: [],
-      created_at: new Date().toISOString(),
-    } as unknown as AiRun);
-  const next = { ...base, ...patch };
+  ensureRunEntry(messageId);
+  const current = runsByMessage.get(messageId)!;
+  const next = { ...current.run, ...patch };
   runsByMessage.set(messageId, {
     run: next,
-    streamedBody: current?.streamedBody ?? '',
-    artifactOpened: current?.artifactOpened ?? false,
+    streamedBody: current.streamedBody,
+    artifactOpened: current.artifactOpened,
   });
   store.setAiRunByMessage(messageId, next);
+}
+
+// ─── §135/§203 batched delta pipeline ────────────────────────────────────────
+// Deltas NEVER touch the chat store or artifact store per token. They
+// accumulate in `pendingStreamText` and are committed to the dedicated stream
+// store at STREAM_FLUSH_MS cadence; only the active AI bubble subscribes to
+// that store. The chat store receives the body exactly once per terminal
+// event (§135 "batch deltas at a render-friendly cadence").
+const STREAM_FLUSH_MS = 90;
+const pendingStreamText = new Map<string, string>();
+let streamFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function flushStreamDeltas(): void {
+  streamFlushTimer = null;
+  if (pendingStreamText.size === 0) return;
+  const stream = useAiStreamStore.getState();
+  for (const messageId of [...pendingStreamText.keys()]) {
+    pendingStreamText.delete(messageId);
+    const entry = runsByMessage.get(messageId);
+    if (!entry) continue;
+    if (entry.run.status !== 'STREAMING') {
+      // One status transition per flush at most — never one per delta.
+      upsertRun(messageId, { status: 'STREAMING' });
+    }
+    stream.setBody(messageId, entry.streamedBody);
+  }
+}
+
+function scheduleStreamFlush(): void {
+  if (streamFlushTimer == null) {
+    streamFlushTimer = setTimeout(flushStreamDeltas, STREAM_FLUSH_MS);
+  }
 }
 
 /** Buffer for deltas that arrive before their run is bound to a bubble. */
@@ -73,15 +135,6 @@ interface OrphanStream {
   deltas: string[];
 }
 const orphanStreams = new Map<string, OrphanStream>();
-
-function appendDelta(messageId: string, delta: string): void {
-  const chat = useChatStore.getState();
-  const entry = runsByMessage.get(messageId);
-  if (!entry) return;
-  const body = entry.streamedBody + delta;
-  entry.streamedBody = body;
-  chat.updateMessage(messageId, { body });
-}
 
 /**
  * Route a streaming delta (ai.delta / ai.response.delta) by run_id.
@@ -100,8 +153,65 @@ function streamDelta(runId: string, fallbackMessageId: string, delta: string): v
       return;
     }
   }
-  appendDelta(messageId, delta);
-  upsertRun(messageId, runId ? { id: runId, status: 'STREAMING' } : { status: 'STREAMING' });
+  const entry = ensureRunEntry(messageId);
+  entry.streamedBody += delta;
+  if (runId && entry.run.id === 'run_pending') entry.run.id = runId;
+  pendingStreamText.set(messageId, entry.streamedBody);
+  scheduleStreamFlush();
+}
+
+/**
+ * Terminal transition — commit the streamed body into the chat store ONCE
+ * (§135), clear the live-stream entries. `finalBody` (server truth) wins
+ * over the buffered partial when present. The shared flush timer is left
+ * alone: it simply finds nothing queued for this message and keeps serving
+ * any other concurrent run.
+ */
+function finalizeStreamedMessage(messageId: string, finalBody: string | null): void {
+  pendingStreamText.delete(messageId);
+  // Last run out releases the shared timer — keeps the pipeline clean when
+  // streams end between flush ticks (and across test timer installs).
+  if (pendingStreamText.size === 0 && streamFlushTimer != null) {
+    clearTimeout(streamFlushTimer);
+    streamFlushTimer = null;
+  }
+  const entry = runsByMessage.get(messageId);
+  const body = finalBody ?? entry?.streamedBody ?? '';
+  useAiStreamStore.getState().clearBody(messageId);
+  if (body) useChatStore.getState().updateMessage(messageId, { body });
+}
+
+/** Drop this message's buffered-but-unbound deltas (terminal cleanup). */
+function dropOrphansFor(runId: string): void {
+  orphanStreams.delete(runId);
+}
+
+/**
+ * §137 — optimistic local cancel. Applies the terminal state immediately so
+ * Stop never waits on the network: partial content is preserved in the chat
+ * store, the run is marked CANCELLED (§134A), buffers are cleared. The
+ * server's own ai.status CANCELLED frame re-enters through dispatch and is
+ * idempotent with this.
+ */
+export function cancelRunLocally(messageId: string): void {
+  const entry = runsByMessage.get(messageId);
+  finalizeStreamedMessage(messageId, null);
+  // Reflect CANCELLED on the STORE run — the authoritative rendered copy —
+  // even when no socket event ever established a dispatch-side entry.
+  const storeRun = useArtifactStore.getState().aiRunsByMessage[messageId];
+  if (storeRun) {
+    useArtifactStore.getState().setAiRunByMessage(messageId, {
+      ...storeRun,
+      status: 'CANCELLED',
+      completed_at: new Date().toISOString(),
+    });
+  } else {
+    upsertRun(messageId, { status: 'CANCELLED', completed_at: new Date().toISOString() });
+  }
+  if (entry) {
+    runsByMessage.delete(messageId);
+    if (entry.run.id) messageByRun.delete(entry.run.id);
+  }
 }
 
 /**
@@ -254,10 +364,26 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
     case 'ai.status': {
       const messageId = resolveMessageId(payload) || String(payload.message_id ?? '');
       if (!messageId) return;
-      const status = String(payload.status ?? '');
+      const status = String(payload.status ?? '') as AiRun['status'];
+      // §137/§134A — CANCELLED is terminal: keep whatever partial content the
+      // backend already streamed, mark the run, release the stream buffers.
+      if (status === 'CANCELLED') {
+        finalizeStreamedMessage(messageId, null);
+        upsertRun(messageId, {
+          id: String(payload.run_id ?? 'run_pending'),
+          status,
+          completed_at: new Date().toISOString(),
+        });
+        const bound = runsByMessage.get(messageId);
+        if (bound) {
+          if (bound.run.id) dropOrphansFor(bound.run.id);
+          runsByMessage.delete(messageId);
+        }
+        return;
+      }
       upsertRun(messageId, {
         id: String(payload.run_id ?? 'run_pending'),
-        status: status as AiRun['status'],
+        status,
         sources: (payload.sources as AiRun['sources']) ?? undefined,
       });
       break;
@@ -311,10 +437,13 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
 
     case 'artifact.event': {
       const kind = String(payload.kind ?? '');
-      if (kind === 'created') {
+      if (kind === 'created' || kind === 'updated' || kind === 'version') {
+        // §139 — regenerated runs produce NEW VERSIONS of an existing
+        // artifact, never overwrites: mergeArtifactVersion appends unknown
+        // versions and bumps current_version when the id already exists.
         const artifact = payload.artifact as Artifact | undefined;
         if (!artifact) return;
-        useArtifactStore.getState().addArtifact(artifact);
+        useArtifactStore.getState().mergeArtifactVersion(artifact);
         const messageId = findMessageForArtifact(event.group_id, artifact.id);
         if (messageId) upsertRun(messageId, { created_artifacts: [artifact.id] });
       }
@@ -336,20 +465,27 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
         messageByRun.get(runId) ||
         '';
       const finalBody = typeof payload.final_body === 'string' ? payload.final_body : undefined;
-      if (finalBody && messageId) chat.updateMessage(messageId, { body: finalBody });
       if (!messageId) return;
-      // Flush any buffered pre-bind stream so text is never lost.
-      const orphan = runId ? orphanStreams.get(runId) : undefined;
-      if (orphan && !finalBody && orphan.deltas.length > 0) {
-        chat.updateMessage(messageId, { body: orphan.deltas.join('') });
-      }
-      if (runId) orphanStreams.delete(runId);
+      // §135 — exactly ONE chat-store write for the whole stream. Server
+      // final_body wins; otherwise the coalesced partial becomes the body.
+      finalizeStreamedMessage(
+        messageId,
+        finalBody ?? (runId ? orphanStreams.get(runId)?.deltas.join('') || null : null),
+      );
+      if (runId) dropOrphansFor(runId);
+      // §142 — AI response metadata: a non-primary model renders as the
+      // subtle fallback indicator, never an alarm.
       upsertRun(messageId, {
         id: runId || 'run_pending',
         status: 'COMPLETED',
         completed_at: new Date().toISOString(),
         sources: (payload.sources as AiRun['sources']) ?? undefined,
         created_artifacts: (payload.created_artifacts as string[]) ?? undefined,
+        ...(firstString(payload.model_used, payload.model)
+          ? { model_used: firstString(payload.model_used, payload.model)! }
+          : {}),
+        ...(payload.is_fallback === true || payload.fallback === true ? { is_fallback: true } : {}),
+        ...(payload.is_byok === true || payload.byok === true ? { is_byok: true } : {}),
       });
       const artifactId = (payload.created_artifacts as string[] | undefined)?.[0];
       if (artifactId) {
@@ -370,6 +506,9 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
       const runId = String(payload.run_id ?? '');
       const messageId = messageByRun.get(runId) ?? String(payload.message_id ?? '');
       if (!messageId) return;
+      // §140 — keep whatever streamed before the failure; never discard it.
+      finalizeStreamedMessage(messageId, null);
+      if (runId) dropOrphansFor(runId);
       upsertRun(messageId, {
         id: runId || 'run_pending',
         status: 'FAILED',
@@ -379,6 +518,8 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
             : typeof payload.code === 'string'
               ? payload.code
               : undefined,
+        error_message:
+          typeof payload.error_message === 'string' ? payload.error_message : undefined,
         completed_at: new Date().toISOString(),
       });
       runsByMessage.delete(messageId);

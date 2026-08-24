@@ -109,6 +109,11 @@ export class DemoRealtimeHub {
     protocol_version: 1,
   };
   private activeRuns = new Map<string, ActiveRun>();
+  /**
+   * §139 — artifact lineage per group+prompt: a regenerated run emits the
+   * NEXT VERSION of the same artifact instead of minting a new one.
+   */
+  private artifactLineage = new Map<string, { artifactId: string; nextVersion: number }>();
 
   createSocket(_url: string): RealtimeSocketLike {
     const connectionId = `hubconn_${++this.clientCounter}`;
@@ -286,6 +291,14 @@ export class DemoRealtimeHub {
 
   // ─── §134A AI run lifecycle as REAL events through the socket ─────────────
 
+  /**
+   * Deterministic seams (used by tests and the demo walkthrough):
+   *   • prompt matching /fail/      → run FAILS with PROVIDER_TIMEOUT (§140)
+   *   • prompt matching /fallback/  → completes via the fallback model (§142)
+   * Regenerated prompts reuse the artifact lineage for the same
+   * group+prompt, so a second run emits a NEW VERSION of the same artifact
+   * rather than a new artifact (§139).
+   */
   startAiRun(meta: AiRunRequestMeta): () => void {
     const runId = meta.runId;
     const timers: TimerHandle[] = [];
@@ -299,9 +312,8 @@ export class DemoRealtimeHub {
       timers.push(t);
     };
 
-    let acc = '';
-    const full = RESPONSE_TEMPLATE(meta.prompt);
-    const parts = full.match(/.{1,140}/gs) ?? [full];
+    // §142 seam — this run is "served" by the fallback model.
+    const isFallbackRun = /fallback/i.test(meta.prompt);
 
     // QUEUED shell already exists; RUNNING first.
     emit('ai.status', { status: 'RUNNING' }, 200);
@@ -317,16 +329,37 @@ export class DemoRealtimeHub {
     emit('ai.status', { status: 'WAITING_TOOL', sources: SOURCES }, 1500);
     toolAt('read_project_references', 'SUCCEEDED', 1990);
 
+    // §140 seam — provider failure after tools; nothing has streamed yet,
+    // mirroring the real orchestrator's no-silent-fallback-after-stream rule.
+    if (/fail/i.test(meta.prompt)) {
+      emit(
+        'ai.failed',
+        {
+          failure_code: 'PROVIDER_TIMEOUT',
+          error_message: 'The primary model did not respond within the timeout window.',
+        },
+        2300,
+      );
+      return () => this.cancelAiRun(runId);
+    }
+
     // STREAMING with batched deltas (FE §135 cadence).
     emit('ai.status', { status: 'STREAMING' }, 2000);
+    const full = RESPONSE_TEMPLATE(meta.prompt);
+    const parts = full.match(/.{1,140}/gs) ?? [full];
     parts.forEach((part, i) => {
       emit('ai.delta', { delta: part }, 2350 + i * 260);
-      void acc;
-      acc += part;
     });
 
-    // Live artifact construction event stream (BE §75 / FE §97).
-    const artifactId = `art_live_${runId}`;
+    // Live artifact construction event stream (BE §75 / FE §97). Repeated
+    // runs of the same prompt extend the SAME artifact lineage — the second
+    // response's diagram arrives as version N+1 (§139), never an overwrite.
+    const lineageKey = `${meta.groupId}:${meta.prompt.trim().toLowerCase()}`;
+    const prior = this.artifactLineage.get(lineageKey);
+    const artifactId = prior?.artifactId ?? `art_live_${runId}`;
+    const versionNumber = prior?.nextVersion ?? 1;
+    this.artifactLineage.set(lineageKey, { artifactId, nextVersion: versionNumber + 1 });
+
     emit(
       'artifact.event',
       {
@@ -337,16 +370,16 @@ export class DemoRealtimeHub {
           project_id: meta.projectId ?? null,
           title: `${meta.aiName}'s blueprint — ${meta.prompt.slice(0, 28)}`,
           artifact_type: 'ARCHITECTURE',
-          current_version: 1,
+          current_version: versionNumber,
           pinned: false,
           used_as_context: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           versions: [
             {
-              id: `v_${artifactId}`,
+              id: `v_${artifactId}_${versionNumber}`,
               artifact_id: artifactId,
-              version_number: 1,
+              version_number: versionNumber,
               content: DIAGRAM_MARKDOWN,
               created_by_name: meta.aiName,
               created_at: new Date().toISOString(),
@@ -364,6 +397,8 @@ export class DemoRealtimeHub {
         final_body: full,
         sources: SOURCES,
         created_artifacts: [artifactId],
+        // §142 — AI response metadata drives the subtle fallback indicator.
+        ...(isFallbackRun ? { model_used: 'secondary-fallback', is_fallback: true } : {}),
       },
       lastDelta + 500,
     );

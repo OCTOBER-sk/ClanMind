@@ -40,7 +40,7 @@ export function installDemoMode(): DemoModeHandle {
   const runtime: DemoRuntime = {
     simulateAiRun(opts) {
       return hub.startAiRun({
-        runId: `run_${Date.now()}`,
+        runId: opts.runId ?? `run_${Date.now()}`,
         messageId: opts.messageId,
         groupId: opts.groupId,
         projectId: opts.projectId ?? null,
