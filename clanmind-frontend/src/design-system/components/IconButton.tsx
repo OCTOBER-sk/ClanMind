@@ -33,7 +33,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
     // §4 semantic tokens
     const variantClasses = {
       primary:
-        'bg-[var(--color-primary)] text-[var(--color-primary-fg)] hover:opacity-90 active:opacity-80',
+        'bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 active:opacity-80',
       secondary:
         'bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-pressed)] active:opacity-90',
       outline:

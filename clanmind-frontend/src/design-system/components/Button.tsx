@@ -47,7 +47,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     // Uses semantic CSS variables, not hard-coded Tailwind palette classes
     const variantClasses = {
       primary:
-        'bg-[var(--color-primary)] text-[var(--color-primary-fg)] hover:opacity-90 active:opacity-80 shadow-[var(--shadow-sm)] border border-transparent',
+        'bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 active:opacity-80 shadow-[var(--shadow-sm)] border border-transparent',
       secondary:
         'bg-[var(--color-surface-hover)] text-[var(--color-text)] hover:bg-[var(--color-surface-pressed)] active:opacity-90 border border-[var(--color-border)]',
       outline:
