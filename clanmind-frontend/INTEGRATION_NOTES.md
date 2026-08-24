@@ -412,3 +412,75 @@ rows so both modes share one pathway.
 8. **Memory pinning is SPEC-SILENT** — FE §116 lists no pin affordance for
    memory items; none was added. (Pinning exists for artifacts §257 and
    messages §33, both previously wired.)
+
+---
+
+## 2026-08-24 — P9 meetings (FE §123–§128, §124A, §213, §165A; BE §50/§50A/§72/§73/§112)
+
+### D23 — Endpoint parity: Meetings REST hits the REAL §112 contract; candidate lifecycle realigned to §50A
+
+The P5-era meeting UI was client-side fiction: an invented `MeetingSession`
+shape (`is_active/is_paused/elapsed_seconds/live_notes`), candidates keyed by a
+nonexistent `meeting_id` column with `content: string`, and acceptance done by
+calling the §110/§111 task/decision endpoints directly from the shell — the
+server never knew the meeting or its promoted ids. P9 replaced all of it with
+the wire contract:
+
+| FE surface | Endpoint (`api/endpoints/meetings.ts`) | BE contract | Demo parity |
+|---|---|---|---|
+| Start meeting (§126) | `POST /projects/:p/meetings` body `{}` → 201 §50 session | §112 (project-scoped; no project → no start) | identical over `ds.meetingSessions` |
+| Session detail | `GET /meetings/:id` → `{session, candidates}` | §112 + §50A trail | identical |
+| End meeting (§127) | `POST /meetings/:id/end {summary_text}` → `{ok}` | §112/§73 (min-1 summary_text) | identical incl. VALIDATION_FAILED message |
+| Detect intake (demo seeds) | `POST /meetings/:id/candidates {candidate_type, content, confidence, source_message_id?}` → 201 row | §50A extra in handlers/intel.ts | identical validation (type enum, 0..1 confidence, record content), 409 when session not ACTIVE |
+| Accept (§124A.2) | `POST /meetings/:id/candidates/:cid/accept {promote:'task'\|'decision'}` → 201 `{promoted_id}` | §50A promote callback creates the REAL task/decision and stamps `promoted_to_type/id` | identical, promoting into genuine `ds.tasks`/`ds.decisions` rows with server defaults |
+
+**Contract corrections shipped with this:** FE types are now byte-shaped to BE
+(`meeting_session_id`, jsonb `content` records, lowercase `'decision'|'task'`
+promote types, `confidence`, `resolved_at`; sessions carry
+`started_by/status ACTIVE|ENDED/summary_artifact_id`). The §123 timer and the
+§213 "paused" state are CLIENT-derived presentations — the server enum has no
+paused value. §124A.2's no-optimistic-accept rule is enforced: the card flips
+to ACCEPTED only after `{promoted_id}` returns.
+
+**Realtime fan-out:** dispatch consumes the room's `meeting.started` /
+`meeting.ended` system broadcasts (plus the §114 `meeting.event` name) by
+hydrating from the validated §112 GET — notify payloads are id-only stubs, so
+nothing half-filled is ever projected; a locally-started session (REST response
+won the race) is not clobbered. Demo REST routes stay SILENT on purpose: the
+real Worker publishes meeting events only on WS-frame paths (backend AUDIT #35),
+so parity means no demo-side broadcasts either.
+
+**§128 Garage artifact:** "Review & Save" now ends the session AND, when the
+user keeps the checkbox ticked ("if chosen"), creates a REAL artifact via
+`POST /projects/:projectId/artifacts` (`{name, artifact_type: MARKDOWN,
+content_type, content}` → 201 `{artifact, version}`) merged into the artifact
+store. The previous LESSON-memory-row stand-in is gone.
+
+**Honest gaps recorded this pass (nothing papered over):**
+1. **No backend route resolves a candidate as REJECTED/MERGED/EXPIRED before
+   end** — only detect + accept exist. Dismiss/Skip/Edit-markers therefore stay
+   CLIENT-held until the session ends (the server then expires leftovers,
+   §50A). A rejected candidate that never sees POST /end would remain PENDING
+   server-side.
+2. **§124 "Edit" is implemented as re-detect**: there is no update-candidate
+   route, so Edit persists the refinement as a NEW §50A row (real server row,
+   promotable with its own content) and marks the original MERGED locally per
+   §124A.2. An edit control that could not affect what the server promotes
+   would have been theater, so none was shipped.
+3. **Scheduling/agenda are SPEC-SILENT**: neither the FE spec nor the BE spec
+   defines any scheduling/calendar/agenda surface for meetings (grep verified;
+   only BE line about "short-lived scheduling information" exists without an
+   object). Nothing was invented. Meeting Mode covers start → live panel →
+   end → summary exactly as specified.
+4. **Live notes have no backend column** — §124's Live Notes section stays
+   client-held for the session and is included nowhere in the persisted
+   summary beyond what the user confirms in the summary_text.
+5. **Meeting summaries list endpoint**: §112 defines no list-sessions route,
+   so `/meeting/:id` deep links resolve via held state or a direct GET; an
+   unknown id falls back to the safest shared surface (§177 pattern).
+
+Verification: `tsc -b` clean; oxlint no new warnings; vitest 41 files / 330
+tests green (P9 adds p9Routes parity, dialogs, panel lifecycle, TopBar/
+ChatHeader flag-gating, dispatch projections); production build passes with
+the canonical purity greps still clean (`demo-token` / `installDemoMode` /
+dataset ids absent from dist/assets).

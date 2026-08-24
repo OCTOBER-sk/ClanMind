@@ -414,17 +414,45 @@ export const MemoryCandidateListSchema = z
   .object({ items: z.array(MemoryCandidateSchema).nullish() })
   .passthrough();
 
+/** BE §50 `meeting_sessions` row. */
+export const MeetingSessionSchema = z
+  .object({
+    id: IdSchema,
+    group_id: IdSchema,
+    project_id: IdSchema.nullish(),
+    started_by: IdSchema,
+    started_at: IsoDateSchema,
+    ended_at: IsoDateSchema.nullish(),
+    status: z.string(),
+    summary_artifact_id: IdSchema.nullish(),
+  })
+  .passthrough();
+
+/**
+ * BE §50A `meeting_candidates` row — `content` is the jsonb detector payload
+ * (record), not a plain string.
+ */
 export const MeetingCandidateSchema = z
   .object({
     id: IdSchema,
     meeting_session_id: IdSchema,
     candidate_type: z.string(),
-    content: z.unknown(),
+    content: z.record(z.string(), z.unknown()),
     confidence: z.number(),
+    source_message_id: IdSchema.nullish(),
     status: z.string(),
     promoted_to_type: z.string().nullish(),
-    promoted_to_id: z.string().nullish(),
+    promoted_to_id: IdSchema.nullish(),
     created_at: IsoDateSchema,
+    resolved_at: IsoDateSchema.nullish(),
+  })
+  .passthrough();
+
+/** GET /meetings/:id → { session, candidates } (BE §112). */
+export const MeetingDetailSchema = z
+  .object({
+    session: MeetingSessionSchema,
+    candidates: z.array(MeetingCandidateSchema).nullish(),
   })
   .passthrough();
 

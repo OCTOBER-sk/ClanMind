@@ -22,11 +22,9 @@ import { useUiStore } from '@/state/useUiStore';
 import { wipeAccountDb } from '@/local/db';
 
 export function clearDomainStores(): void {
-  // Meeting timer is a raw setInterval handle — stop it before dropping state.
-  const meeting = useMeetingStore.getState();
-  if (meeting.timerIntervalId !== null) {
-    clearInterval(meeting.timerIntervalId);
-  }
+  // The meeting timer interval is owned by the shell's useEffect — dropping
+  // the active flags stops it; state itself resets via resetMeeting().
+  useMeetingStore.getState().resetMeeting();
 
   useChatStore.setState({
     messages: [],
@@ -71,16 +69,6 @@ export function clearDomainStores(): void {
     rightPanelMode: 'closed',
     aiRunByArtifact: {},
     aiRunsByMessage: {},
-  });
-
-  useMeetingStore.setState({
-    currentSession: null,
-    isMeetingActive: false,
-    isMeetingPaused: false,
-    elapsedSeconds: 0,
-    isStartDialogOpen: false,
-    isEndSummaryDialogOpen: false,
-    timerIntervalId: null,
   });
 
   // Sync queue/checkpoint/conflicts belong to the account's data plane.

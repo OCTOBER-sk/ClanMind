@@ -94,6 +94,7 @@ export type AiActionStatus =
 export type MemoryScope = 'GROUP' | 'PROJECT' | 'USER_PRIVATE';
 export type MemoryCandidateStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'MERGED' | 'EXPIRED';
 
+/** §124A.1 — mirrors BE `meeting_candidates.candidate_type` (§50A). */
 export type MeetingCandidateType =
   | 'DECISION'
   | 'TASK'
@@ -101,6 +102,9 @@ export type MeetingCandidateType =
   | 'CONTRADICTION'
   | 'RESEARCH_NEED'
   | 'MILESTONE_CHANGE';
+
+/** §124A.2 — mirrors BE `meeting_candidates.status` (§50A). */
+export type MeetingCandidateStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'MERGED' | 'EXPIRED';
 
 export type NotificationCategory =
   | 'MENTION'
@@ -590,31 +594,39 @@ export interface MemoryCandidate {
   created_at: string;
 }
 
-export interface MeetingCandidate {
-  id: string;
-  meeting_id: string;
-  group_id: string;
-  project_id: string;
-  candidate_type: MeetingCandidateType;
-  status: MemoryCandidateStatus;
-  content: string;
-  metadata?: Record<string, unknown>;
-  promoted_to_type?: 'DECISION' | 'TASK';
-  promoted_to_id?: string;
-  created_at: string;
-}
-
+/**
+ * BE §50 `meeting_sessions` row — the wire contract is authoritative; the
+ * §123 header timer and the paused state (§213 matrix) are CLIENT-derived
+ * presentations (the server enum is only ACTIVE|ENDED).
+ */
 export interface MeetingSession {
   id: string;
   group_id: string;
-  project_id: string;
+  project_id: string | null;
+  started_by: string;
   started_at: string;
-  ended_at?: string;
-  is_active: boolean;
-  is_paused: boolean;
-  elapsed_seconds: number;
-  live_notes: string[];
-  candidates: MeetingCandidate[];
+  ended_at: string | null;
+  status: 'ACTIVE' | 'ENDED';
+  summary_artifact_id: string | null;
+}
+
+/**
+ * BE §50A `meeting_candidates` row. `content` is the jsonb payload the
+ * detector produced (title/description/context keys are what the promote
+ * callback reads); `promoted_to_type` is lowercase 'decision'|'task'.
+ */
+export interface MeetingCandidate {
+  id: string;
+  meeting_session_id: string;
+  candidate_type: MeetingCandidateType;
+  content: Record<string, unknown>;
+  confidence: number;
+  source_message_id: string | null;
+  status: MeetingCandidateStatus;
+  promoted_to_type: string | null;
+  promoted_to_id: string | null;
+  created_at: string;
+  resolved_at: string | null;
 }
 
 /**

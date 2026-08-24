@@ -84,6 +84,27 @@ export async function fetchArtifact(artifactId: string): Promise<Artifact | null
   return parsed.success ? mapArtifactRow(parsed.data) : null;
 }
 
+/**
+ * BE §109 — create an artifact in a Project (used by §128 to persist a saved
+ * meeting summary as a Garage artifact). Body mirrors createArtifactBody:
+ * `{name, artifact_type, content_type, content}` → 201 `{artifact, version}`.
+ */
+export async function createProjectArtifact(
+  projectId: string,
+  input: { name: string; artifact_type: string; content_type: string; content: string },
+): Promise<Artifact> {
+  const raw = await api.post(`/projects/${encodeURIComponent(projectId)}/artifacts`, {
+    name: input.name,
+    artifact_type: input.artifact_type,
+    content_type: input.content_type,
+    content: input.content,
+  });
+  const envelope = raw as Record<string, unknown>;
+  const parsed = ArtifactRowSchema.safeParse(envelope.artifact ?? raw);
+  if (!parsed.success) throw new Error('Create-artifact response failed schema validation.');
+  return mapArtifactRow(parsed.data);
+}
+
 function parseArtifactResponse(raw: unknown): Artifact {
   const parsed = ArtifactRowSchema.safeParse(raw);
   if (!parsed.success) {

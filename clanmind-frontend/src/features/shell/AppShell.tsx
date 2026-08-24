@@ -38,6 +38,12 @@ import {
 } from '@/api/endpoints/github';
 import { GITHUB_STATUS_LABEL } from '@/features/github/useGithubConnection';
 import { ApiError } from '@/api/errors';
+import {
+  acceptMeetingCandidate,
+  detectMeetingCandidate,
+  endMeeting as endMeetingRequest,
+} from '@/api/endpoints/meetings';
+import { createProjectArtifact } from '@/api/endpoints/artifacts';
 import { ContextInspector } from '@/features/artifacts/ContextInspector';
 import { ResearchDrawer } from '@/features/ai/ResearchDrawer';
 import { SyncConflictCard } from '@/features/sync/SyncConflictCard';
@@ -133,6 +139,7 @@ export function AppShell() {
     setCompareVersionNumber,
     openArtifactPanel,
     closeRightPanel,
+    mergeArtifactVersion,
   } = useArtifactStore();
 
   const {
@@ -140,13 +147,16 @@ export function AppShell() {
     isMeetingPaused,
     elapsedSeconds,
     currentSession,
+    candidates: meetingCandidates,
+    liveNotes,
     pauseMeeting,
     resumeMeeting,
-    endMeeting,
+    beginEnding,
+    finishEnding,
     tickTimer,
     addLiveNote,
-    updateCandidateStatus,
-    restoreCandidate,
+    addCandidate,
+    patchCandidate: patchMeetingCandidate,
     setStartDialogOpen,
   } = useMeetingStore();
 
@@ -168,7 +178,6 @@ export function AppShell() {
     memoryCandidates,
     notifications,
     aiActions,
-    upsertMemory,
     updateAiAction,
   } = useProjectDataStore();
 
@@ -563,34 +572,76 @@ export function AppShell() {
 
   // (Send/retry/AI-trigger pipeline moved to features/chat/useChatController.ts — R1)
 
-  /** §124A.2: create the real object through the §111/§110 endpoints, wait
-   *  for the server row, then mark the candidate ACCEPTED with its id. */
+  /** §124A.2: DECISION/TASK candidates promote through the REAL §112/§50A
+   *  endpoint — the Worker creates the object and stamps promoted_to_type/id;
+   *  the card flips to ACCEPTED only after that confirmation arrives. Other
+   *  candidate types have no promote path server-side (no reject/resolve
+   *  routes exist yet — D23), so their resolution stays client-held. */
   const handleAcceptMeetingCandidate = async (c: MeetingCandidate) => {
-    if (!activeProjectId) {
-      toast({ title: 'Open a project context first', description: 'Candidates promote into the active Project.' });
-      return;
-    }
-    if (c.candidate_type === 'DECISION') {
-      const decision = await decisionsCtl.propose({ title: c.content.slice(0, 300) });
-      if (decision) {
-        updateCandidateStatus(c.id, 'ACCEPTED', { type: 'DECISION', id: decision.id });
-        toast({ title: 'Decision proposed', variant: 'success' });
+    if (!currentSession || currentSession.status !== 'ACTIVE') return;
+    if (c.candidate_type === 'DECISION' || c.candidate_type === 'TASK') {
+      if (!activeProjectId) {
+        toast({ title: 'Open a project context first', description: 'Candidates promote into the active Project.' });
+        return;
+      }
+      try {
+        // {promote: 'task'|'decision'} → {promoted_id} — never optimistic.
+        const { promoted_id } = await acceptMeetingCandidate(
+          currentSession.id,
+          c.id,
+          c.candidate_type === 'TASK' ? 'task' : 'decision',
+        );
+        patchMeetingCandidate(c.id, {
+          status: 'ACCEPTED',
+          promoted_to_type: c.candidate_type === 'TASK' ? 'task' : 'decision',
+          promoted_to_id: promoted_id,
+          resolved_at: new Date().toISOString(),
+        });
+        toast({
+          title: c.candidate_type === 'TASK' ? 'Task created' : 'Decision proposed',
+          variant: 'success',
+        });
+      } catch (err) {
+        toast({ title: 'Could not save this candidate', description: errorMessageOf(err) });
+        throw err; // keep the card's busy state honest
       }
       return;
     }
-    if (c.candidate_type === 'TASK') {
-      const task = await tasksCtl.create({
-        title: c.content.slice(0, 300),
-        owner_user_id: currentUserId,
+    // OPEN_QUESTION / CONTRADICTION / RESEARCH_NEED / MILESTONE_CHANGE —
+    // addressed in-conversation; no §50A promotion exists for these types.
+    patchMeetingCandidate(c.id, {
+      status: 'ACCEPTED',
+      resolved_at: new Date().toISOString(),
+    });
+  };
+
+  /** §124A.2 Dismissed → REJECTED; Restore brings it back PENDING. No backend
+   *  route resolves a candidate as rejected yet (D23) — client-held state. */
+  const handleDismissMeetingCandidate = (id: string) =>
+    patchMeetingCandidate(id, { status: 'REJECTED', resolved_at: new Date().toISOString() });
+
+  const handleRestoreMeetingCandidate = (id: string) =>
+    patchMeetingCandidate(id, { status: 'PENDING', resolved_at: null });
+
+  /** §124 "Edit" — the only honest write path is a NEW §50A detect row with
+   *  the refined content (POST /meetings/:id/candidates); the original is
+   *  marked MERGED (§124A.2 subtle note) so nothing silently disappears. */
+  const handleEditMeetingCandidate = async (id: string, title: string) => {
+    const original = meetingCandidates.find((c) => c.id === id);
+    if (!original || !currentSession || currentSession.status !== 'ACTIVE') return;
+    try {
+      // Confidence rides along; content keeps any extra detector keys.
+      const replacement = await detectMeetingCandidate(currentSession.id, {
+        candidate_type: original.candidate_type,
+        content: { ...original.content, title },
+        confidence: original.confidence,
       });
-      if (task) {
-        updateCandidateStatus(c.id, 'ACCEPTED', { type: 'TASK', id: task.id });
-        toast({ title: 'Task created', variant: 'success' });
-      }
-      return;
+      patchMeetingCandidate(id, { status: 'MERGED', resolved_at: new Date().toISOString() });
+      addCandidate(replacement);
+    } catch (err) {
+      toast({ title: 'Could not update this candidate', description: errorMessageOf(err) });
+      throw err;
     }
-    // OPEN_QUESTION / CONTRADICTION / RESEARCH_NEED / MILESTONE_CHANGE — addressed
-    updateCandidateStatus(c.id, 'ACCEPTED');
   };
 
   /** §164A.2 — approve submits the exact displayed hash+version to the real
@@ -688,40 +739,48 @@ export function AppShell() {
       .finally(() => closeRightPanel());
   };
 
-  /** §128: saved summary becomes a Garage artifact */
-  const handleSaveMeetingSummary = () => {
-    const groupName = activeGroup?.name || 'Group';
-    const sessionDecisions =
-      currentSession?.candidates.filter(
-        (c) => c.status === 'ACCEPTED' && c.candidate_type === 'DECISION'
-      ).length ?? 0;
-    const sessionTasks =
-      currentSession?.candidates.filter(
-        (c) => c.status === 'ACCEPTED' && c.candidate_type === 'TASK'
-      ).length ?? 0;
-    const now = new Date().toISOString();
-    // §128 — the saved summary lands in Project memory as a LESSON row
-    // (proper Garage artifact creation is P9 scope).
-    upsertMemory({
-      id: `mem_summary_${Date.now()}`,
-      scope_type: 'PROJECT',
-      group_id: groupForRoute?.id ?? '',
-      project_id: activeProjectId,
-      user_id: null,
-      memory_type: 'LESSON',
-      content: `${groupName} — Meeting summary with ${sessionDecisions} accepted decisions and ${sessionTasks} accepted tasks.`,
-      normalized_content: null,
-      confidence: 1,
-      importance: 0.7,
-      source_type: 'meeting',
-      source_id: currentSession?.id ?? null,
-      status: 'ACTIVE',
-      created_at: now,
-      updated_at: now,
-      last_used_at: null,
-      archived_at: null,
-    });
-    toast({ title: 'Meeting summary saved', description: 'Available in Garage as an artifact.' });
+  /** §112/§127/§128 — "Review & Save" posts the human-confirmed summary_text
+   *  to POST /meetings/:id/end (the server then expires leftovers, §50A),
+   *  retires the active surface, and when chosen persists the summary as a
+   *  REAL Garage artifact (POST /projects/:id/artifacts). */
+  const handleEndMeeting = async (summaryText: string, saveArtifact: boolean): Promise<boolean> => {
+    if (!currentSession || currentSession.status !== 'ACTIVE') return false;
+    try {
+      await endMeetingRequest(currentSession.id, summaryText);
+    } catch (err) {
+      toast({ title: 'Could not end the meeting', description: errorMessageOf(err) });
+      return false;
+    }
+    finishEnding();
+    // Sessions are project-scoped server-side (§112), so the session row is
+    // the authoritative artifact target.
+    const artifactProjectId = currentSession.project_id ?? activeProjectId;
+    if (saveArtifact && artifactProjectId) {
+      const groupName = activeGroup?.name || 'Group';
+      try {
+        const artifact = await createProjectArtifact(artifactProjectId, {
+          name: `${groupName} — Meeting summary`,
+          artifact_type: 'MARKDOWN',
+          content_type: 'text/markdown',
+          content: summaryText,
+        });
+        mergeArtifactVersion(artifact);
+        toast({
+          title: 'Meeting summary saved',
+          description: 'Saved to Garage as an artifact.',
+          variant: 'success',
+        });
+      } catch (err) {
+        // The session HAS ended server-side; only the Garage copy failed.
+        toast({
+          title: 'Meeting ended',
+          description: `The summary could not be saved to Garage: ${errorMessageOf(err)}`,
+        });
+      }
+    } else {
+      toast({ title: 'Meeting summary saved' });
+    }
+    return true;
   };
 
   /** §30 — Reply opens the thread in the right work surface. */
@@ -883,19 +942,20 @@ export function AppShell() {
     <>
       {isMeetingActive ? (
         <MeetingPanel
-          candidates={currentSession?.candidates || []}
-          liveNotes={currentSession?.live_notes || []}
+          candidates={meetingCandidates}
+          liveNotes={liveNotes}
           aiName={activeGroup?.ai_name || 'Odin'}
           onAcceptCandidate={handleAcceptMeetingCandidate}
-          onDismissCandidate={(id) => updateCandidateStatus(id, 'REJECTED')}
-          onRestoreCandidate={restoreCandidate}
+          onEditCandidate={handleEditMeetingCandidate}
+          onDismissCandidate={handleDismissMeetingCandidate}
+          onRestoreCandidate={handleRestoreMeetingCandidate}
           onAddNote={addLiveNote}
           onResearchShortcut={(topic) => {
             setComposerText(`/research ${topic}`);
             navigateToSection('chat');
           }}
           onOpenPromoted={(type) => {
-            if (type === 'DECISION') navigateToSection('decisions');
+            if (type === 'decision') navigateToSection('decisions');
             else navigateToSection('tasks');
           }}
           onClose={closeRightPanel}
@@ -1102,14 +1162,15 @@ export function AppShell() {
       {/* §185 Sync Banner — standalone strip, separate from TopBar */}
       <SyncBanner />
 
-      {/* Active Meeting Banner if active (§123) */}
+      {/* Active Meeting Banner if active (§123) — End opens the §127 review;
+          the session only retires once POST /end confirms. */}
       {isMeetingActive && (
         <MeetingActiveHeader
           elapsedSeconds={elapsedSeconds}
           isPaused={isMeetingPaused}
           onPause={pauseMeeting}
           onResume={resumeMeeting}
-          onEnd={endMeeting}
+          onEnd={beginEnding}
         />
       )}
 
@@ -1546,7 +1607,7 @@ export function AppShell() {
       <MeetingStartDialog />
       <MeetingEndSummaryDialog
         onAcceptCandidate={handleAcceptMeetingCandidate}
-        onSaveSummary={handleSaveMeetingSummary}
+        onEndMeeting={handleEndMeeting}
       />
 
       {/* Keyboard shortcuts help (§63) */}

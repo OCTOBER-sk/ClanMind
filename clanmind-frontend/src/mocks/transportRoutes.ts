@@ -6,7 +6,12 @@
 
 import type { Transport, TransportRequest, TransportResponse, TransportUploadRequest } from '@/api/transport';
 import type { DemoDataset } from './dataset';
-import type { Message, AiAction, AiProviderConfig } from '@/types';
+import type {
+  Message,
+  AiAction,
+  AiProviderConfig,
+  MeetingCandidate,
+} from '@/types';
 import { getDemoHub } from './wsHub';
 import {
   ATTACHMENTS_PER_MESSAGE_MAX,
@@ -999,6 +1004,176 @@ export function createDemoTransport(ds: DemoDataset): Transport {
       decision.updated_at = new Date().toISOString();
       getDemoHub().broadcast('decision.rejected', ds.projects.find((pr) => pr.id === decision.project_id)?.group_id ?? '', { decision });
       return ok({ ok: true });
+    }],
+
+    // ── Meetings (P9): BE §112 handlers/intel.ts parity + §50A extras ───────
+    // The real Worker's REST meeting paths publish nothing (WS-frame only,
+    // backend AUDIT #35), so these demo handlers stay silent too.
+
+    ['POST', '/projects/:projectId/meetings', (p) => {
+      const project = ds.projects.find((pr) => pr.id === p.projectId);
+      if (!project) return fail(404, 'NOT_FOUND', 'Project not found.');
+      // startMeetingBody = z.object({}) — any body is accepted and stripped.
+      const nowIso = new Date().toISOString();
+      const session = {
+        id: `meet_${crypto.randomUUID()}`,
+        group_id: project.group_id,
+        project_id: project.id,
+        started_by: ds.currentUser.id,
+        started_at: nowIso,
+        ended_at: null,
+        status: 'ACTIVE' as const,
+        summary_artifact_id: null,
+      };
+      ds.meetingSessions.push(session);
+      return ok(session, 201);
+    }],
+
+    ['GET', '/meetings/:meetingId', (p) => {
+      const session = ds.meetingSessions.find((m) => m.id === p.meetingId);
+      if (!session) return fail(404, 'NOT_FOUND', 'Meeting not found.');
+      const candidates = ds.meetingCandidates.filter(
+        (c) => c.meeting_session_id === session.id,
+      );
+      return ok({ session, candidates });
+    }],
+
+    ['POST', '/meetings/:meetingId/end', (p, req) => {
+      const session = ds.meetingSessions.find((m) => m.id === p.meetingId);
+      if (!session) return fail(404, 'NOT_FOUND', 'Meeting not found.');
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      if (typeof body.summary_text !== 'string' || body.summary_text.length < 1) {
+        return fail(400, 'VALIDATION_FAILED', 'summary_text is required.');
+      }
+      // §50A — the structured summary row; §73 fields ride the session trail.
+      session.status = 'ENDED';
+      session.ended_at = new Date().toISOString();
+      // Leftover PENDING candidates expire at end (§50A/§124A.3 leftovers).
+      for (const candidate of ds.meetingCandidates) {
+        if (candidate.meeting_session_id === session.id && candidate.status === 'PENDING') {
+          candidate.status = 'EXPIRED';
+          candidate.resolved_at = session.ended_at;
+        }
+      }
+      return ok({ ok: true });
+    }],
+
+    ['POST', '/meetings/:meetingId/candidates', (p, req) => {
+      const session = ds.meetingSessions.find((m) => m.id === p.meetingId);
+      if (!session) return fail(404, 'NOT_FOUND', 'Meeting not found.');
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const VALID_TYPES = ['DECISION', 'TASK', 'OPEN_QUESTION', 'CONTRADICTION', 'RESEARCH_NEED', 'MILESTONE_CHANGE'];
+      const content = body.content;
+      const confidence = body.confidence;
+      if (
+        typeof body.candidate_type !== 'string' ||
+        !VALID_TYPES.includes(body.candidate_type) ||
+        typeof content !== 'object' ||
+        content === null ||
+        Array.isArray(content) ||
+        typeof confidence !== 'number' ||
+        confidence < 0 ||
+        confidence > 1
+      ) {
+        return fail(400, 'VALIDATION_FAILED', 'Invalid candidate body.');
+      }
+      if (session.status !== 'ACTIVE') {
+        return fail(409, 'CONFLICT', 'No active meeting session.');
+      }
+      const candidate = {
+        id: `mc_${crypto.randomUUID()}`,
+        meeting_session_id: session.id,
+        candidate_type: body.candidate_type as MeetingCandidate['candidate_type'],
+        content: content as Record<string, unknown>,
+        confidence: confidence as number,
+        source_message_id:
+          typeof body.source_message_id === 'string' ? body.source_message_id : null,
+        status: 'PENDING' as const,
+        promoted_to_type: null,
+        promoted_to_id: null,
+        created_at: new Date().toISOString(),
+        resolved_at: null,
+      };
+      ds.meetingCandidates.push(candidate);
+      return ok(candidate, 201);
+    }],
+
+    ['POST', '/meetings/:meetingId/candidates/:candidateId/accept', (p, req) => {
+      const session = ds.meetingSessions.find((m) => m.id === p.meetingId);
+      if (!session) return fail(404, 'NOT_FOUND', 'Meeting not found.');
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      if (body.promote !== 'task' && body.promote !== 'decision') {
+        return fail(400, 'VALIDATION_FAILED', "promote ('task'|'decision') is required.");
+      }
+      if (!session.project_id) {
+        return fail(400, 'VALIDATION_FAILED', 'Meeting has no active project context.');
+      }
+      const candidate = ds.meetingCandidates.find((c) => c.id === p.candidateId);
+      if (!candidate) return fail(404, 'NOT_FOUND', 'Candidate not found.');
+      if (candidate.status !== 'PENDING') {
+        return fail(409, 'CONFLICT', 'Candidate already resolved.');
+      }
+      // Same promote defaults as handlers/intel.ts — content.title wins.
+      const nowIso = new Date().toISOString();
+      let promotedId: string;
+      if (body.promote === 'task') {
+        const title =
+          typeof candidate.content['title'] === 'string'
+            ? candidate.content['title']
+            : 'Untitled task';
+        const task = {
+          id: `task_${crypto.randomUUID()}`,
+          project_id: session.project_id,
+          title,
+          description:
+            typeof candidate.content['description'] === 'string'
+              ? candidate.content['description']
+              : null,
+          owner_user_id: null,
+          status: 'TODO' as const,
+          priority: 'MEDIUM' as const,
+          due_at: null,
+          version: 1,
+          created_by_user_id: ds.currentUser.id,
+          created_by_ai_id: null,
+          created_at: nowIso,
+          updated_at: nowIso,
+          completed_at: null,
+        };
+        ds.tasks.push(task);
+        promotedId = task.id;
+      } else {
+        const title =
+          typeof candidate.content['title'] === 'string'
+            ? candidate.content['title']
+            : 'Untitled decision';
+        const decision = {
+          id: `dec_${crypto.randomUUID()}`,
+          project_id: session.project_id,
+          title,
+          context:
+            typeof candidate.content['context'] === 'string'
+              ? candidate.content['context']
+              : null,
+          options: null,
+          selected_option: null,
+          rationale: null,
+          status: 'PROPOSED' as const,
+          version: 1,
+          proposed_by: ds.currentUser.id,
+          approved_by: null,
+          approved_at: null,
+          created_at: nowIso,
+          updated_at: nowIso,
+        };
+        ds.decisions.push(decision);
+        promotedId = decision.id;
+      }
+      candidate.status = 'ACCEPTED';
+      candidate.promoted_to_type = body.promote;
+      candidate.promoted_to_id = promotedId;
+      candidate.resolved_at = nowIso;
+      return ok({ promoted_id: promotedId }, 201);
     }],
 
     // ── Memory (P8): BE §108 handlers/memory.ts parity ──────────────────────

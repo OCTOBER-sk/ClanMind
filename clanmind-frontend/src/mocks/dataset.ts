@@ -22,6 +22,8 @@ import type {
   GithubActionItem,
   AiProviderConfig,
   AiModelRoute,
+  MeetingSession,
+  MeetingCandidate,
 } from '@/types';
 
 export interface DemoDataset {
@@ -38,6 +40,10 @@ export interface DemoDataset {
   memories: MemoryEntry[];
   /** §36 PENDING candidate rows. */
   memoryCandidates: MemoryCandidate[];
+  /** §50 meeting_sessions rows (BE §112 surface). */
+  meetingSessions: MeetingSession[];
+  /** §50A meeting_candidates rows. */
+  meetingCandidates: MeetingCandidate[];
   notifications: NotificationItem[];
   aiActions: AiAction[];
   artifacts: Artifact[];
@@ -753,6 +759,10 @@ export function createDemoDataset(): DemoDataset {
     decisions,
     memories,
     memoryCandidates,
+    // §50/§50A — meetings start empty; sessions/candidates are created at
+    // runtime through the §112 demo routes (no fixture meetings).
+    meetingSessions: [],
+    meetingCandidates: [],
     notifications,
     aiActions,
     artifacts,

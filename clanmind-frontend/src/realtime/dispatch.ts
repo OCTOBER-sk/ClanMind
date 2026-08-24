@@ -34,6 +34,8 @@ import { mapMessageRow } from '@/api/messageRow';
 import { mapTaskRow } from '@/api/endpoints/tasks';
 import { mapDecisionRow } from '@/api/endpoints/decisions';
 import { mapMemoryRow } from '@/api/endpoints/memory';
+import { fetchMeeting } from '@/api/endpoints/meetings';
+import { useMeetingStore } from '@/state/useMeetingStore';
 import type { AiRun, Artifact, DiagramContent, Message } from '@/types';
 import type { RealtimeEvent } from '@/realtime/events';
 
@@ -827,6 +829,45 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
       const memoryId =
         firstString(payload.memory_id, (payload.memory as Record<string, unknown> | undefined)?.id) ?? '';
       if (memoryId) useProjectDataStore.getState().deleteMemory(memoryId);
+      break;
+    }
+
+    case 'meeting.event':
+    case 'meeting.started': {
+      // §114 server→client vocabulary + the room's broadcastSystem names
+      // (group-room.ts sends `meeting.started` with {meeting_session_id,
+      // project_id, started_by}). Hydrate the FULL session from §112 GET —
+      // never project a half-filled session from the notify payload.
+      const sessionId = firstString(payload.meeting_session_id, payload.meeting_id, payload.id);
+      if (!sessionId) break;
+      const alreadyActive = useMeetingStore.getState().currentSession?.id === sessionId;
+      if (alreadyActive) break;
+      void fetchMeeting(sessionId)
+        .then(({ session, candidates }) => {
+          const store = useMeetingStore.getState();
+          // A locally-started session (REST response won the race) is kept.
+          if (useMeetingStore.getState().isMeetingActive) return;
+          store.setSession(session);
+          store.setCandidates(candidates);
+        })
+        .catch(() => undefined); // unknown/unauthorized id: honest absence
+      break;
+    }
+
+    case 'meeting.ended': {
+      const sessionId = firstString(payload.meeting_session_id, payload.meeting_id, payload.id);
+      if (!sessionId) break;
+      const state = useMeetingStore.getState();
+      if (state.currentSession?.id !== sessionId) break;
+      // Re-read the server truth: leftovers were expired at end (§50A).
+      void fetchMeeting(sessionId)
+        .then(({ candidates }) => {
+          useMeetingStore.getState().setCandidates(candidates);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          useMeetingStore.getState().finishEnding();
+        });
       break;
     }
 

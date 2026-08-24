@@ -1,157 +1,112 @@
 import { create } from 'zustand';
-import type { MeetingCandidate, MeetingSession, MemoryCandidateStatus } from '@/types';
+import type {
+  MeetingCandidate,
+  MeetingCandidateStatus,
+  MeetingSession,
+} from '@/types';
 
+/**
+ * Meeting state (FE §123/§124/§124A, BE §50/§50A).
+ *
+ * `currentSession` is the SERVER row (BE §50) — the §123 header timer and
+ * `isMeetingPaused` (§213 matrix "paused") are client-derived presentations;
+ * the backend status enum is only ACTIVE|ENDED. `candidates` is the session's
+ * §50A trail; live notes (§124 "Live notes") have no backend column and stay
+ * client-held for the session (D23).
+ */
 export interface MeetingState {
   currentSession: MeetingSession | null;
+  /** §50A candidates for the current session, newest first. */
+  candidates: MeetingCandidate[];
   isMeetingActive: boolean;
   isMeetingPaused: boolean;
   elapsedSeconds: number;
+  /** §124 Live notes — client-held during the session. */
+  liveNotes: string[];
   isStartDialogOpen: boolean;
   isEndSummaryDialogOpen: boolean;
-  timerIntervalId: number | null;
 
-  startMeeting: (groupId: string, projectId: string) => void;
+  setSession: (session: MeetingSession) => void;
+  setCandidates: (candidates: MeetingCandidate[]) => void;
+  addCandidate: (candidate: MeetingCandidate) => void;
+  patchCandidate: (id: string, patch: Partial<MeetingCandidate>) => void;
   pauseMeeting: () => void;
   resumeMeeting: () => void;
-  endMeeting: () => void;
   tickTimer: () => void;
   addLiveNote: (note: string) => void;
-  addCandidate: (candidate: MeetingCandidate) => void;
-  updateCandidateStatus: (
-    id: string,
-    status: MemoryCandidateStatus,
-    promotedTo?: { type: 'DECISION' | 'TASK'; id: string }
-  ) => void;
-  /** §124A.2 — bring a dismissed candidate back to the active panel */
-  restoreCandidate: (id: string) => void;
+  /**
+   * §127 — user pressed End: open the summary review while the session is
+   * still ACTIVE server-side; only POST /end (Review & Save) retires it.
+   */
+  beginEnding: () => void;
+  /** Server confirmed the end — retire the active surface. */
+  finishEnding: () => void;
+  resetMeeting: () => void;
   setStartDialogOpen: (open: boolean) => void;
   setEndSummaryDialogOpen: (open: boolean) => void;
 }
 
-// §11 — candidates arrive from the meeting pipeline (BE §50A) or demo
-// hydration; no runtime fixtures.
-const INITIAL_CANDIDATES: MeetingCandidate[] = [];
-
-export const useMeetingStore = create<MeetingState>((set, get) => ({
+const INITIAL = {
   currentSession: null,
+  candidates: [] as MeetingCandidate[],
   isMeetingActive: false,
   isMeetingPaused: false,
   elapsedSeconds: 0,
+  liveNotes: [] as string[],
   isStartDialogOpen: false,
   isEndSummaryDialogOpen: false,
-  timerIntervalId: null,
+};
 
-  startMeeting: (groupId, projectId) => {
-    const session: MeetingSession = {
-      id: `meet_${Date.now()}`,
-      group_id: groupId,
-      project_id: projectId,
-      started_at: new Date().toISOString(),
-      is_active: true,
-      is_paused: false,
-      elapsed_seconds: 0,
-      live_notes: [],
-      candidates: [...INITIAL_CANDIDATES],
-    };
+export const useMeetingStore = create<MeetingState>((set) => ({
+  ...INITIAL,
+
+  setSession: (session) =>
     set({
       currentSession: session,
-      isMeetingActive: true,
-      isMeetingPaused: false,
-      elapsedSeconds: 0,
+      isMeetingActive: session.status === 'ACTIVE',
       isStartDialogOpen: false,
-    });
-  },
+    }),
 
-  pauseMeeting: () =>
-    set((state) => ({
-      isMeetingPaused: true,
-      currentSession: state.currentSession
-        ? { ...state.currentSession, is_paused: true }
-        : null,
-    })),
-
-  resumeMeeting: () =>
-    set((state) => ({
-      isMeetingPaused: false,
-      currentSession: state.currentSession
-        ? { ...state.currentSession, is_paused: false }
-        : null,
-    })),
-
-  endMeeting: () => {
-    set({
-      isMeetingActive: false,
-      isMeetingPaused: false,
-      isEndSummaryDialogOpen: true,
-    });
-  },
-
-  tickTimer: () => {
-    const { isMeetingActive, isMeetingPaused, elapsedSeconds, currentSession } = get();
-    if (isMeetingActive && !isMeetingPaused) {
-      const nextSeconds = elapsedSeconds + 1;
-      set({
-        elapsedSeconds: nextSeconds,
-        currentSession: currentSession
-          ? { ...currentSession, elapsed_seconds: nextSeconds }
-          : null,
-      });
-    }
-  },
-
-  addLiveNote: (note) =>
-    set((state) => ({
-      currentSession: state.currentSession
-        ? {
-            ...state.currentSession,
-            live_notes: [...state.currentSession.live_notes, note],
-          }
-        : null,
-    })),
+  setCandidates: (candidates) => set({ candidates }),
 
   addCandidate: (candidate) =>
+    set((state) => ({ candidates: [candidate, ...state.candidates] })),
+
+  patchCandidate: (id, patch) =>
     set((state) => ({
+      candidates: state.candidates.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    })),
+
+  pauseMeeting: () => set({ isMeetingPaused: true }),
+
+  resumeMeeting: () => set({ isMeetingPaused: false }),
+
+  tickTimer: () =>
+    set((state) => (state.isMeetingActive && !state.isMeetingPaused
+      ? { elapsedSeconds: state.elapsedSeconds + 1 }
+      : {})),
+
+  addLiveNote: (note) =>
+    set((state) => ({ liveNotes: [...state.liveNotes, note] })),
+
+  beginEnding: () => set({ isEndSummaryDialogOpen: true }),
+
+  finishEnding: () =>
+    set((state) => ({
+      isMeetingActive: false,
+      isMeetingPaused: false,
       currentSession: state.currentSession
-        ? {
-            ...state.currentSession,
-            candidates: [candidate, ...state.currentSession.candidates],
-          }
+        ? { ...state.currentSession, status: 'ENDED', ended_at: new Date().toISOString() }
         : null,
     })),
 
-  updateCandidateStatus: (id, status, promotedTo) =>
-    set((state) => ({
-      currentSession: state.currentSession
-        ? {
-            ...state.currentSession,
-            candidates: state.currentSession.candidates.map((c) =>
-              c.id === id
-                ? {
-                    ...c,
-                    status,
-                    promoted_to_type: promotedTo?.type || c.promoted_to_type,
-                    promoted_to_id: promotedTo?.id || c.promoted_to_id,
-                  }
-                : c
-            ),
-          }
-        : null,
-    })),
-
-  restoreCandidate: (id) =>
-    set((state) => ({
-      currentSession: state.currentSession
-        ? {
-            ...state.currentSession,
-            candidates: state.currentSession.candidates.map((c) =>
-              c.id === id && c.status === 'REJECTED'
-                ? { ...c, status: 'PENDING' }
-                : c
-            ),
-          }
-        : null,
-    })),
+  resetMeeting: () => set(INITIAL),
 
   setStartDialogOpen: (isStartDialogOpen) => set({ isStartDialogOpen }),
   setEndSummaryDialogOpen: (isEndSummaryDialogOpen) => set({ isEndSummaryDialogOpen }),
 }));
+
+/** Convenience selector — statuses are compared as the §50A union. */
+export function isActiveCandidate(status: MeetingCandidateStatus): boolean {
+  return status === 'PENDING';
+}
