@@ -10,6 +10,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Check } from 'lucide-react';
 import { copyToClipboard } from '@/tauri/bridge';
+import { SafeMarkdownLink } from '@/tauri/externalLinks';
 
 export interface DocumentViewerProps {
   content: string;
@@ -50,6 +51,7 @@ export function DocumentViewer({ content }: DocumentViewerProps) {
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
+            a: SafeMarkdownLink,
             h1: ({ children }) => (
               <h1 className="text-xl font-bold mt-4 mb-3 pb-2 border-b border-[var(--color-border)] text-gray-900 dark:text-white">
                 {children}

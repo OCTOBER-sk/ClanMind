@@ -11,6 +11,7 @@ import { useAiStreamStore } from '@/features/ai/aiStreamStore';
 import { Pin, Reply, Check, Copy, Sparkles, Clock, RotateCcw, Globe, FileText } from 'lucide-react';
 import { Button } from '@/design-system/components/Button';
 import { copyToClipboard } from '@/tauri/bridge';
+import { SafeMarkdownLink } from '@/tauri/externalLinks';
 import { formatBytes } from '@/config/limits';
 import type { Message, AiRun, GroupRole } from '@/types';
 
@@ -296,6 +297,7 @@ function MessageRowInner({
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
+                a: SafeMarkdownLink,
                 p: ({ children }) => <p className="mb-1.5 last:mb-0">{children}</p>,
                 h1: ({ children }) => (
                   <h1 className="text-base font-bold my-2" style={{ color: 'var(--color-text)' }}>

@@ -1,12 +1,7 @@
 ﻿import React from 'react';
-import {
-  Globe,
-  ExternalLink,
-  Sparkles,
-  AlertTriangle,
-  X,
-} from 'lucide-react';
+import { Globe, ExternalLink, Sparkles, AlertTriangle, X } from 'lucide-react';
 import type { AiSourceCitation } from '@/types';
+import { handleExternalLinkClick } from '@/tauri/externalLinkPolicy';
 
 export interface ResearchDrawerProps {
   topic: string;
@@ -110,7 +105,8 @@ export function ResearchDrawer({
                 key={src.id}
                 href={src.url}
                 target="_blank"
-                rel="noreferrer"
+                rel="noreferrer noopener"
+                onClick={handleExternalLinkClick}
                 className="block p-3 rounded-lg border border-[var(--color-border)] bg-white dark:bg-gray-950 hover:border-purple-400 dark:hover:border-purple-600 transition-colors shadow-2xs group"
               >
                 <div className="flex items-center justify-between mb-1">

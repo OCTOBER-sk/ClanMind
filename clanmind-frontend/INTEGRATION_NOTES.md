@@ -730,3 +730,74 @@ exactly the P13 baseline (diffed warning-for-warning); vitest 54 files /
 chunk 927.36 kB (+0.15 kB from memo/useCallback wrappers); dist purity greps
 clean (`demo-token` / `installDemoMode` / dataset ids absent from
 dist/assets); no sourcemaps shipped.
+
+### D29 — P15 final: security audit + Tauri packaging prep; phase-close
+
+**Security findings and fixes (both authority files binding: FE §156/§232/§287/
+§292/§293/§294/§295/§296/§297, BE §63/§187):**
+
+1. **FIXED — phantom `@tauri-apps/*` dependencies.** `src/tauri/bridge.ts`
+   imports `@tauri-apps/api` + six plugins, but they were declared ONLY in the
+   repo-root package.json — the frontend resolved them by Node walking up into
+   `/ClanMind/node_modules/`. A standalone `pnpm install` of this package would
+   not resolve them (packaging blocker). All seven are now declared in
+   clanmind-frontend/package.json at the same ranges the shell was tested
+   against (api ^2.11.1, dialog ^2.7.2, fs ^2.5.1, notification ^2.3.3,
+   shell ^2.3.5, store ^2.4.4, updater ^2.10.1); lockfile updated.
+
+2. **FIXED — §295 gap: rendered links bypassed the controlled mechanism.**
+   Markdown anchors in chat bubbles/document artifacts rendered as bare `<a>`
+   (a click would navigate the webview away), ResearchDrawer source cards were
+   plain anchors, and `bridge.openExternalUrl` had ZERO callers. New
+   `src/tauri/externalLinkPolicy.ts` (`isSafeHttpUrl`,
+   `handleExternalLinkClick`) + component-only `src/tauri/externalLinks.tsx`
+   (`SafeMarkdownLink`). http(s) links preventDefault() FIRST and route through
+   the bridge (shell open in Tauri; `window.open(...,'noopener,noreferrer')`
+   otherwise); non-http(s) schemes render href-less (defense-in-depth under
+   react-markdown's own URL transform). Wired into MessageRow, DocumentViewer,
+   ResearchDrawer. Splitting policy/component kept oxlint at the 16-warning
+   baseline exactly.
+
+3. **Verified clean (no change needed):** BYOK key lifecycle is memory-only —
+   raw key lives in one React state field, is dropped immediately after server
+   validate (`setByokKey('')`, §63.1/§325.11), only `key_last4` ever renders,
+   never persisted anywhere (SettingsView.tsx ByokCard). No
+   `dangerouslySetInnerHTML`/innerHTML in app code; no rehype-raw — both
+   markdown surfaces are react-markdown+remark-gfm only, raw HTML skipped
+   (§296); GitHubDiffViewer highlights via its own React-span tokenizer.
+   No eval/new Function/document.write. localStorage holds only UI prefs +
+   window state + device UUID + Supabase auth session (SDK-standard, required
+   by §196 session restore; NOT a BYOK secret per §325.11). env.ts carries only
+   publishable anon key. No iframes/srcDoc anywhere (§293/§297). osNotify
+   enforces §278 title-only preview gate. dist purity greps clean; no
+   sourcemaps; secret-pattern scan (sk-/ghp_/AKIA/PEM) clean across src, dist,
+   src-tauri. CSP identical in index.html + tauri.conf.json: script-src
+   'self' (no unsafe-inline for scripts, no eval need), style-src 'self'
+   'unsafe-inline' (Tauri-standard, covers React style attrs), built
+   dist/index.html has exactly one external module <script> and zero inline
+   handlers. Dependency list manually reviewed: all mainstream, maintained,
+   no typosquat/unusual packages.
+
+**Packaging prep status:** tauri.conf.json matches spec — identifier
+io.clanmind.desktop, 1440×900 default / minWidth 1024 × minHeight 700 (FE spec
+sets no numeric minimums; values keep ≥900 two-pane band usable, recorded per
+measurable-changes rule), §195 window-state persistence via store plugin +
+browser fallback, updater stub present (pubkey + endpoints) satisfying §309
+shape, bundle targets nsis+msi. Capabilities least-privilege vs §294:
+core/dialog/fs/notification/store/updater defaults + `shell:allow-open` ONLY
+(no exec) — every permission maps to a registered plugin in lib.rs/Cargo.toml;
+no broad filesystem or shell grants.
+
+**Tests:** +6 security regressions (453 → 459), all green:
+`src/features/chat/markdownSecurity.test.tsx` locks §296 sanitize-on-render
+(raw HTML `<script>/<img onerror>/<iframe>` never materializes on either
+markdown surface) and §295 link routing (http(s) clicks go through the bridge
+path with noopener; `javascript:` links never become clickable). No existing
+test weakened or skipped.
+
+Verification: `pnpm exec tsc -b` exit 0; oxlint exit 0, 16 warnings = exact
+P14 baseline (diffed warning-for-warning); vitest 55 files / 459 tests passed;
+production build ✓ 718 ms, App chunk 925.17 kB (−2.19 kB vs P14);
+dist purity greps clean (`demo-token`/`installDemoMode`/dataset ids absent),
+0 sourcemaps, secret-pattern scan clean. P15 close: ALL FE-spec phases
+(P0–P15) committed green.
