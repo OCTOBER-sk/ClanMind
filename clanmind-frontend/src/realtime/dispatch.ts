@@ -25,9 +25,12 @@ import { useArtifactStore } from '@/state/useArtifactStore';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useGroupStore } from '@/state/useGroupStore';
 import { useAiStreamStore } from '@/features/ai/aiStreamStore';
+import {
+  useConstructionStore,
+} from '@/features/artifacts/constructionStore';
 import { MessageSchema } from '@/api/schemas';
 import { mapMessageRow } from '@/api/messageRow';
-import type { AiRun, Artifact, Message } from '@/types';
+import type { AiRun, Artifact, DiagramContent, Message } from '@/types';
 import type { RealtimeEvent } from '@/realtime/events';
 
 const runsByMessage = new Map<string, { run: AiRun; streamedBody: string; artifactOpened: boolean }>();
@@ -443,19 +446,109 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
         // versions and bumps current_version when the id already exists.
         const artifact = payload.artifact as Artifact | undefined;
         if (!artifact) return;
+        const isNew = !useArtifactStore.getState().artifacts.some((a) => a.id === artifact.id);
         useArtifactStore.getState().mergeArtifactVersion(artifact);
-        const messageId = findMessageForArtifact(event.group_id, artifact.id);
+        const messageId = resolveArtifactMessageId(event.group_id, artifact.id, payload);
         if (messageId) upsertRun(messageId, { created_artifacts: [artifact.id] });
+        // §252 — a creation born of a live run is a user-requested
+        // substantial output; open its construction trace and surface the
+        // newest artifact (§251). Opening NEVER steals keyboard focus (§253).
+        if (kind === 'created') {
+          useConstructionStore.getState().beginConstruction(artifact.id);
+          if (isNew && messageId) useArtifactStore.getState().autoOpenArtifact(artifact.id);
+        }
       }
       break;
     }
 
-    // NOTE on 'artifact.created' (real fan-out): its payload is a stub
-    // {artifact_id, version} and GET /artifacts/:id returns METADATA ONLY
-    // (content_ref → object storage; no inline content anywhere on §109).
-    // The FE artifact viewer consumes inline content (FE §97), so there is
-    // nothing contract-honest to project yet — recorded as an open backend
-    // gap in INTEGRATION_NOTES.md (D15) rather than papered over here.
+    // ─── BE §75 granular construction vocabulary (live artifact streaming) ──
+    //
+    // `artifact.created` may carry either a FULL inline artifact row (demo
+    // parity; D17) or the real backend's metadata stub `{artifact_id,
+    // version}` (D15). Both are consumed: full rows merge into the store;
+    // every shape opens a construction trace so an opened panel shows honest
+    // build status instead of half-invented content.
+
+    case 'artifact.created': {
+      const inline = payload.artifact as Artifact | undefined;
+      const artifactId =
+        typeof payload.artifact_id === 'string'
+          ? payload.artifact_id
+          : (typeof inline?.id === 'string' ? inline.id : undefined);
+      if (!artifactId) return;
+      const isNew = !useArtifactStore.getState().artifacts.some((a) => a.id === artifactId);
+      if (inline && Array.isArray(inline.versions)) {
+        useArtifactStore.getState().mergeArtifactVersion(inline);
+        const messageId = resolveArtifactMessageId(event.group_id, artifactId, payload);
+        if (messageId) upsertRun(messageId, { created_artifacts: [artifactId] });
+      }
+      useConstructionStore.getState().beginConstruction(
+        artifactId,
+        typeof payload.render_state === 'string' ? payload.render_state : undefined,
+      );
+      // §252 auto-open only for run-bound, fully-described creations —
+      // metadata stubs (D15) have nothing renderable yet.
+      if (inline && isNew && resolveArtifactMessageId(event.group_id, artifactId, payload)) {
+        useArtifactStore.getState().autoOpenArtifact(artifactId);
+      }
+      break;
+    }
+
+    case 'artifact.node.created': {
+      const artifactId =
+        firstString(payload.artifact_id, payload.artifactId) ??
+        String((payload.node as { artifact_id?: string } | undefined)?.artifact_id ?? '');
+      const node = payload.node as DiagramContent['nodes'][number] | undefined;
+      if (!artifactId || !node || typeof node.id !== 'string' || !node.id) return;
+      useConstructionStore.getState().nodeCreated(artifactId, node);
+      break;
+    }
+
+    case 'artifact.node.updated': {
+      const artifactId = firstString(payload.artifact_id, payload.artifactId);
+      const node = payload.node as DiagramContent['nodes'][number] | undefined;
+      if (!artifactId || !node || typeof node.id !== 'string' || !node.id) return;
+      useConstructionStore.getState().nodeUpdated(artifactId, node);
+      break;
+    }
+
+    case 'artifact.edge.created': {
+      const artifactId = firstString(payload.artifact_id, payload.artifactId);
+      const edge = payload.edge as DiagramContent['edges'][number] | undefined;
+      if (!artifactId || !edge || typeof edge.source !== 'string' || typeof edge.target !== 'string') return;
+      useConstructionStore.getState().edgeCreated(artifactId, edge);
+      break;
+    }
+
+    case 'artifact.render_state.updated': {
+      const artifactId = firstString(payload.artifact_id, payload.artifactId);
+      const stateText = firstString(payload.state, payload.status, payload.render_state);
+      if (!artifactId || !stateText) return;
+      useConstructionStore.getState().renderStateChanged(artifactId, stateText);
+      break;
+    }
+
+    case 'artifact.completed': {
+      const artifactId =
+        firstString(payload.artifact_id, payload.artifactId) ??
+        firstString((payload.artifact as Artifact | undefined)?.id);
+      if (!artifactId) return;
+      // Final inline row (demo parity / future backend surface) merges the
+      // complete version content; completion then settles the animation.
+      const inline = payload.artifact as Artifact | undefined;
+      if (inline && Array.isArray(inline.versions)) {
+        useArtifactStore.getState().mergeArtifactVersion(inline);
+      }
+      useConstructionStore.getState().completeConstruction(artifactId);
+      break;
+    }
+
+    // NOTE on 'artifact.created' in LIVE mode: payloads are still metadata
+    // stubs {artifact_id, version} and GET /artifacts/:id returns METADATA
+    // ONLY (content_ref → object storage; no inline content on §109). The
+    // handler above therefore opens only an honest construction trace for
+    // stubs — full rendering waits on the backend gap recorded in
+    // INTEGRATION_NOTES.md (D15/D17). Demo mode emits full rows (D17.3).
 
     case 'ai.completed':
     case 'ai.response.completed': {
@@ -601,4 +694,22 @@ function findMessageForArtifact(groupId: string, artifactId: string): string | n
     if (entry.run.created_artifacts.includes(artifactId)) return messageId;
   }
   return null;
+}
+
+/**
+ * Resolve the chat bubble an artifact event belongs to: explicit
+ * `message_id` wins, then the run→bubble binding (REST start / §18 frames),
+ * then the legacy created_artifacts scan. Null = unbound (§252 gate).
+ */
+function resolveArtifactMessageId(
+  groupId: string,
+  artifactId: string,
+  payload: Record<string, unknown>,
+): string | null {
+  const direct = firstString(payload.message_id);
+  if (direct) return direct;
+  const runId = firstString(payload.run_id);
+  const viaRun = runId ? messageByRun.get(runId) : undefined;
+  if (viaRun) return viaRun;
+  return findMessageForArtifact(groupId, artifactId);
 }

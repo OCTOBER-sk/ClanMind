@@ -29,11 +29,25 @@ export interface AiRunRequestMeta {
 const RESPONSE_TEMPLATE = (prompt: string) =>
   `I researched **${prompt.slice(0, 80)}** across current sources and your project references.\n\n### Findings\n- SPI with DMA reduces packet latency from **160 µs to 6.5 µs** at 1 kHz.\n- I2C bus arbitration locked the attitude thread for ~150 µs per cycle.\n- DMA circular buffers in SRAM1 eliminate double-copy overhead.\n\n### Recommendation\nAdopt SPI DMA double-buffering. I generated the system blueprint in your work surface.`;
 
-const DIAGRAM_MARKDOWN = `graph TD
-  IMU[ICM-42688P IMU Sensor] -->|SPI 24MHz| DMA[STM32 DMA1 Stream 0]
-  DMA -->|Circular Buffer| SRAM[SRAM1 Ring Buffer]
-  SRAM -->|1 kHz IRQ| PID[Attitude PID Controller]
-  PID -->|PWM Signals| ESC[Electronic Speed Controllers]`;
+/**
+ * BE §74 — the live blueprint arrives as a STABLE DOMAIN SCHEMA
+ * (`{nodes[], edges[]}`), never DOM/mermaid instructions. The client's
+ * @xyflow/react renderer owns all visual layout.
+ */
+const LIVE_BLUEPRINT_NODES = [
+  { id: 'imu', label: 'ICM-42688P IMU Sensor', kind: 'sensor' },
+  { id: 'dma', label: 'STM32 DMA1 Stream 0', kind: 'processing' },
+  { id: 'sram', label: 'SRAM1 Ring Buffer', kind: 'buffer' },
+  { id: 'pid', label: 'Attitude PID Controller', kind: 'processing' },
+  { id: 'esc', label: 'Electronic Speed Controllers', kind: 'actuator' },
+] as const;
+
+const LIVE_BLUEPRINT_EDGES = [
+  { source: 'imu', target: 'dma', label: 'SPI 24 MHz' },
+  { source: 'dma', target: 'sram', label: 'Circular buffer' },
+  { source: 'sram', target: 'pid', label: '1 kHz IRQ' },
+  { source: 'pid', target: 'esc', label: 'PWM signals' },
+] as const;
 
 const SOURCES = [
   {
@@ -360,37 +374,70 @@ export class DemoRealtimeHub {
     const versionNumber = prior?.nextVersion ?? 1;
     this.artifactLineage.set(lineageKey, { artifactId, nextVersion: versionNumber + 1 });
 
-    emit(
-      'artifact.event',
-      {
-        kind: 'created',
-        artifact: {
-          id: artifactId,
-          group_id: meta.groupId,
-          project_id: meta.projectId ?? null,
-          title: `${meta.aiName}'s blueprint — ${meta.prompt.slice(0, 28)}`,
-          artifact_type: 'ARCHITECTURE',
-          current_version: versionNumber,
-          pinned: false,
-          used_as_context: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          versions: [
-            {
-              id: `v_${artifactId}_${versionNumber}`,
-              artifact_id: artifactId,
-              version_number: versionNumber,
-              content: DIAGRAM_MARKDOWN,
-              created_by_name: meta.aiName,
-              created_at: new Date().toISOString(),
-            },
-          ],
+    const nowIso = () => new Date().toISOString();
+    const blueprintRow = (contentJson: string) => ({
+      id: artifactId,
+      group_id: meta.groupId,
+      project_id: meta.projectId ?? null,
+      title: `${meta.aiName}'s blueprint — ${meta.prompt.slice(0, 28)}`,
+      artifact_type: 'ARCHITECTURE',
+      current_version: versionNumber,
+      pinned: false,
+      used_as_context: false,
+      created_at: nowIso(),
+      updated_at: nowIso(),
+      versions: [
+        {
+          id: `v_${artifactId}_${versionNumber}`,
+          artifact_id: artifactId,
+          version_number: versionNumber,
+          content: contentJson,
+          created_by_name: meta.aiName,
+          created_at: nowIso(),
         },
-      },
-      2400,
-    );
+      ],
+    });
+
+    // §75 — creation first: metadata row with EMPTY content. The version's
+    // real content assembles from the granular node/edge events below and
+    // lands in full on `artifact.completed`.
+    emit('artifact.event', { kind: 'created', artifact: blueprintRow('') }, 2400);
+
+    // Progressive construction — node fade/scale arrival, then its outgoing
+    // spectral edge draws exactly once (FE §98/§99).
+    let cursor = 2550;
+    for (let n = 0; n < LIVE_BLUEPRINT_NODES.length; n++) {
+      const node = LIVE_BLUEPRINT_NODES[n]!;
+      const nodeDef = { id: node.id, label: node.label, kind: node.kind };
+      emit('artifact.node.created', { artifact_id: artifactId, node: nodeDef }, cursor);
+      if (n > 0) {
+        const edge = LIVE_BLUEPRINT_EDGES[n - 1];
+        if (edge) {
+          emit(
+            'artifact.edge.created',
+            { artifact_id: artifactId, edge: { source: edge.source, target: edge.target, label: edge.label } },
+            cursor + 140,
+          );
+        }
+      }
+      cursor += 380;
+    }
+
+    emit('artifact.render_state.updated', { artifact_id: artifactId, state: 'Settling layout' }, cursor + 120);
 
     const lastDelta = 2350 + (parts.length - 1) * 260;
+    // §75 terminal event carries the FULL inline version (demo parity with
+    // the FE contract note D17); the client merges it verbatim.
+    emit(
+      'artifact.completed',
+      {
+        artifact_id: artifactId,
+        render_state: 'Ready',
+        artifact: blueprintRow(JSON.stringify({ nodes: [...LIVE_BLUEPRINT_NODES], edges: [...LIVE_BLUEPRINT_EDGES] })),
+      },
+      Math.max(cursor + 320, lastDelta + 500),
+    );
+
     emit(
       'ai.completed',
       {
@@ -400,7 +447,7 @@ export class DemoRealtimeHub {
         // §142 — AI response metadata drives the subtle fallback indicator.
         ...(isFallbackRun ? { model_used: 'secondary-fallback', is_fallback: true } : {}),
       },
-      lastDelta + 500,
+      Math.max(cursor + 520, lastDelta + 700),
     );
 
     return () => this.cancelAiRun(runId);

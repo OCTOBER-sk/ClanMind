@@ -350,6 +350,48 @@ export interface ArtifactVersion {
   created_at: string;
 }
 
+// ─── Structured artifact content schemas (BE §74 — stable domain schemas,
+//     NEVER DOM/AI-emitted markup; the client renders them) ──────────────────
+
+/** One diagram node as emitted by the backend artifact engine. */
+export interface DiagramNodeSpec {
+  id: string;
+  label: string;
+  /** Free-form domain kind from the backend registry (BE §45) — never a DOM hint. */
+  kind?: string;
+}
+
+/** One directed edge; `label` is optional relationship text. */
+export interface DiagramEdgeSpec {
+  id?: string;
+  source: string;
+  target: string;
+  label?: string;
+}
+
+/** BE §74 example payload shape for DIAGRAM-family artifacts. */
+export interface DiagramContent {
+  nodes: DiagramNodeSpec[];
+  edges: DiagramEdgeSpec[];
+}
+
+/** CHART artifacts — typed series data, rendered by recharts on the client. */
+export interface ChartSeriesSpec {
+  key: string;
+  label?: string;
+  /** CSS color for the series; tokens preferred at the render site. */
+  color?: string;
+}
+
+export interface ChartContent {
+  chart_type: 'bar' | 'line' | 'area' | 'pie';
+  title?: string;
+  /** Data-row field used for the x axis / pie labels. */
+  x_key: string;
+  series: ChartSeriesSpec[];
+  data: Array<Record<string, unknown>>;
+}
+
 export interface Artifact {
   id: string;
   group_id: string;

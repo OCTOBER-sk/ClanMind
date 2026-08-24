@@ -27,6 +27,68 @@ const fail = (status: number, code: string, message?: string): TransportResponse
   json: { error: { code, message: message ?? code, request_id: `req_${crypto.randomUUID()}` } },
 });
 
+// ─── Artifacts (BE §44/§109): canonical FE rows ↔ §44 wire rows ─────────────
+
+/**
+ * Serialize a dataset artifact into the §44 wire row the real Worker returns
+ * (metadata + `content_ref`), including the inline-`content` extension the
+ * client contract documents (INTEGRATION_NOTES D17) until the backend ships
+ * an inline-content surface.
+ */
+function toWireArtifact(ds: DemoDataset, a: DemoDataset['artifacts'][number]): Record<string, unknown> {
+  const aiName = ds.groups[0]?.ai_name || 'Odin';
+  return {
+    id: a.id,
+    group_id: a.group_id,
+    project_id: a.project_id ?? null,
+    name: a.title,
+    artifact_type: a.artifact_type,
+    status: a.deleted ? 'DELETED' : 'ACTIVE',
+    pinned: a.pinned,
+    current_version_id: `v_${a.id}_${a.current_version}`,
+    current_version: a.current_version,
+    created_by_user_id: a.created_by_id && a.created_by_id !== 'odin_ai' ? a.created_by_id : ds.currentUser.id,
+    created_by_ai_id: null,
+    deleted_at: a.deleted ? a.updated_at : null,
+    created_at: a.created_at,
+    updated_at: a.updated_at,
+    versions: a.versions.map((v) => ({
+      id: v.id ?? `v_${a.id}_${v.version_number}`,
+      artifact_id: a.id,
+      version_number: v.version_number,
+      content_type: a.artifact_type === 'TABLE' || a.artifact_type === 'ARCHITECTURE' ? 'application/json' : 'text/markdown',
+      content_ref: `groups/${a.group_id}/artifacts/${a.id}/v${v.version_number}`,
+      checksum: null,
+      created_by_user_id: v.created_by_name === aiName ? null : ds.currentUser.id,
+      created_by_ai_id: v.created_by_name === aiName ? 'odin_ai' : null,
+      parent_version_id: v.version_number > 1 ? `v_${a.id}_${v.version_number - 1}` : null,
+      created_at: v.created_at,
+      content: v.content,
+      change_summary: v.change_summary ?? null,
+    })),
+  };
+}
+
+/** Apply a restore in-place so later GETs stay consistent; returns the row. */
+function restoreInPlace(
+  ds: DemoDataset,
+  artifactId: string,
+  versionNumber: number,
+): { row: Record<string, unknown> | null; artifact?: DemoDataset['artifacts'][number] } {
+  const artifact = ds.artifacts.find((a) => a.id === artifactId);
+  if (!artifact) return { row: null };
+  const target = artifact.versions.find((v) => v.version_number === versionNumber);
+  if (!target) return { row: null };
+  // §256 lineage semantics — restoring creates a NEW current pointer without
+  // destroying history: current_version moves, versions array stays intact.
+  artifact.current_version = target.version_number;
+  artifact.updated_at = new Date().toISOString();
+  if (!artifact.versions.includes(target)) {
+    artifact.versions.push(target);
+  }
+  return { row: toWireArtifact(ds, artifact), artifact };
+}
+
 function matchPath(pattern: string, path: string): Record<string, string> | null {
   const p = pattern.split('/').filter(Boolean);
   const a = path.split('/').filter(Boolean);
@@ -270,6 +332,57 @@ export function createDemoTransport(ds: DemoDataset): Transport {
         default_branch: 'main',
         last_synced_at: new Date(Date.now() - 15 * 60_000).toISOString(),
       })],
+
+    // ── Artifacts (P6): BE §109 parity over the dataset. ───────────────────
+
+    ['GET', '/projects/:projectId/artifacts', (p) =>
+      ok({ items: ds.artifacts
+        .filter((a) => a.project_id === p.projectId && !a.deleted)
+        .map((a) => toWireArtifact(ds, a)) })],
+
+    ['GET', '/artifacts/:artifactId', (p) => {
+      const artifact = ds.artifacts.find((a) => a.id === p.artifactId);
+      if (!artifact || artifact.deleted) return fail(404, 'NOT_FOUND', 'Artifact not found.');
+      return ok(toWireArtifact(ds, artifact));
+    }],
+
+    ['POST', '/artifacts/:artifactId/restore', (p, req) => {
+      const body = (req.body ?? {}) as { version_number?: unknown };
+      const versionNumber = Number(body.version_number);
+      if (!Number.isInteger(versionNumber) || versionNumber < 1) {
+        return fail(400, 'VALIDATION_FAILED', 'version_number must be a positive integer.');
+      }
+      const { row, artifact } = restoreInPlace(ds, p.artifactId, versionNumber);
+      if (!row || !artifact) return fail(404, 'NOT_FOUND', 'Artifact or version not found.');
+      // Fan out so other room members reconcile the new current version.
+      getDemoHub().broadcast('artifact.event', artifact.group_id, {
+        kind: 'version',
+        artifact: row,
+      });
+      return ok(row);
+    }],
+
+    ['POST', '/artifacts/:artifactId/pin', (p, req) => {
+      const artifact = ds.artifacts.find((a) => a.id === p.artifactId);
+      if (!artifact || artifact.deleted) return fail(404, 'NOT_FOUND', 'Artifact not found.');
+      const body = (req.body ?? {}) as { pinned?: unknown };
+      if (typeof body.pinned !== 'boolean') {
+        return fail(400, 'VALIDATION_FAILED', 'pinned must be a boolean.');
+      }
+      artifact.pinned = body.pinned;
+      artifact.updated_at = new Date().toISOString();
+      return ok(toWireArtifact(ds, artifact));
+    }],
+
+    ['DELETE', '/artifacts/:artifactId', (p) => {
+      const artifact = ds.artifacts.find((a) => a.id === p.artifactId);
+      if (!artifact) return fail(404, 'NOT_FOUND', 'Artifact not found.');
+      // §256 — soft delete; permanent deletion happens server-side later.
+      artifact.deleted = true;
+      artifact.pinned = false;
+      artifact.updated_at = new Date().toISOString();
+      return ok({ id: artifact.id, deleted_at: artifact.updated_at });
+    }],
 
     // ── Attachments (P4): BE §43 rows, §81 validation, §84 signing. ────────
 

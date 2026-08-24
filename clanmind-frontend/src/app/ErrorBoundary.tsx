@@ -13,6 +13,11 @@ interface ErrorBoundaryProps {
   label?: string;
   /** Global catastrophic variant (§286) */
   variant?: 'feature' | 'global';
+  /**
+   * Custom fallback UI (FE §291 — artifact renderer isolation renders its
+   * own "cannot be rendered" card instead of the generic feature screen).
+   */
+  fallback?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -50,6 +55,11 @@ export class ErrorBoundary extends React.Component<
 
   render() {
     if (!this.state.hasError) return this.props.children;
+
+    // §291 — callers may supply a context-specific isolation fallback.
+    if (this.props.fallback !== undefined) {
+      return <>{this.props.fallback}</>;
+    }
 
     const { variant = 'feature', label } = this.props;
 

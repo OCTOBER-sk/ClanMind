@@ -239,3 +239,55 @@ Two contract gaps recorded for the backend stream — nothing papered over:
 Client pre-flight limits mirror BE §178 from one config site
 (`src/config/limits.ts`: 25 MB/file, 10/message) and exist for UX rejection
 only (§236 toast, never silent); the server remains authoritative.
+
+---
+
+## 2026-08-24 — P6 artifacts & Garage (FE §87–§111, §250–§257; BE §44–§46/§74–§75/§109)
+
+### D17 — Artifact content & live-stream contract (extends D15)
+1. **Structured content is the render contract.** DIAGRAM-family versions are
+   consumed as BE §74 `{nodes[], edges[]}` domain schemas
+   (`DiagramContent` in `src/types`). The client owns ALL layout/rendering
+   (@xyflow/react); a tolerant legacy adapter converts old mermaid-flavoured
+   text rows into the same schema so historical versions stay viewable.
+   CHART versions use typed `{chart_type, x_key, series[], data[]}` rows.
+2. **BE §75 vocabulary consumed end-to-end.** `dispatch` now projects
+   `artifact.created / node.created / node.updated / edge.created /
+   render_state.updated / completed` into a dedicated construction store
+   (progressive arrival, one-shot edge draw §98/§99, single completion glow
+   §100, textual status for reduced motion §219). The legacy demo envelope
+   `artifact.event {kind created|updated|version}` keeps working unchanged.
+3. **Demo emits full inline rows on the granular events** (`artifact.created`
+   metadata + EMPTY content first; `artifact.completed` carries the complete
+   version row) — documented parity until the real backend ships an inline-
+   content surface. **D15 stands for live mode**: stub `{artifact_id,
+   version}` payloads open an honest construction trace and store nothing;
+   they never auto-open a panel.
+4. **§252 auto-open gate:** creation events resolve their chat bubble via
+   explicit `message_id`, else `run_id`→bubble binding, else the legacy
+   created_artifacts scan; ONLY run-bound creations with describable content
+   auto-open (§251 newest-active), and opening never moves keyboard focus
+   (§253).
+5. **§109 REST wired both modes:** GET `/projects/:id/artifacts`,
+   GET `/artifacts/:id`, POST `/artifacts/:id/restore {version_number}`,
+   POST `/artifacts/:id/pin {pinned}`, DELETE (soft). Demo transport answers
+   identical shapes over the dataset incl. BE §102 envelopes. Pin/restore go
+   through `useArtifactController` with optimistic updates + rollback.
+6. **Exports (§254):** Markdown/SVG/PNG/JSON/source are REALLY generated
+   client-side per type (diagram SVG from the same deterministic layout used
+   on screen; PNG via canvas rasterization). PDF is deliberately NOT offered
+   — no honest PDF producer exists client-side and §254 forbids advertising
+   unsupported formats.
+7. **Presence removed from the artifact header.** The previous hard-coded
+   "2 viewing" violated FE §109 (realtime-only presence); it is gone rather
+   than faked. Real viewer/editing presence lands when the room exposes it.
+8. `PdfViewer.tsx` (visual mockup, G12) was deleted — its only entry point
+   was a `.pdf`-title hack in the panel that P6's honest renderer routing
+   removed. Real pdf.js viewing remains recorded under G12/P14 scope.
+
+Open items observed during this pass (backend stream):
+- Inline version `content` or a signed-URL resolver is still required for
+  live-mode artifact rendering (D15/D17.3).
+- No artifact comments/presence endpoints exist yet (FE §108/§109 remain
+  UI-ready but unwired rather than faked).
+

@@ -548,6 +548,7 @@ export function Composer({
         onClick={trackCaret}
         onKeyUp={trackCaret}
         onSelect={trackCaret}
+        data-composer-textarea="true"
         aria-label={
           visibility === 'GROUP'
             ? 'Message the group'

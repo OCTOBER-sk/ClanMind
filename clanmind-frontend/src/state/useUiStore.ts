@@ -33,6 +33,8 @@ export interface UiState {
   lastProjectIdByGroup: Record<string, string>;
   /** §15 — most-recently-visited Groups first in the switcher. */
   recentGroupIds: string[];
+  /** §90 — Garage grid/list preference, remembered locally per device. */
+  garageViewMode: 'grid' | 'list';
   isCreateGroupDialogOpen: boolean;
   isCreateProjectDialogOpen: boolean;
   isInviteDialogOpen: boolean;
@@ -53,6 +55,8 @@ export interface UiState {
   recordLastProject: (groupId: string, projectId: string) => void;
   /** §195 remember the Group currently being viewed. */
   recordLastGroup: (groupId: string) => void;
+  /** §90 — persist the Garage view preference. */
+  setGarageViewMode: (mode: 'grid' | 'list') => void;
   setCreateGroupDialogOpen: (open: boolean) => void;
   setCreateProjectDialogOpen: (open: boolean) => void;
   setInviteDialogOpen: (open: boolean) => void;
@@ -77,6 +81,7 @@ export const useUiStore = create<UiState>()(
       lastGroupId: undefined,
       lastProjectIdByGroup: {},
       recentGroupIds: [],
+      garageViewMode: 'grid',
       isCreateGroupDialogOpen: false,
       isCreateProjectDialogOpen: false,
       isInviteDialogOpen: false,
@@ -128,6 +133,7 @@ export const useUiStore = create<UiState>()(
       setApprovalDialogOpen: (isApprovalDialogOpen) =>
         set({ isApprovalDialogOpen }),
       setByokDialogOpen: (isByokDialogOpen) => set({ isByokDialogOpen }),
+      setGarageViewMode: (garageViewMode) => set({ garageViewMode }),
     }),
     {
       name: 'cm_ui',
@@ -142,6 +148,7 @@ export const useUiStore = create<UiState>()(
         lastGroupId: state.lastGroupId,
         lastProjectIdByGroup: state.lastProjectIdByGroup,
         recentGroupIds: state.recentGroupIds,
+        garageViewMode: state.garageViewMode,
       }),
     },
   ),

@@ -1,8 +1,15 @@
-﻿import React from 'react';
+﻿/**
+ * DOCUMENT / MARKDOWN / RESEARCH / CODE artifact renderer — safe markdown
+ * pipeline only (FE §296: react-markdown + remark-gfm, zero raw HTML).
+ * Fenced code blocks get the §27 toolbar: language label + Copy that
+ * preserves bytes exactly, flipping to "✓ Copied".
+ */
+
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Check } from 'lucide-react';
-import { useState } from 'react';
+import { copyToClipboard } from '@/tauri/bridge';
 
 export interface DocumentViewerProps {
   content: string;
@@ -10,11 +17,21 @@ export interface DocumentViewerProps {
 
 export function DocumentViewer({ content }: DocumentViewerProps) {
   const [copied, setCopied] = useState(false);
+  // §27 stable copy state per code block (offset-keyed, never random).
+  const [copiedCodeIndex, setCopiedCodeIndex] = useState<number | null>(null);
 
-  const handleCopyAll = () => {
-    navigator.clipboard.writeText(content);
+  const handleCopyAll = async () => {
+    const ok = await copyToClipboard(content);
+    if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
+  };
+
+  const handleCopyCode = async (code: string, blockOffset: number) => {
+    const ok = await copyToClipboard(code);
+    if (!ok) return;
+    setCopiedCodeIndex(blockOffset);
+    setTimeout(() => setCopiedCodeIndex(null), 1800);
   };
 
   return (
@@ -69,11 +86,53 @@ export function DocumentViewer({ content }: DocumentViewerProps) {
                 {children}
               </blockquote>
             ),
-            code: ({ children }) => (
-              <code className="px-1.5 py-0.5 rounded bg-[var(--color-surface-hover)] font-mono text-[11px] text-[var(--color-text)]">
-                {children}
-              </code>
+            pre: ({ children }) => (
+              // Unwrapped: the §27 code component owns its own framed block.
+              <>{children}</>
             ),
+            code: ({ className, children, node }) => {
+              const match = /language-(\w+)/.exec(className || '');
+              const codeString = String(children).replace(/\n$/, '');
+              const isBlock = match || codeString.includes('\n');
+              if (!isBlock) {
+                return (
+                  <code className="px-1.5 py-0.5 rounded bg-[var(--color-surface-hover)] font-mono text-[11px] text-[var(--color-text)]">
+                    {children}
+                  </code>
+                );
+              }
+              // §27 — exact-bytes copy with a stable, position-derived key.
+              const blockOffset = node?.position?.start.offset ?? 0;
+              return (
+                <div
+                  className="my-3 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] font-mono text-[11px]"
+                >
+                  <div className="flex items-center justify-between border-b border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-tertiary)]">
+                    <span>{match ? match[1] : 'code'}</span>
+                    <button
+                      onClick={() => void handleCopyCode(codeString, blockOffset)}
+                      className="flex cursor-pointer items-center gap-1 hover:opacity-80"
+                      aria-label={`Copy ${match ? match[1] : 'code'} block`}
+                    >
+                      {copiedCodeIndex === blockOffset ? (
+                        <>
+                          <Check className="h-3 w-3 text-emerald-500" aria-hidden="true" />
+                          <span>Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" aria-hidden="true" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <pre className="overflow-x-auto p-3">
+                    <code>{children}</code>
+                  </pre>
+                </div>
+              );
+            },
           }}
         >
           {content}

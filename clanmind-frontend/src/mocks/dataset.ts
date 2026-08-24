@@ -444,13 +444,25 @@ export function createDemoDataset(): DemoDataset {
       used_as_context: true,
       created_at: new Date(now - DAY).toISOString(),
       updated_at: new Date(now - 2 * HOUR).toISOString(),
+      // BE §74 — stable domain schema ({nodes[], edges[]}), never markup.
       versions: [
         {
           id: 'v_1',
           artifact_id: 'art_diagram_1',
           version_number: 1,
-          content:
-            'graph TD\n  IMU[ICM-42688P IMU Sensor] -->|SPI 24MHz| DMA[STM32 DMA1 Stream 0]\n  DMA -->|Circular Buffer| SRAM[SRAM1 Ring Buffer]\n  SRAM -->|1 kHz IRQ| PID[Attitude PID Controller]',
+          content: JSON.stringify({
+            nodes: [
+              { id: 'imu', label: 'ICM-42688P IMU Sensor', kind: 'sensor' },
+              { id: 'dma', label: 'STM32 DMA1 Stream 0', kind: 'processing' },
+              { id: 'sram', label: 'SRAM1 Ring Buffer', kind: 'buffer' },
+              { id: 'pid', label: 'Attitude PID Controller', kind: 'processing' },
+            ],
+            edges: [
+              { source: 'imu', target: 'dma', label: 'SPI 24 MHz' },
+              { source: 'dma', target: 'sram', label: 'Circular buffer' },
+              { source: 'sram', target: 'pid', label: '1 kHz IRQ' },
+            ],
+          }),
           created_by_name: 'Odin',
           created_at: new Date(now - DAY).toISOString(),
         },
@@ -458,8 +470,23 @@ export function createDemoDataset(): DemoDataset {
           id: 'v_2',
           artifact_id: 'art_diagram_1',
           version_number: 2,
-          content:
-            'graph TD\n  IMU[ICM-42688P IMU Sensor] -->|SPI 24MHz| DMA[STM32 DMA1 Stream 0]\n  DMA -->|Circular Buffer| SRAM[SRAM1 Ring Buffer]\n  SRAM -->|1 kHz IRQ| PID[Attitude PID Controller]\n  PID -->|PWM Signals| ESC[Electronic Speed Controllers]\n  PID -->|Telemetry Stream| Radio[Ground 915MHz Radio]',
+          content: JSON.stringify({
+            nodes: [
+              { id: 'imu', label: 'ICM-42688P IMU Sensor', kind: 'sensor' },
+              { id: 'dma', label: 'STM32 DMA1 Stream 0', kind: 'processing' },
+              { id: 'sram', label: 'SRAM1 Ring Buffer', kind: 'buffer' },
+              { id: 'pid', label: 'Attitude PID Controller', kind: 'processing' },
+              { id: 'esc', label: 'Electronic Speed Controllers', kind: 'actuator' },
+              { id: 'radio', label: 'Ground 915 MHz Radio', kind: 'hardware' },
+            ],
+            edges: [
+              { source: 'imu', target: 'dma', label: 'SPI 24 MHz' },
+              { source: 'dma', target: 'sram', label: 'Circular buffer' },
+              { source: 'sram', target: 'pid', label: '1 kHz IRQ' },
+              { source: 'pid', target: 'esc', label: 'PWM signals' },
+              { source: 'pid', target: 'radio', label: 'Telemetry stream' },
+            ],
+          }),
           change_summary: 'Added ESC actuation and Ground Radio telemetry output stages.',
           created_by_name: 'Odin',
           created_at: new Date(now - 2 * HOUR).toISOString(),

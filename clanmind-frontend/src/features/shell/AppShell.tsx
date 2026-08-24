@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { sectionFromPathname } from '@/app/nav';
 import { TopBar } from './TopBar';
@@ -18,6 +18,7 @@ import {
   type ChatScope,
 } from '@/features/chat/chatSelectors';
 import { ArtifactPanel } from '@/features/artifacts/ArtifactPanel';
+import { useConstructionStore } from '@/features/artifacts/constructionStore';
 import { ThreadPanel } from '@/features/chat/ThreadPanel';
 import { MeetingActiveHeader } from '@/features/meetings/MeetingActiveHeader';
 import { MeetingPanel } from '@/features/meetings/MeetingPanel';
@@ -56,6 +57,7 @@ import { useMeetingStore } from '@/state/useMeetingStore';
 import { useSyncStore } from '@/state/useSyncStore';
 import { useProjectDataStore } from '@/state/useProjectDataStore';
 import { useUiStore } from '@/state/useUiStore';
+import { cn } from '@/design-system/utils';
 import { AlertOctagon, X } from 'lucide-react';
 import type { GroupRole, Message, Task, Decision, MainNavSection, MeetingCandidate } from '@/types';
 import { applyWindowState, captureWindowState, checkForUpdate, installUpdate, restoreWindowState, saveWindowState } from '@/tauri/bridge';
@@ -112,8 +114,6 @@ export function AppShell() {
     setRightPanelMode,
     setActiveVersionNumber,
     setCompareVersionNumber,
-    toggleArtifactPin,
-    toggleArtifactContext,
     openArtifactPanel,
     closeRightPanel,
   } = useArtifactStore();
@@ -240,6 +240,60 @@ export function AppShell() {
 
   const { toast } = useToast();
   useGlobalShortcuts();
+
+  // ─── §95/§248 — right-surface open/close transitions ──────────────────────
+  // Open: chat scroll is PRESERVED (captured + re-applied across the width
+  // animation) and focus stays where the user had it (§253 — never stolen).
+  // Close: panel contracts, chat recovers its width, focus returns to the
+  // trigger (or the composer as a safe fallback).
+  const prevPanelModeRef = useRef(rightPanelMode);
+  const lastTriggerRef = useRef<HTMLElement | null>(null);
+  const savedChatScrollRef = useRef<number | null>(null);
+  const [animatePanelWidth, setAnimatePanelWidth] = useState(false);
+
+  useEffect(() => {
+    const wasOpen = prevPanelModeRef.current !== 'closed';
+    const isOpen = rightPanelMode !== 'closed';
+    prevPanelModeRef.current = rightPanelMode;
+
+    if (isOpen && !wasOpen) {
+      const active = document.activeElement;
+      lastTriggerRef.current = active instanceof HTMLElement ? active : null;
+      const scroller = document.querySelector<HTMLElement>('[data-virt-viewport="true"]');
+      savedChatScrollRef.current = scroller?.scrollTop ?? null;
+      // Animate the width expansion for one transition window only, so the
+      // resizer stays immediate afterwards.
+      setAnimatePanelWidth(true);
+      const t = setTimeout(() => setAnimatePanelWidth(false), 300);
+      // Re-assert the captured scrollTop once the width transition lands.
+      const t2 = setTimeout(() => {
+        const el = document.querySelector<HTMLElement>('[data-virt-viewport="true"]');
+        if (el && savedChatScrollRef.current != null) el.scrollTop = savedChatScrollRef.current;
+      }, 240);
+      return () => {
+        clearTimeout(t);
+        clearTimeout(t2);
+      };
+    }
+
+    if (!isOpen && wasOpen) {
+      const el = document.querySelector<HTMLElement>('[data-virt-viewport="true"]');
+      if (el && savedChatScrollRef.current != null) el.scrollTop = savedChatScrollRef.current;
+      savedChatScrollRef.current = null;
+      const trigger = lastTriggerRef.current;
+      lastTriggerRef.current = null;
+      if (trigger && document.contains(trigger)) {
+        trigger.focus({ preventScroll: true });
+      } else {
+        document.querySelector<HTMLElement>('[data-composer-textarea="true"]')?.focus({ preventScroll: true });
+      }
+    }
+  }, [rightPanelMode]);
+
+  // Live construction trace of the artifact currently on the surface (§97).
+  const activeConstruction = useConstructionStore((s) =>
+    activeArtifact ? s.byArtifact[activeArtifact.id] ?? null : null,
+  );
 
   // §30 — the thread surface tracks a root MESSAGE ID and resolves it live
   // from the merged list, so replies/edits appear without stale snapshots.
@@ -789,13 +843,17 @@ export function AppShell() {
           artifact={activeArtifact}
           activeVersionNumber={activeVersionNumber || activeArtifact.current_version}
           compareVersionNumber={compareVersionNumber}
+          construction={activeConstruction}
           onClose={closeRightPanel}
           onSelectVersion={setActiveVersionNumber}
           onSetCompareVersion={setCompareVersionNumber}
-          onTogglePin={toggleArtifactPin}
-          onToggleContext={toggleArtifactContext}
           onAskOdinAboutNode={(nodeLabel) => {
-            setComposerText(`@Odin Explain details for component: "${nodeLabel}"`);
+            // §107 — the selected object id/context rides into the request.
+            setComposerText(`@${activeGroup?.ai_name || 'Odin'} About "${nodeLabel}" in ${activeArtifact.title}: `);
+            navigateToSection('chat');
+          }}
+          onSendToChat={(art) => {
+            setComposerText(`@${activeGroup?.ai_name || 'Odin'} Using "${art.title}" as context — `);
             navigateToSection('chat');
           }}
         />
@@ -1081,7 +1139,6 @@ export function AppShell() {
               <GarageView
                 artifacts={artifacts}
                 onOpenArtifact={(art) => openArtifactPanel(art)}
-                onTogglePin={toggleArtifactPin}
               />
             </ErrorBoundary>
           )}
@@ -1200,7 +1257,12 @@ export function AppShell() {
               onResize={setRightPanelWidth}
             />
             <aside
-              className="h-full flex flex-col shrink-0 panel-open"
+              className={cn(
+                'panel-open h-full flex flex-col shrink-0',
+                // §95/§248 — the width EXPANSION animates once per open; the
+                // resizer stays immediate afterwards.
+                animatePanelWidth && 'transition-[width] duration-200 ease-out',
+              )}
               style={{ width: rightPanelWidth, background: 'var(--color-surface)' }}
               aria-label={rightSurfaceTitle}
             >

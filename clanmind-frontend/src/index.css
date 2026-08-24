@@ -403,6 +403,13 @@
   animation: node-arrive 200ms var(--ease-decelerate) forwards;
 }
 
+/* Diagram edge draw — FE §98/§99: reveals along the path exactly ONCE during
+   live construction, then the edge stays static (never pulses forever). */
+.cm-edge-draw {
+  stroke-dasharray: 220;
+  animation: spectral-draw 700ms var(--ease-standard) 1 forwards;
+}
+
 /* Panel animations */
 .panel-open {
   animation: panel-open var(--duration-standard) var(--ease-decelerate) forwards;
@@ -440,12 +447,18 @@
   .node-arrive,
   .reaction-pop,
   .completion-glow,
+  .cm-edge-draw,
   .streaming-cursor::after,
   /* Sheets appear/disappear instantly — §6 replace large panel motion */
   .sheet-panel-right,
   .sheet-panel-left,
   .sheet-overlay {
     animation: none !important;
+  }
+
+  /* §99 — a draw that cannot animate must not leave a dashed artifact */
+  .cm-edge-draw {
+    stroke-dasharray: none !important;
   }
 
   /* Kill all transitions */

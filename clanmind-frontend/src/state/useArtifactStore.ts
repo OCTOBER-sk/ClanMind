@@ -28,7 +28,6 @@ export interface ArtifactState {
   setRightPanelMode: (mode: RightPanelMode) => void;
   toggleArtifactPin: (artifactId: string) => void;
   toggleArtifactContext: (artifactId: string) => void;
-  addArtifact: (artifact: Artifact) => void;
   /**
    * §139 — upsert for live artifact events: a known artifact id receives the
    * incoming versions as NEW VERSIONS (append + current_version bump), an
@@ -37,6 +36,12 @@ export interface ArtifactState {
   mergeArtifactVersion: (artifact: Artifact) => void;
   openArtifactPanel: (artifact: Artifact) => void;
   closeRightPanel: () => void;
+  /**
+   * §252/§251 — bring a LIVE-created artifact to the front. Only meaningful
+   * for artifacts the user explicitly requested (callers gate on that); most
+   * recent becomes the active one. Never steals keyboard focus (§253).
+   */
+  autoOpenArtifact: (artifactId: string) => void;
   /** Track a live AI run for an artifact */
   setArtifactRunStatus: (info: ArtifactRunInfo) => void;
   /** Clear run status when run completes or is dismissed */
@@ -98,14 +103,6 @@ export const useArtifactStore = create<ArtifactState>((set) => ({
           : state.activeArtifact,
     })),
 
-  addArtifact: (artifact) =>
-    set((state) => ({
-      artifacts: [artifact, ...state.artifacts],
-      activeArtifact: artifact,
-      activeVersionNumber: artifact.current_version,
-      rightPanelMode: 'artifact',
-    })),
-
   mergeArtifactVersion: (incoming) =>
     set((state) => {
       const existing = state.artifacts.find((a) => a.id === incoming.id);
@@ -146,6 +143,19 @@ export const useArtifactStore = create<ArtifactState>((set) => ({
     }),
 
   closeRightPanel: () => set({ rightPanelMode: 'closed' }),
+
+  autoOpenArtifact: (artifactId) =>
+    set((state) => {
+      const artifact = state.artifacts.find((a) => a.id === artifactId);
+      if (!artifact) return {};
+      const version = artifact.current_version || 1;
+      return {
+        activeArtifact: artifact,
+        activeVersionNumber: version,
+        compareVersionNumber: null,
+        rightPanelMode: 'artifact',
+      };
+    }),
 
   setArtifactRunStatus: (info) =>
     set((state) => ({

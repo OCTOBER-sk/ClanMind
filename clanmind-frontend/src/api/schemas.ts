@@ -298,3 +298,54 @@ export const FeatureFlagsSchema = z
     interactive_artifacts: z.boolean().catch(false),
   })
   .passthrough();
+
+// ─── Artifacts (BE §44–§46, §109) ────────────────────────────────────────────
+
+/**
+ * BE §44 version row. `content_ref` points into object storage on the real
+ * backend (D15); when a response carries inline `content` the FE renders it,
+ * otherwise the row is still usable for metadata (version menus, compare).
+ */
+export const ArtifactVersionRowSchema = z
+  .object({
+    id: IdSchema,
+    artifact_id: IdSchema,
+    version_number: z.number(),
+    content_type: z.string().nullish(),
+    content_ref: z.string().nullish(),
+    checksum: z.string().nullish(),
+    created_by_user_id: z.string().nullish(),
+    created_by_ai_id: z.string().nullish(),
+    parent_version_id: z.string().nullish(),
+    created_at: IsoDateSchema,
+    /** Inline content extension (demo parity / future backend surface). */
+    content: z.string().nullish(),
+    change_summary: z.string().nullish(),
+  })
+  .passthrough();
+
+/** BE §44 artifact row + current-version join. */
+export const ArtifactRowSchema = z
+  .object({
+    id: IdSchema,
+    group_id: IdSchema.nullish(),
+    project_id: IdSchema.nullish(),
+    name: z.string().nullish(),
+    title: z.string().nullish(),
+    artifact_type: z.string(),
+    status: z.string().nullish(),
+    pinned: z.boolean().nullish(),
+    current_version_id: z.string().nullish(),
+    current_version: z.number().nullish(),
+    created_by_user_id: z.string().nullish(),
+    created_by_ai_id: z.string().nullish(),
+    deleted_at: z.string().nullish(),
+    created_at: IsoDateSchema,
+    updated_at: IsoDateSchema,
+    versions: z.array(ArtifactVersionRowSchema).nullish(),
+  })
+  .passthrough();
+
+export const ArtifactListSchema = z
+  .object({ items: z.array(ArtifactRowSchema).nullish() })
+  .passthrough();

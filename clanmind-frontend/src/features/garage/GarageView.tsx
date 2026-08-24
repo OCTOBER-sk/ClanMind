@@ -1,47 +1,104 @@
-import React, { useEffect, useState } from 'react';
+/**
+ * Project Garage (FE §87–§90, §257) — a project library, not an uploads dump.
+ *
+ * Sections: All · Artifacts · Files · Research · Pinned · Recent.
+ * Grid (§90) and list (§89) views; the preference persists locally.
+ * Cards show preview/title/type/creator/updated/version/pin (§88) with
+ * pinned-first ordering (§257).
+ */
+
+import { useMemo, useState } from 'react';
 import {
-  Folder,
-  FileText,
   FileCode,
+  FileText,
+  Folder,
+  FolderOpen,
   LayoutGrid,
   List,
+  MoreHorizontal,
   Pin,
-  Sparkles,
   Search,
-  FolderOpen,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/design-system/components/Button';
 import { Badge } from '@/design-system/components/Badge';
+import { Dropdown } from '@/design-system/components/Dropdown';
+import { IconButton } from '@/design-system/components/IconButton';
+import { Tooltip } from '@/design-system/components/Tooltip';
 import { cn } from '@/design-system/utils';
 import { useToast } from '@/design-system/components/Toast';
+import { useUiStore } from '@/state/useUiStore';
 import { LocalFileTreeView, type LocalFileItem } from './LocalFileTreeView';
 import { SEED_LOCAL_FILES } from './localFiles';
 import { pickLocalFolder } from '@/tauri/bridge';
+import { useArtifactController } from '@/features/artifacts/useArtifactController';
+import { relativeTime } from '@/features/artifacts/relativeTime';
+import { parseDiagramContent, diagramToSvg } from '@/features/artifacts/diagramUtils';
 import type { Artifact } from '@/types';
 
 export interface GarageViewProps {
   artifacts: Artifact[];
   onOpenArtifact: (artifact: Artifact) => void;
-  onTogglePin: (id: string) => void;
 }
 
-type GarageTab = 'all' | 'artifacts' | 'files' | 'pinned';
+type GarageSection = 'all' | 'artifacts' | 'files' | 'research' | 'pinned' | 'recent';
 
-export function GarageView({ artifacts, onOpenArtifact, onTogglePin }: GarageViewProps) {
+const SECTIONS: Array<{ id: GarageSection; label: string }> = [
+  { id: 'all', label: 'All' },
+  { id: 'artifacts', label: 'Artifacts' },
+  { id: 'files', label: 'Files' },
+  { id: 'research', label: 'Research' },
+  { id: 'pinned', label: 'Pinned' },
+  { id: 'recent', label: 'Recent' },
+];
+
+const DIAGRAM_FAMILY = new Set([
+  'DIAGRAM', 'FLOWCHART', 'ARCHITECTURE', 'GRAPH', 'TIMELINE', 'MINDMAP', 'DECISION_TREE',
+]);
+
+function creatorOf(a: Artifact): string {
+  return [...a.versions].sort((x, y) => y.version_number - x.version_number)[0]?.created_by_name ?? 'Unknown';
+}
+
+/** Pinned first (§257), then most recently updated. */
+function garageOrder(a: Artifact[]): Artifact[] {
+  return [...a].sort((x, y) => {
+    if (x.pinned !== y.pinned) return x.pinned ? -1 : 1;
+    return y.updated_at.localeCompare(x.updated_at);
+  });
+}
+
+/** Real preview where possible: diagrams render their deterministic SVG. */
+function previewFor(artifact: Artifact): { kind: 'image'; url: string } | { kind: 'text'; excerpt: string } {
+  if (DIAGRAM_FAMILY.has(artifact.artifact_type)) {
+    const version =
+      artifact.versions.find((v) => v.version_number === artifact.current_version) ?? artifact.versions[0];
+    const parsed = parseDiagramContent(version?.content);
+    if (parsed) {
+      return { kind: 'image', url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(diagramToSvg(parsed.content))}` };
+    }
+  }
+  // Text preview: the first meaningful body line of the current version.
+  const version =
+    artifact.versions.find((v) => v.version_number === artifact.current_version) ?? artifact.versions[0];
+  const firstLine = (version?.content ?? '')
+    .split('\n')
+    .map((line) => line.replace(/^#+\s*/, '').replace(/[*_`>-]/g, '').trim())
+    .find((line) => line.length > 0);
+  const excerpt = (firstLine || artifact.title).slice(0, 96);
+  return { kind: 'text', excerpt };
+}
+
+export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<GarageTab>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>(
-    () => (localStorage.getItem('cm_garage_view') as 'grid' | 'list') || 'grid'
-  );
+  const [section, setSection] = useState<GarageSection>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [localFiles, setLocalFiles] = useState<LocalFileItem[]>(SEED_LOCAL_FILES);
+  const { togglePin, toggleContext, exportAs } = useArtifactController();
 
-  // §90: remember preferred view locally
-  useEffect(() => {
-    localStorage.setItem('cm_garage_view', viewMode);
-  }, [viewMode]);
+  // Grid/list persisted via the UI-prefs store (FE §90).
+  const viewMode = useGarageViewMode();
 
-  // §187/§237: connect a local folder via the Tauri dialog
   const handleAddFolder = async () => {
     const folder = await pickLocalFolder();
     if (folder === null) return; // cancelled — not an error
@@ -55,101 +112,150 @@ export function GarageView({ artifacts, onOpenArtifact, onTogglePin }: GarageVie
     ]);
   };
 
-  const filteredArtifacts = artifacts.filter((a) => {
-    if (activeTab === 'pinned' && !a.pinned) return false;
-    if (activeTab === 'artifacts' && a.artifact_type === 'OTHER') return false;
-    if (searchQuery && !a.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
+  const visibleArtifacts = useMemo(() => {
+    let list = artifacts.filter((a) => !a.deleted);
+    switch (section) {
+      case 'artifacts':
+        list = list.filter((a) => a.artifact_type !== 'RESEARCH');
+        break;
+      case 'research':
+        list = list.filter((a) => a.artifact_type === 'RESEARCH');
+        break;
+      case 'pinned':
+        list = list.filter((a) => a.pinned);
+        break;
+      case 'recent':
+        list = [...list]
+          .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+          .slice(0, 12);
+        break;
+      default:
+        break;
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((a) =>
+        a.title.toLowerCase().includes(q) || a.artifact_type.toLowerCase().includes(q),
+      );
+    }
+    // §257 — pinned first everywhere except the Recent section.
+    return section === 'recent' ? list : garageOrder(list);
+  }, [artifacts, section, searchQuery]);
 
-  const cardActionClass =
-    'p-1 rounded cursor-pointer hover:opacity-80 focus-visible:shadow-[var(--focus-ring)]';
+  const moreItemsFor = (artifact: Artifact) => [
+    { id: 'open', label: 'Open', onClick: () => onOpenArtifact(artifact) },
+    {
+      id: 'pin',
+      label: artifact.pinned ? 'Unpin' : 'Pin to Garage',
+      onClick: () => togglePin(artifact.id),
+    },
+    {
+      id: 'ctx',
+      label: artifact.used_as_context ? '✓ Used by Odin' : 'Use as Project Context',
+      onClick: () => toggleContext(artifact.id),
+    },
+    {
+      id: 'export_json',
+      label: 'Export JSON',
+      onClick: () => exportAs(artifact.id, artifact.current_version, 'json'),
+    },
+  ];
+
+  const renderEmpty = (message: string, hint: string) => (
+    <div className="py-16 text-center text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+      <Folder className="mx-auto mb-2 h-10 w-10 opacity-40" aria-hidden="true" />
+      <p className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>{message}</p>
+      <p className="mt-1">{hint}</p>
+    </div>
+  );
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--color-background)' }}>
-      {/* Top Header & Filter Bar */}
+    <div className="flex h-full flex-col overflow-hidden" style={{ background: 'var(--color-background)' }}>
+      {/* Header */}
       <div
-        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-6 border-b"
+        className="flex flex-col items-start justify-between gap-3 border-b p-6 sm:flex-row sm:items-center"
         style={{ borderColor: 'var(--color-border)' }}
       >
         <div>
           <h1 className="text-xl font-bold" style={{ color: 'var(--color-text)' }}>
             Project Garage
           </h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
-            Living library of project artifacts, system models, research findings, and technical references.
+          <p className="mt-0.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+            The project library — artifacts, research findings, and technical references.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* View Mode Toggle */}
+          {/* §90 view mode — remembered locally */}
           <div
-            className="flex items-center p-1 rounded-lg border"
+            className="flex items-center rounded-lg border p-1"
             style={{ background: 'var(--color-surface-hover)', borderColor: 'var(--color-border)' }}
+            role="group"
+            aria-label="View mode"
           >
             <button
-              onClick={() => setViewMode('grid')}
+              onClick={() => setGarageGrid()}
               aria-label="Grid view"
               aria-pressed={viewMode === 'grid'}
               className={cn(
-                'p-1.5 rounded-md cursor-pointer transition-colors',
-                viewMode === 'grid' && 'bg-[var(--color-surface-raised)] shadow-[var(--shadow-sm)]'
+                'cursor-pointer rounded-md p-1.5 transition-colors',
+                viewMode === 'grid' && 'bg-[var(--color-surface-raised)] shadow-[var(--shadow-sm)]',
               )}
               style={{ color: viewMode === 'grid' ? 'var(--color-text)' : 'var(--color-text-tertiary)' }}
             >
-              <LayoutGrid className="w-4 h-4" aria-hidden="true" />
+              <LayoutGrid className="h-4 w-4" aria-hidden="true" />
             </button>
             <button
-              onClick={() => setViewMode('list')}
+              onClick={() => setGarageList()}
               aria-label="List view"
               aria-pressed={viewMode === 'list'}
               className={cn(
-                'p-1.5 rounded-md cursor-pointer transition-colors',
-                viewMode === 'list' && 'bg-[var(--color-surface-raised)] shadow-[var(--shadow-sm)]'
+                'cursor-pointer rounded-md p-1.5 transition-colors',
+                viewMode === 'list' && 'bg-[var(--color-surface-raised)] shadow-[var(--shadow-sm)]',
               )}
               style={{ color: viewMode === 'list' ? 'var(--color-text)' : 'var(--color-text-tertiary)' }}
             >
-              <List className="w-4 h-4" aria-hidden="true" />
+              <List className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
 
           <Button
             size="sm"
             variant="primary"
-            leftIcon={<FolderOpen className="w-3.5 h-3.5" />}
-            onClick={handleAddFolder}
+            leftIcon={<FolderOpen className="h-3.5 w-3.5" />}
+            onClick={() => void handleAddFolder()}
           >
             Connect local folder
           </Button>
         </div>
       </div>
 
-      {/* Tabs & Search */}
+      {/* Sections & search */}
       <div
-        className="flex items-center justify-between px-6 py-3 border-b"
+        className="flex items-center justify-between gap-3 overflow-x-auto border-b px-6 py-3"
         style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
       >
-        <div className="flex items-center gap-3">
-          {(['all', 'artifacts', 'files', 'pinned'] as const).map((tab) => (
+        <div className="flex items-center gap-2">
+          {SECTIONS.map((s) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
+              key={s.id}
+              onClick={() => setSection(s.id)}
+              aria-pressed={section === s.id}
               className={cn(
-                'px-3 py-1.5 text-xs font-semibold rounded-lg capitalize transition-colors cursor-pointer',
-                activeTab === tab
+                'shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-colors',
+                section === s.id
                   ? 'bg-[var(--color-primary)] text-[var(--color-primary-fg)]'
-                  : 'hover:bg-[var(--color-surface-hover)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]',
               )}
-              style={activeTab === tab ? undefined : { color: 'var(--color-text-secondary)' }}
             >
-              {tab}
+              {s.label}
             </button>
           ))}
         </div>
 
-        <div className="relative w-64">
+        <div className="relative w-56 shrink-0">
           <Search
-            className="w-3.5 h-3.5 absolute left-3 top-2.5"
+            className="absolute left-3 top-2.5 h-3.5 w-3.5"
             style={{ color: 'var(--color-text-tertiary)' }}
             aria-hidden="true"
           />
@@ -158,7 +264,7 @@ export function GarageView({ artifacts, onOpenArtifact, onTogglePin }: GarageVie
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Filter garage items…"
             aria-label="Filter garage items"
-            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border outline-none"
+            className="w-full rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none"
             style={{
               borderColor: 'var(--color-border)',
               background: 'var(--color-surface-raised)',
@@ -170,54 +276,80 @@ export function GarageView({ artifacts, onOpenArtifact, onTogglePin }: GarageVie
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">
-        {/* §87 Files section — local file tree with sync states (§189/§212) */}
-        {activeTab === 'files' ? (
+        {section === 'files' ? (
           <LocalFileTreeView
             files={localFiles}
             onSelectFile={(f) => {
               toast({
                 title: f.name,
-                description: f.isFolder ? 'Folder contents are indexed locally.' : 'File preview coming with the filesystem bridge.',
+                description: f.isFolder
+                  ? 'Folder contents are indexed locally.'
+                  : 'File preview arrives with the filesystem bridge.',
               });
             }}
           />
-        ) : filteredArtifacts.length === 0 ? (
-          <div className="text-center py-16 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
-            <Folder className="w-10 h-10 mx-auto mb-2 opacity-40" aria-hidden="true" />
-            {/* §179 empty state: what / why / next */}
-            <p className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-              No {activeTab === 'pinned' ? 'pinned ' : ''}artifacts yet.
-            </p>
-            <p className="mt-1">Ask Odin in chat to create an architecture blueprint or system specification.</p>
-          </div>
+        ) : visibleArtifacts.length === 0 ? (
+          section === 'research' ? (
+            renderEmpty('No research saved yet.', 'Deep-research runs save their findings here automatically.')
+          ) : section === 'pinned' ? (
+            renderEmpty('Nothing pinned yet.', 'Pin artifacts from the work surface or a card to keep them at hand.')
+          ) : (
+            renderEmpty(
+              'No artifacts yet.',
+              'Ask Odin in chat to draft a spec or blueprint — it will appear here.',
+            )
+          )
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredArtifacts.map((artifact) => (
-              <div
-                key={artifact.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => onOpenArtifact(artifact)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onOpenArtifact(artifact);
-                  }
-                }}
-                className="group relative p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between"
-                style={{
-                  borderColor: 'var(--color-border)',
-                  background: 'var(--color-surface-raised)',
-                }}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="p-1.5 rounded-md" style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}>
-                        {artifact.artifact_type === 'DIAGRAM' || artifact.artifact_type === 'ARCHITECTURE' ? (
-                          <FileCode className="w-4 h-4" aria-hidden="true" />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {visibleArtifacts.map((artifact) => {
+              const preview = previewFor(artifact);
+              return (
+                <div
+                  key={artifact.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onOpenArtifact(artifact)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onOpenArtifact(artifact);
+                    }
+                  }}
+                  className="group relative flex cursor-pointer flex-col rounded-xl border p-4 transition-all hover:border-[var(--color-border-strong)]"
+                  style={{
+                    borderColor: 'var(--color-border)',
+                    background: 'var(--color-surface-raised)',
+                  }}
+                >
+                  {/* §88 preview — real SVG for diagrams, body excerpt for text */}
+                  {preview.kind === 'image' ? (
+                    <img
+                      src={preview.url}
+                      alt=""
+                      aria-hidden="true"
+                      className="mb-3 h-24 w-full rounded-lg border object-contain object-left-top bg-white p-1"
+                      style={{ borderColor: 'var(--color-border)' }}
+                    />
+                  ) : (
+                    <p
+                      className="mb-3 line-clamp-2 rounded-lg border p-2.5 text-[11px] italic"
+                      style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-tertiary)', background: 'var(--color-surface)' }}
+                    >
+                      {preview.excerpt}
+                    </p>
+                  )}
+
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span
+                        className="rounded-md p-1.5"
+                        style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
+                        aria-hidden="true"
+                      >
+                        {DIAGRAM_FAMILY.has(artifact.artifact_type) || artifact.artifact_type === 'CODE' ? (
+                          <FileCode className="h-4 w-4" />
                         ) : (
-                          <FileText className="w-4 h-4" aria-hidden="true" />
+                          <FileText className="h-4 w-4" />
                         )}
                       </span>
                       <Badge variant="neutral" size="sm">
@@ -225,98 +357,140 @@ export function GarageView({ artifacts, onOpenArtifact, onTogglePin }: GarageVie
                       </Badge>
                     </div>
 
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onTogglePin(artifact.id);
-                      }}
-                      aria-label={artifact.pinned ? 'Unpin artifact' : 'Pin artifact'}
-                      aria-pressed={artifact.pinned}
-                      className={cardActionClass}
-                    >
-                      <Pin
-                        className={cn('w-3.5 h-3.5', artifact.pinned && 'fill-current')}
-                        style={{ color: artifact.pinned ? 'var(--color-warning)' : 'var(--color-text-tertiary)' }}
-                        aria-hidden="true"
-                      />
-                    </button>
+                    {/* §88 hover actions — pin is ALSO keyboard reachable */}
+                    <div className="flex items-center gap-0.5 opacity-100 transition-opacity group-hover:opacity-100 sm:opacity-60 sm:focus-within:opacity-100 sm:group-hover:opacity-100">
+                      <Tooltip content={artifact.pinned ? 'Unpin' : 'Pin'}>
+                        <IconButton
+                          aria-label={artifact.pinned ? 'Unpin artifact' : 'Pin artifact'}
+                          aria-pressed={artifact.pinned}
+                          size="xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePin(artifact.id);
+                          }}
+                        >
+                          <Pin
+                            className={cn('h-3.5 w-3.5', artifact.pinned && 'fill-current')}
+                            style={{ color: artifact.pinned ? 'var(--color-warning)' : undefined }}
+                            aria-hidden="true"
+                          />
+                        </IconButton>
+                      </Tooltip>
+                      <span onClick={(e) => e.stopPropagation()} role="presentation">
+                        <Dropdown
+                          align="end"
+                          trigger={
+                            <IconButton aria-label={`More actions for ${artifact.title}`} size="xs">
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </IconButton>
+                          }
+                          items={moreItemsFor(artifact)}
+                        />
+                      </span>
+                    </div>
                   </div>
 
-                  <h3 className="font-bold text-xs" style={{ color: 'var(--color-text)' }}>
+                  <h3 className="mt-2 line-clamp-2 text-xs font-bold" style={{ color: 'var(--color-text)' }}>
                     {artifact.title}
                   </h3>
-                </div>
 
-                <div
-                  className="flex items-center justify-between mt-4 pt-3 border-t text-[10px]"
-                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-tertiary)' }}
-                >
-                  <span>v{artifact.current_version} · By Odin</span>
-                  {artifact.used_as_context && (
-                    <span className="flex items-center gap-1 font-medium" style={{ color: 'var(--color-warning)' }}>
-                      <Sparkles className="w-2.5 h-2.5" aria-hidden="true" /> Used by Odin
+                  {/* §88 metadata row */}
+                  <div
+                    className="mt-3 flex items-center justify-between border-t pt-3 text-[10px]"
+                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-tertiary)' }}
+                  >
+                    <span className="truncate">
+                      v{artifact.current_version} · {creatorOf(artifact)} · {relativeTime(artifact.updated_at)}
                     </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div
-            className="divide-y rounded-xl overflow-hidden border"
-            style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
-          >
-            {filteredArtifacts.map((artifact) => (
-              <div
-                key={artifact.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => onOpenArtifact(artifact)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onOpenArtifact(artifact);
-                  }
-                }}
-                className="flex items-center justify-between p-3.5 cursor-pointer transition-colors text-xs"
-                style={{ color: 'var(--color-text)' }}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <FileText className="w-4 h-4 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} aria-hidden="true" />
-                  <div className="min-w-0">
-                    <p className="font-semibold truncate">{artifact.title}</p>
-                    <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
-                      {artifact.artifact_type} · Version {artifact.current_version}
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {artifact.used_as_context && (
+                        <span className="flex items-center gap-1 font-medium" style={{ color: 'var(--color-warning)' }}>
+                          <Sparkles className="h-2.5 w-2.5" aria-hidden="true" /> Used by Odin
+                        </span>
+                      )}
+                      {artifact.pinned && (
+                        <Pin className="h-3 w-3 fill-current" style={{ color: 'var(--color-warning)' }} aria-label="Pinned" />
+                      )}
                     </span>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
-                  {artifact.used_as_context && (
-                    <span className="flex items-center gap-1" style={{ color: 'var(--color-warning)' }}>
-                      <Sparkles className="w-3 h-3" aria-hidden="true" /> Context
-                    </span>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onTogglePin(artifact.id);
-                    }}
-                    aria-label={artifact.pinned ? 'Unpin artifact' : 'Pin artifact'}
-                    className={cardActionClass}
+              );
+            })}
+          </div>
+        ) : (
+          /* §89 list columns */
+          <div
+            className="overflow-hidden rounded-xl border"
+            style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+          >
+            <div
+              className="grid grid-cols-[minmax(0,3fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_32px] gap-2 border-b px-3.5 py-2 text-[10px] font-bold uppercase tracking-wide"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-tertiary)', background: 'var(--color-surface)' }}
+            >
+              <span>Name</span>
+              <span>Type</span>
+              <span>Updated</span>
+              <span>Creator</span>
+              <span>Version</span>
+              <span />
+            </div>
+            <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+              {visibleArtifacts.map((artifact) => (
+                <div
+                  key={artifact.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onOpenArtifact(artifact)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onOpenArtifact(artifact);
+                    }
+                  }}
+                  className="grid cursor-pointer grid-cols-[minmax(0,3fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_32px] items-center gap-2 px-3.5 py-2.5 text-xs transition-colors hover:bg-[var(--color-surface-hover)]"
+                  style={{ color: 'var(--color-text)', borderColor: 'var(--color-border)' }}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <FileText className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} aria-hidden="true" />
+                    <span className="truncate font-semibold">{artifact.title}</span>
+                    {artifact.pinned && (
+                      <Pin className="h-3 w-3 shrink-0 fill-current" style={{ color: 'var(--color-warning)' }} aria-label="Pinned" />
+                    )}
+                  </span>
+                  <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{artifact.artifact_type}</span>
+                  <span style={{ color: 'var(--color-text-secondary)' }}>{relativeTime(artifact.updated_at)}</span>
+                  <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{creatorOf(artifact)}</span>
+                  <span>v{artifact.current_version}</span>
+                  <span
+                    onClick={(e) => e.stopPropagation()}
+                    role="presentation"
+                    className="flex justify-end"
                   >
-                    <Pin
-                      className={cn('w-3.5 h-3.5', artifact.pinned && 'fill-current')}
-                      style={{ color: artifact.pinned ? 'var(--color-warning)' : 'var(--color-text-tertiary)' }}
-                      aria-hidden="true"
+                    <Dropdown
+                      align="end"
+                      trigger={<IconButton aria-label={`More actions for ${artifact.title}`} size="xs"><MoreHorizontal className="h-3.5 w-3.5" /></IconButton>}
+                      items={moreItemsFor(artifact)}
                     />
-                  </button>
+                  </span>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </div>
     </div>
   );
+}
+
+/** Thin selector so the component only re-renders on its own pref. */
+function useGarageViewMode() {
+  return useUiStore((s) => s.garageViewMode);
+}
+
+function setGarageGrid() {
+  useUiStore.getState().setGarageViewMode('grid');
+}
+
+function setGarageList() {
+  useUiStore.getState().setGarageViewMode('list');
 }
