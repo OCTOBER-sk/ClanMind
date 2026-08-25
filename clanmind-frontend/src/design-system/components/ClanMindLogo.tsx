@@ -96,7 +96,7 @@ export function ClanMindLogo({
             'transition-colors',
             variant === 'spectral'
               ? 'fill-amber-400 animate-pulse'
-              : 'fill-blue-400 dark:fill-blue-500'
+              : 'fill-gray-900 dark:fill-white'
           )}
         />
       </svg>
@@ -104,7 +104,7 @@ export function ClanMindLogo({
       {/* Wordmark */}
       {showWordmark && (
         <span className={cn('font-bold tracking-tight text-gray-900 dark:text-gray-100', currentSize.text)}>
-          Clan<span className="text-blue-600 dark:text-blue-400">Mind</span>
+          ClanMind
         </span>
       )}
     </div>
