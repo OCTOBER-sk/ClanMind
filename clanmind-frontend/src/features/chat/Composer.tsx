@@ -712,7 +712,7 @@ export function Composer({
               className={cn(
                 'inline-flex items-center justify-center p-2 rounded-lg transition-all select-none',
                 canSend
-                  ? 'bg-[var(--color-primary)] text-[var(--color-primary-fg)] hover:opacity-90 active:scale-95 cursor-pointer'
+                  ? 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 active:scale-95 cursor-pointer'
                   : 'cursor-not-allowed opacity-40'
               )}
               style={!canSend ? { background: 'var(--color-surface-hover)' } : undefined}

@@ -49,6 +49,30 @@ export interface SendMessageInput {
 }
 
 /**
+ * §39 row subset of the triggering user message, resolved by the live
+ * `POST /messages` response. The server-assigned uuid id (not the locally
+ * minted one) is what the backend accepts as `input_message_id`, and
+ * `private_conversation_id` names the §2.4 conversation the message landed in.
+ */
+interface AiRunSourceRef {
+  id?: string;
+  private_conversation_id?: string | null;
+}
+
+function serverRefOf(row: AiRunSourceRef | null | undefined): {
+  inputMessageId: string | null;
+  privateConversationId: string | null;
+} {
+  return {
+    inputMessageId: typeof row?.id === 'string' && row.id.length > 0 ? row.id : null,
+    privateConversationId:
+      typeof row?.private_conversation_id === 'string' && row.private_conversation_id.length > 0
+        ? row.private_conversation_id
+        : null,
+  };
+}
+
+/**
  * §134/§138/§139 — start ONE AI run for `prompt` as a brand-new shell message.
  * Every entry point (fresh @odin send, Retry, Regenerate) comes through here,
  * which is what guarantees each attempt is a NEW run and the previous
@@ -63,6 +87,14 @@ function spawnAiRun(input: {
   projectId?: string;
   visibility: MessageVisibility;
   prompt: string;
+  /**
+   * Resolves with the server §39 row of the triggering message (live POST
+   * response). The run start waits for it so the REST call can carry the
+   * composer's privacy scope + input linkage with SERVER-authoritative ids.
+   * On failure the run still starts — scoped by visibility alone, never
+   * degraded to GROUP (audit FINAL_PREKEY A2/B1).
+   */
+  source?: Promise<AiRunSourceRef | null>;
 }): void {
   const { activeGroup } = useGroupStore.getState();
   const aiName = activeGroup?.ai_name || 'Odin';
@@ -119,40 +151,61 @@ function spawnAiRun(input: {
   // LIVE — REST is the canonical start path (BE §106; WS ai.run answers
   // NOT_AVAILABLE_ON_WS). Streaming deltas reach the room via the realtime
   // port and are projected (batched, §135) by dispatchRealtimeEvent.
-  void api
-    .post<{ run_id?: string }>(`/groups/${input.groupId}/ai/runs`, {
-      message: input.prompt,
-      project_id: input.projectId ?? null,
-      mode: 'ASSIST',
-    })
-    .then((res) => {
-      if (typeof res?.run_id !== 'string') return;
-      // Lazy — keeps the live runtime out of non-live chunks.
-      void import('@/live/liveRuntime').then((m) => m.bindRunId(res.run_id!, aiShellId));
-    })
-    .catch((err: unknown) => {
-      // §94 quota contract → AiQuotaCard BYOK branch on the failed shell.
-      const exhaustion = quotaExhaustionOf(err);
-      const failedRun: Partial<AiRun> = {
-        id: runId,
-        group_id: input.groupId,
-        status: 'FAILED',
+  const startLiveRun = (ref: {
+    inputMessageId: string | null;
+    privateConversationId: string | null;
+  }): void => {
+    void api
+      .post<{ run_id?: string }>(`/groups/${input.groupId}/ai/runs`, {
+        message: input.prompt,
+        project_id: input.projectId ?? null,
         mode: 'ASSIST',
-        prompt: input.prompt,
-        error_code:
-          err instanceof ApiError && err.code === 'APPLICATION_AI_QUOTA_EXHAUSTED'
-            ? 'APPLICATION_AI_QUOTA_EXHAUSTED'
-            : 'RUN_START_FAILED',
-        ...(exhaustion ? { can_continue_with_byok: exhaustion.canContinueWithByok } : {}),
-        completed_at: new Date().toISOString(),
-      };
-      useArtifactStore.getState().setAiRunByMessage(aiShellId, failedRun as AiRun);
-      if (!exhaustion) {
-        useChatStore.getState().updateMessage(aiShellId, {
-          body: "I couldn't start that run. The request failed before reaching the model.",
-        });
-      }
-    });
+        // §2.4/§55A — the run carries the composer's privacy scope. Omitting
+        // it defaults the run (and Odin's persisted answer, orchestrator
+        // persistAiMessage + completion broadcast) to Group-visible: a
+        // private question must never produce a Group-visible answer.
+        visibility: input.visibility,
+        // §40 — PRIVATE_AI conversations are re-resolved/authorized
+        // server-side; a claimed id must be the requester's own conversation.
+        ...(ref.privateConversationId
+          ? { private_conversation_id: ref.privateConversationId }
+          : {}),
+        ...(ref.inputMessageId ? { input_message_id: ref.inputMessageId } : {}),
+      })
+      .then((res) => {
+        if (typeof res?.run_id !== 'string') return;
+        // Lazy — keeps the live runtime out of non-live chunks.
+        void import('@/live/liveRuntime').then((m) => m.bindRunId(res.run_id!, aiShellId));
+      })
+      .catch((err: unknown) => {
+        // §94 quota contract → AiQuotaCard BYOK branch on the failed shell.
+        const exhaustion = quotaExhaustionOf(err);
+        const failedRun: Partial<AiRun> = {
+          id: runId,
+          group_id: input.groupId,
+          status: 'FAILED',
+          mode: 'ASSIST',
+          prompt: input.prompt,
+          error_code:
+            err instanceof ApiError && err.code === 'APPLICATION_AI_QUOTA_EXHAUSTED'
+              ? 'APPLICATION_AI_QUOTA_EXHAUSTED'
+              : 'RUN_START_FAILED',
+          ...(exhaustion ? { can_continue_with_byok: exhaustion.canContinueWithByok } : {}),
+          completed_at: new Date().toISOString(),
+        };
+        useArtifactStore.getState().setAiRunByMessage(aiShellId, failedRun as AiRun);
+        if (!exhaustion) {
+          useChatStore.getState().updateMessage(aiShellId, {
+            body: "I couldn't start that run. The request failed before reaching the model.",
+          });
+        }
+      });
+  };
+
+  void (input.source ?? Promise.resolve(null)).then(
+    (row) => startLiveRun(serverRefOf(row)),
+    () => startLiveRun({ inputMessageId: null, privateConversationId: null }),
+  );
 }
 
 export function useChatController() {
@@ -286,8 +339,12 @@ export function useChatController() {
       // live-backend gap (accepted by demo; stripped by today's Worker zod).
       const isPrivateAi = newMsg.visibility === 'PRIVATE_AI';
       const isPrivatePair = newMsg.visibility === 'PRIVATE_PAIR';
-      void api
-        .post(`/groups/${newMsg.group_id}/messages`, {
+      // The §39 response row carries the SERVER-assigned id + the resolved
+      // private conversation — exactly what a following AI run start needs
+      // for `input_message_id` / `private_conversation_id` (audit A2). The
+      // promise settles null on failure; the run must still start scoped.
+      const deliveredRow: Promise<AiRunSourceRef | null> = api
+        .post<AiRunSourceRef>(`/groups/${newMsg.group_id}/messages`, {
           project_id: newMsg.project_id ?? null,
           client_message_id: clientOperationId,
           body: newMsg.body,
@@ -296,8 +353,9 @@ export function useChatController() {
           ...(isPrivateAi ? { private_to: 'ai' as const } : {}),
           ...(isPrivatePair && newMsg.recipient_id ? { private_to: newMsg.recipient_id } : {}),
         })
-        .then(() => {
+        .then((row) => {
           useChatStore.getState().updateMessage(newMsg.id, { is_pending: false });
+          return row ?? null;
         })
         .catch(() => {
           // §245 — never discard a failed message.
@@ -305,6 +363,7 @@ export function useChatController() {
             is_failed: true,
             is_pending: false,
           });
+          return null;
         });
 
       // §134A — AI trigger creates the shell immediately; run events arrive
@@ -348,6 +407,7 @@ export function useChatController() {
           projectId: activeProject?.id,
           visibility: newMsg.visibility,
           prompt: aiPromptOf(newMsg.body),
+          source: deliveredRow,
         });
       }
     },

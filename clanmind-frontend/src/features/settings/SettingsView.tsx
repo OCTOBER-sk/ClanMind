@@ -265,7 +265,7 @@ export function SettingsView({
             className={cn(
               'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg font-semibold transition-colors cursor-pointer text-left',
               activeSection === item.id
-                ? 'bg-[var(--color-primary)] text-[var(--color-primary-fg)] shadow-[var(--shadow-sm)]'
+                ? 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)] shadow-[var(--shadow-sm)]'
                 : 'hover:bg-[var(--color-surface-hover)]'
             )}
             style={activeSection === item.id ? undefined : { color: 'var(--color-text-secondary)' }}

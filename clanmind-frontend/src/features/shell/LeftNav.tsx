@@ -83,7 +83,7 @@ const CHAT_ITEM: NavItem = { id: 'chat', label: 'Chat', icon: <MessageSquare cla
 const SETTINGS_ITEM: NavItem = { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" /> };
 
 const activeNavClass =
-  'bg-[var(--color-primary)] text-[var(--color-primary-fg)] shadow-[var(--shadow-sm)]';
+  'bg-[var(--color-primary)] text-[var(--color-primary-foreground)] shadow-[var(--shadow-sm)]';
 const idleNavClass = 'hover:bg-[var(--color-surface-hover)]';
 const RAIL_WIDTH_COLLAPSED_PX = 56;
 

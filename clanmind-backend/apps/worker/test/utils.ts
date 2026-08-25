@@ -83,6 +83,9 @@ export interface TestState {
   projectRows: Project[];
   instructionRows: ProjectInstruction[];
   messageRows: Message[];
+  /** §43/§122 message_attachments links persisted via createWithMentions. */
+  messageAttachmentLinkRows: { message_id: string; attachment_id: string }[];
+  attachmentRows: Attachment[];
   memoryRows: import("@clanmind/domain").Memory[];
   candidateRows: import("@clanmind/domain").MemoryCandidate[];
   notificationRows: NotificationRow[];
@@ -381,12 +384,30 @@ export function makeTestServices(): TestState {
 
   const messageRows: Message[] = [];
   let messageSeq = 0;
+  /** §43 links persisted by createWithMentions (mirrors the §122 RPC). */
+  const messageAttachmentLinkRows: { message_id: string; attachment_id: string }[] = [];
   const messageRepo: MessageRepository = {
     async createWithMentions(input) {
       const existing = messageRows.find(
         (m) => m.group_id === input.group_id && m.client_message_id === input.client_message_id,
       );
       if (existing) return existing; // §19 idempotent duplicate
+      // §43/§122 — mirror the migration's authorization before linking: every
+      // attachment must exist, belong to THIS Group, be owned by the sender
+      // and not be deleted. A violation aborts the transaction.
+      for (const attachmentId of input.attachment_ids ?? []) {
+        const att = attachmentRows.find((a) => a.id === attachmentId);
+        const authorized =
+          att !== undefined &&
+          att.group_id === input.group_id &&
+          att.owner_user_id === input.sender_user_id &&
+          att.deleted_at === null;
+        if (!authorized) {
+          throw new Error(
+            "attachment_ids contains an unknown, deleted, foreign-Group, or non-owned attachment",
+          );
+        }
+      }
       messageSeq += 1;
       const row: Message = {
         id: crypto.randomUUID(),
@@ -407,6 +428,9 @@ export function makeTestServices(): TestState {
         deleted_at: null,
       };
       messageRows.push(row);
+      for (const attachmentId of new Set(input.attachment_ids ?? [])) {
+        messageAttachmentLinkRows.push({ message_id: row.id, attachment_id: attachmentId });
+      }
       return row;
     },
     async findById(id) {
@@ -1206,6 +1230,8 @@ export function makeTestServices(): TestState {
     projectRows,
     instructionRows,
     messageRows,
+    messageAttachmentLinkRows,
+    attachmentRows,
     memoryRows,
     candidateRows,
     notificationRows,

@@ -244,7 +244,7 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
               className={cn(
                 'shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-colors',
                 section === s.id
-                  ? 'bg-[var(--color-primary)] text-[var(--color-primary-fg)]'
+                  ? 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)]'
                   : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]',
               )}
             >

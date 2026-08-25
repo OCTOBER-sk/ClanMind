@@ -221,14 +221,16 @@ routes exist (`demo.<id>.<expiry>` token stand-in); binary byte-serving lands
 with the P6 viewer.
 
 Two contract gaps recorded for the backend stream — nothing papered over:
-1. **Linking.** The Worker only inserts `message_attachments` when
-   `message_id` rides the UPLOAD form; but a composer cannot know the server
-   message id before `POST /messages`. The FE therefore sends
-   `attachment_ids: [§43 ids…]` in the message POST body (BE §122 puts link
-   inserts inside the message transaction, so this matches the spec's intent).
-   Today's Worker zod strips unknown body keys silently → live sends store
-   objects WITHOUT links until the backend accepts `attachment_ids` (or offers
-   a link endpoint). Demo implements §122 fully (links on message POST).
+1. **Linking — RESOLVED 2026-08-25 (blocker 2).** The composer still cannot
+   know the server message id before `POST /messages`, so it sends
+   `attachment_ids: [§43 ids…]` in the message POST body. The Worker's
+   message-create zod schema now accepts `attachment_ids` and the §122 RPC
+   (`create_message_with_mentions`, migration
+   `20260825000102_message_attachment_links.sql`) inserts the
+   `message_attachments` rows atomically with the message — every id is
+   authorized inside that transaction (same Group, owned by the sender, not
+   soft-deleted; violations abort the send instead of silently dropping
+   links). Demo implements the same contract.
 2. **Index axis.** BE §127 INDEXING/READY/FAILED/STALE/DELETED is not exposed
    by any endpoint/event yet. Live chips therefore hold `index_state:
    INDEXING` after transfer ("Uploaded · Preparing for Odin…", FE §50) and

@@ -17,7 +17,8 @@ export class SupabaseMessageRepository implements MessageRepository {
       sender_ai_id?: string | null;
     },
   ): Promise<Message> {
-    // §122: message + mentions + outbox committed by one SQL function.
+    // §122: message + mentions + attachment links + outbox committed by one
+    // SQL function.
     const { data, error } = await this.db.rpc("create_message_with_mentions", {
       input: {
         group_id: input.group_id,
@@ -32,6 +33,7 @@ export class SupabaseMessageRepository implements MessageRepository {
         reply_to_id: input.reply_to_id ?? null,
         client_message_id: input.client_message_id,
         mention_user_ids: input.mention_user_ids ?? [],
+        attachment_ids: input.attachment_ids ?? [],
       },
     });
     if (error) throw error;

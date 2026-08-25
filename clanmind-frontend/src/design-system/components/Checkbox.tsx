@@ -25,7 +25,7 @@ export function Checkbox({
       onCheckedChange={onCheckedChange}
       disabled={disabled}
       className={cn(
-        'peer h-4 w-4 shrink-0 rounded border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-[var(--color-primary)] data-[state=checked]:text-[var(--color-primary-fg)] data-[state=checked]:border-transparent cursor-pointer inline-flex items-center justify-center',
+        'peer h-4 w-4 shrink-0 rounded border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-[var(--color-primary)] data-[state=checked]:text-[var(--color-primary-foreground)] data-[state=checked]:border-transparent cursor-pointer inline-flex items-center justify-center',
         className
       )}
     >

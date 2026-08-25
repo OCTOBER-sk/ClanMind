@@ -501,7 +501,7 @@ export function MessageList({
             'absolute bottom-3 right-8 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-[var(--shadow-lg)] transition-transform hover:scale-105 active:scale-95 cursor-pointer z-30 border',
             unreadNewCount > 0
               ? 'bg-[var(--color-info)] text-white hover:opacity-90'
-              : 'bg-[var(--color-primary)] text-[var(--color-primary-fg)] hover:opacity-90'
+              : 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90'
           )}
           style={{ borderColor: 'var(--color-border)' }}
         >

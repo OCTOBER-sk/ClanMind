@@ -32,6 +32,13 @@ export interface SendMessageInput {
   /** §2.4 private scope — set only by PrivateConversationService callers. */
   visibility?: "GROUP" | "PRIVATE_PAIR" | "PRIVATE_AI";
   private_conversation_id?: string | null;
+  /**
+   * §43/§122 — uploaded attachment row ids to link inside the message
+   * transaction. The composer uploads bytes before the message exists, so
+   * the link rides the create call; the §122 RPC inserts the
+   * `message_attachments` rows atomically with the message itself.
+   */
+  attachment_ids?: string[];
 }
 
 export interface ListMessagesInput {

@@ -10,8 +10,8 @@
  * readable color (a frozen rainbow still renders ~1.8:1 segments).
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, extname, resolve } from 'node:path';
 
 const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8');
 
@@ -129,5 +129,76 @@ describe('§6 — prefers-reduced-motion contract', () => {
 
   it('a draw that cannot animate leaves no dashed artifact (§99)', () => {
     expect(reduce).toContain('stroke-dasharray: none');
+  });
+});
+
+// ── Undefined-token reference guard (FINAL_PREKEY blocker 3) ────────────────
+// B3: `var(--color-primary-fg)` shipped at nine call sites while only
+// `--color-primary-foreground` exists — an undefined var() makes the color
+// declaration invalid at computed-value time, so text silently inherits the
+// background color (white-on-white send icon, invisible skip link / nav
+// labels, both themes). This guard fails the suite the moment ANY source file
+// references a custom property that index.css does not define.
+describe('design tokens — every referenced CSS variable is defined', () => {
+  /** Every `--name:` definition anywhere in index.css (@theme, :root, .dark). */
+  const definedTokens = new Set<string>();
+  for (const m of css.matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)) {
+    definedTokens.add(m[1]!);
+  }
+  expect(definedTokens.size, 'index.css must define tokens').toBeGreaterThan(0);
+
+  function collectSourceFiles(dir: string): string[] {
+    const out: string[] = [];
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        if (entry === '__snapshots__' || entry === 'node_modules') continue;
+        out.push(...collectSourceFiles(full));
+      } else if (['.ts', '.tsx'].includes(extname(entry))) {
+        out.push(full);
+      }
+    }
+    return out;
+  }
+
+  it('no var(--…) reference points at an undefined token', () => {
+    const srcDir = resolve(__dirname, '..');
+    const offenders: string[] = [];
+    for (const file of collectSourceFiles(srcDir)) {
+      // Test files may reference undefined tokens as NEGATIVE fixtures.
+      if (file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue;
+      const source = readFileSync(file, 'utf8');
+      for (const m of source.matchAll(/var\((--[a-zA-Z0-9-]+)/g)) {
+        const token = m[1]!;
+        if (!definedTokens.has(token)) {
+          offenders.push(`${file}: ${token}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      `undefined CSS custom property references (invalid var() → inherited/invisible color):\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('the known-broken alias --color-primary-fg never returns', () => {
+    const srcDir = resolve(__dirname, '..');
+    for (const file of collectSourceFiles(srcDir)) {
+      if (file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue;
+      const source = readFileSync(file, 'utf8');
+      expect(source, `${file} references the undefined --color-primary-fg`).not.toContain(
+        '--color-primary-fg',
+      );
+    }
+  });
+
+  it.each([
+    ['light', '#ffffff'],
+    ['dark', '#090a0f'],
+  ])('%s: --color-primary-foreground contrasts with --color-primary (AA)', (_theme, fg) => {
+    // The primary/foreground pair is THE fix target of blocker 3; assert the
+    // real ratio so future palette edits cannot reintroduce invisibility.
+    const primary = _theme === 'light' ? '#111827' : '#f9fafb';
+    expect(contrast(fg, primary)).toBeGreaterThanOrEqual(4.5);
   });
 });

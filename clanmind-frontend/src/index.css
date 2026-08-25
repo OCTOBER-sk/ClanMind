@@ -521,17 +521,11 @@
 /* ============================================================
    Accessibility helpers
    ============================================================ */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
+/* `.sr-only` comes from Tailwind core (inside @layer utilities).
+   Do NOT redefine it here: an unlayered duplicate outranks every
+   layered utility, which permanently defeated `focus:not-sr-only`
+   and kept the keyboard skip link clipped to 1×1 when focused
+   (FINAL_PREKEY blocker 3). */
 
 /* ============================================================
    Tauri window drag region

@@ -1,0 +1,3 @@
+#!/bin/bash
+cd /home/santhosh/projects/ClanMind/clanmind-frontend
+opencode run --agent midas "Your TODO list at docs/FRONTEND_TODO.md was reviewed and APPROVED by the orchestrator. PROCEED NOW to STEP 4 of your original brief: perform the deep audit item by item, grading every item PASS/PARTIAL/FAIL/NOT-IMPLEMENTED with file:line evidence, structural checks for private-content leakage and permission gating, streaming state machine trace, run pnpm exec tsc -b && pnpm test && pnpm run build yourself, dist purity check, and write docs/FRONTEND_AUDIT2_REPORT.md with final verdict staging-ready / production-ready / not-ready plus blocking list."

@@ -17,6 +17,13 @@ const sendMessageBody = z.object({
   mention_tokens: z.array(z.string().min(1).max(60)).max(50).optional(),
   /** §2.4 private mode: a teammate id, or "ai" for the Group AI. */
   private_to: z.union([z.string().uuid(), z.literal("ai")]).optional(),
+  /**
+   * §43/§122 — uploaded attachment row ids linked inside the message
+   * transaction. The composer uploads before the message exists, so the
+   * links ride THIS body; unknown keys must never silently strip them again.
+   * Cap mirrors the default `attachments_per_message_max` limit (§178).
+   */
+  attachment_ids: z.array(z.string().uuid()).max(10).optional(),
 });
 
 const editMessageBody = z.object({ body: z.string().min(1) });
@@ -91,6 +98,11 @@ export function messageRoutes(): Hono<{ Bindings: Env; Variables: AuthVariables 
       sender_user_id: user.user_id,
       visibility,
       private_conversation_id: privateConversationId,
+      // §122 — deduped; the RPC inserts message_attachments atomically and
+      // authorizes every id (same Group, owned by the sender, not deleted).
+      attachment_ids: parsed.data.attachment_ids
+        ? [...new Set(parsed.data.attachment_ids)]
+        : undefined,
     });
     // Broadcast is async (§122) — fan out after persistence; the DO dedupes
     // against the outbox consumer delivery. Private events carry only their

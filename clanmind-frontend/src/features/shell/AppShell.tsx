@@ -1135,7 +1135,7 @@ export function AppShell() {
       {/* §7 — skip link: first tabbable element; visually hidden until focused */}
       <a
         href="#cm-main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[300] focus:rounded-lg focus:bg-[var(--color-primary)] focus:px-3 focus:py-2 focus:text-xs focus:font-semibold focus:text-[var(--color-primary-fg)] focus:shadow-[var(--shadow-lg)] focus:outline-none"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[300] focus:rounded-lg focus:bg-[var(--color-primary)] focus:px-3 focus:py-2 focus:text-xs focus:font-semibold focus:text-[var(--color-primary-foreground)] focus:shadow-[var(--shadow-lg)] focus:outline-none"
       >
         Skip to main content
       </a>

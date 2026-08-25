@@ -395,7 +395,7 @@ export default function DiagramViewer({
           </div>
           <button
             onClick={() => onAskOdinAboutNode?.(selectedNode.label)}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-primary-fg)] transition-opacity hover:opacity-90"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-primary-foreground)] transition-opacity hover:opacity-90"
           >
             <Sparkles className="h-3 w-3 text-amber-400" aria-hidden="true" />
             Ask Odin about this
