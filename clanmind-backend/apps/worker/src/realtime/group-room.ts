@@ -18,6 +18,7 @@ import { SupabaseReactionRepository } from "../repositories/engagement.repo";
 import { SupabasePrivateConversationRepository } from "../repositories/private-conversation.repo";
 import { SupabaseMeetingRepository } from "../repositories/project-intel.repo";
 import { SupabaseOutbox } from "../repositories/jobs.repo";
+import { assertProjectInGroup } from "../project-guard";
 import type { Env } from "../env";
 
 /** §102 error frame: stable machine-readable code + message, top-level fields. */
@@ -92,6 +93,14 @@ export class GroupRoom implements DurableObject {
           new SupabaseMessageRepository(db),
           { message_body_max_chars: limits.message_body_max_chars },
           outbox,
+          // M1/§185 #11: WS edit/delete re-verify ACTIVE membership at write
+          // time exactly like the REST path (services.ts). A connect-time
+          // check goes stale the moment a member is removed — a live socket
+          // must not keep edit/delete on old messages.
+          (groupId, userId) => this.requireActiveMember(groupId, userId, db),
+          // M2/§185 #4: WS message.send validates the project belongs to this
+          // Group, same as the REST path.
+          (projectId, groupId) => assertProjectInGroup(db, projectId, groupId),
         ),
         reactions: new SupabaseReactionRepository(db),
         meetings: new MeetingService(new SupabaseMeetingRepository(db)),

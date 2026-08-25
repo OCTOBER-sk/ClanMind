@@ -71,6 +71,21 @@ export class MessageService {
     /** Optional §123 outbox: edit/delete events fan out through the
      * broadcaster when wired (send already emits via the §122 RPC). */
     private readonly outbox?: EventOutbox,
+    /** M1 (BACKEND_AUDIT2_REPORT §6) / §185 #11 / §86: re-verifies ACTIVE
+     * Group membership at WRITE time. Connect-time or send-time checks go
+     * stale the moment a member is removed — a removed member must not keep
+     * edit/delete on their old messages. Wired by the worker (REST services
+     * and the DO room share this one gate). */
+    private readonly assertActiveMember?: (
+      groupId: string,
+      userId: string,
+    ) => Promise<void>,
+    /** M2 (BACKEND_AUDIT2 §6): a client-supplied project_id must belong to the
+     * message's Group — never trusted as a foreign cross-group reference. */
+    private readonly assertProjectInGroup?: (
+      projectId: string,
+      groupId: string,
+    ) => Promise<void>,
   ) {}
 
   async send(
@@ -88,6 +103,12 @@ export class MessageService {
     }
     if (!input.client_message_id || input.client_message_id.length > 128) {
       throw new AppError("VALIDATION_FAILED", "client_message_id is required.");
+    }
+    // M2/§185 #4: a foreign project reference must not be written. When the
+    // callback is wired it re-derives project.group_id and rejects any value
+    // that does not belong to this message's Group.
+    if (input.project_id) {
+      await this.assertProjectInGroup?.(input.project_id, input.group_id);
     }
     return this.messages.createWithMentions(input);
   }
@@ -171,6 +192,10 @@ export class MessageService {
     if (message.sender_user_id !== actorUserId) {
       throw new AppError("GROUP_PERMISSION_DENIED", "Only the sender can modify this message.");
     }
+    // M1: sender identity alone is not authorization — a REMOVED member keeps
+    // no write access to their old messages. Re-verify ACTIVE membership in
+    // the message's Group right now (§86 chain, §185 #11).
+    await this.assertActiveMember?.(message.group_id, actorUserId);
     return message;
   }
 

@@ -139,7 +139,7 @@ describe("§95A/§143 notifications", () => {
 
   it("private messages notify only the conversation audience (§2.4)", async () => {
     const { rows, r } = notificationRepo();
-    const consumer = new NotificationWorkerConsumer(new NotificationService(r), () => []);
+    const consumer = new NotificationWorkerConsumer(new NotificationService(r), () => [], () => []);
     await consumer.process(
       row({
         payload: { visibility: "PRIVATE_PAIR", audience_user_ids: [U1, U2] },
@@ -156,6 +156,7 @@ describe("§95A/§143 notifications", () => {
     const consumer = new NotificationWorkerConsumer(
       new NotificationService(r),
       (r2) => (r2.payload["mentioned"] as string[] | undefined) ?? [],
+      () => [],
     );
     await consumer.process(row({ payload: { visibility: "GROUP", mentioned: [U2] } }));
     expect(rows).toHaveLength(1);

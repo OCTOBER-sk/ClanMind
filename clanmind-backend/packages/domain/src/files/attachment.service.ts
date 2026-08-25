@@ -213,6 +213,28 @@ export class AttachmentService {
     await this.attachments.linkToMessage(messageId, attachmentId);
   }
 
+  /**
+   * M3 (BACKEND_AUDIT2 §6): bind an attachment link to a message only when
+   * that message is readable by the actor AND belongs to the same Group.
+   * `verifyMessage` re-derives the message's owning Group + readability
+   * (deleted/private checks), so a foreign cross-group message or an
+   * unreadable private message is never linked. The raw `linkToMessage`
+   * remains for internal/trusted callers.
+   */
+  async linkToMessageInGroup(input: {
+    attachmentId: string;
+    messageId: string;
+    groupId: string;
+    userId: string;
+    verifyMessage: (messageId: string, userId: string) => Promise<{ group_id: string }>;
+  }): Promise<void> {
+    const target = await input.verifyMessage(input.messageId, input.userId);
+    if (target.group_id !== input.groupId) {
+      throw new AppError("FORBIDDEN", "The message does not belong to this Group.");
+    }
+    await this.attachments.linkToMessage(input.messageId, input.attachmentId);
+  }
+
   async listByMessage(messageId: string): Promise<Attachment[]> {
     return this.attachments.listByMessage(messageId);
   }

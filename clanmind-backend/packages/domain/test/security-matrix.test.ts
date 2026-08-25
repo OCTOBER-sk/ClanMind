@@ -354,7 +354,7 @@ describe("§55A private notification isolation (§95A)", () => {
         return null;
       },
     };
-    const consumer = new NotificationWorkerConsumer(new NotificationService(repo), () => []);
+    const consumer = new NotificationWorkerConsumer(new NotificationService(repo), () => [], () => []);
     await consumer.process(
       row({
         actor_id: U1,

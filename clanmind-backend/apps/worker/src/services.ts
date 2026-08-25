@@ -103,13 +103,14 @@ import {
   SupabaseMemoryCandidateRepository,
   SupabaseMemoryRepository,
 } from "./repositories/project-intel.repo";
-import { approvedDecisionMemoryHook } from "./ai/runtime";
+import { approvedDecisionMemoryHook, projectIdToGroupId } from "./ai/runtime";
 import {
   SupabaseGithubConnectionRepository,
   SupabaseGithubActionsRepository,
   SupabaseWebhookEventStore,
 } from "./repositories/github.repo";
 import { SupabaseActionRepository } from "./repositories/ai-runtime.repo";
+import { assertProjectInGroup } from "./project-guard";
 import type { Env } from "./env";
 
 /**
@@ -246,7 +247,13 @@ export function buildServices(env: Env): AppServices {
     nicknames: new NicknameService(new SupabaseNicknameRepository(db)),
     messages: new MessageService(new SupabaseMessageRepository(db), {
       message_body_max_chars: limits.message_body_max_chars,
-    }, outbox),
+    }, outbox, (groupId, userId) =>
+      // M1/§185 #11: PATCH/DELETE /messages/:id re-verify ACTIVE membership
+      // at write time — requireMember throws FORBIDDEN for removed members.
+      membership.requireMember(groupId, userId).then(() => undefined),
+      // M2/§185 #4: the message's project_id must belong to this Group.
+      (projectId, groupId) => assertProjectInGroup(db, projectId, groupId),
+    ),
     realtime,
     reactions: new ReactionService(new SupabaseReactionRepository(db)),
     pins: new PinService(new SupabasePinRepository(db)),
@@ -265,8 +272,14 @@ export function buildServices(env: Env): AppServices {
     decisions: new DecisionService(
       new SupabaseDecisionRepository(db),
       approvedDecisionMemoryHook(db, memory),
+      outbox,
+      (projectId) => projectIdToGroupId(db, projectId),
     ),
-    tasks: new TaskService(new SupabaseTaskRepository(db)),
+    tasks: new TaskService(
+      new SupabaseTaskRepository(db),
+      outbox,
+      (projectId) => projectIdToGroupId(db, projectId),
+    ),
     meetings: new MeetingService(new SupabaseMeetingRepository(db)),
     attachments: new AttachmentService(
       new SupabaseAttachmentRepository(db),
@@ -282,7 +295,7 @@ export function buildServices(env: Env): AppServices {
     githubActions: new SupabaseGithubActionsRepository(db),
     webhookEvents: new SupabaseWebhookEventStore(db),
     actions: new SupabaseActionRepository(db),
-    approvals: new ApprovalEngine(new SupabaseActionRepository(db)),
+    approvals: new ApprovalEngine(new SupabaseActionRepository(db), outbox),
   };
 }
 
@@ -387,15 +400,30 @@ export function buildBackgroundRuntime(env: Env): {
   );
 
   processor.register(
-    new NotificationWorkerConsumer(services.notifications, async (row) => {
-      const messageId = row.aggregate_id;
-      const { data, error } = await db
-        .from("message_mentions")
-        .select("mentioned_user_id")
-        .eq("message_id", messageId);
-      if (error) throw error;
-      return (data ?? []).map((m: { mentioned_user_id: string }) => m.mentioned_user_id);
-    }),
+    new NotificationWorkerConsumer(
+      services.notifications,
+      async (row) => {
+        const messageId = row.aggregate_id;
+        const { data, error } = await db
+          .from("message_mentions")
+          .select("mentioned_user_id")
+          .eq("message_id", messageId);
+        if (error) throw error;
+        return (data ?? []).map((m: { mentioned_user_id: string }) => m.mentioned_user_id);
+      },
+      // M7 (BACKEND_AUDIT2 §6): OWNER/ADMIN reviewers for approval-requesting
+      // proposals (ai.action.proposed / decision.proposed).
+      async (groupId) => {
+        const { data, error } = await db
+          .from("group_members")
+          .select("user_id")
+          .eq("group_id", groupId)
+          .in("role", ["OWNER", "ADMIN"])
+          .is("removed_at", null);
+        if (error) throw error;
+        return (data ?? []).map((m: { user_id: string }) => m.user_id);
+      },
+    ),
   );
   processor.register(new ActivityBuilderConsumer(services.activity));
 

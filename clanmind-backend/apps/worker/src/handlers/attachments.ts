@@ -46,7 +46,25 @@ export function attachmentRoutes(): Hono<{ Bindings: Env; Variables: AuthVariabl
       current_attachment_count: currentCount,
     });
     if (messageId) {
-      await services.attachments.linkToMessage(messageId, attachment.id);
+      // M3/§185 #4 (BACKEND_AUDIT2 §6): never link an attachment to a
+      // foreign or unreadable message. The target must exist (not deleted),
+      // belong to THIS Group, and be readable by the uploader — a private
+      // message cannot be attached by a non-participant.
+      await services.attachments.linkToMessageInGroup({
+        attachmentId: attachment.id,
+        messageId,
+        groupId,
+        userId: user.user_id,
+        verifyMessage: (mid, uid) =>
+          services.messages.requireReadable(mid, uid, async (conversationId, u) => {
+            try {
+              await services.privateConversations.requireMember(conversationId, u);
+              return true;
+            } catch {
+              return false;
+            }
+          }),
+      });
     }
     return c.json(attachment, 201);
   });

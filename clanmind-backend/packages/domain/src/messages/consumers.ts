@@ -1,6 +1,5 @@
 import type { OutboxConsumer, OutboxRow } from "../jobs/outbox-processor";
-import type { ActivityService } from "./search.service";
-import type { NotificationService } from "./search.service";
+import type { ActivityService, NotificationRow, NotificationService } from "./search.service";
 
 /**
  * §124 "notification worker" outbox consumer. Semantic rules (§143): never
@@ -14,6 +13,9 @@ export class NotificationWorkerConsumer implements OutboxConsumer {
   constructor(
     private readonly notifications: NotificationService,
     private readonly mentionedUserIds: (row: OutboxRow) => string[] | Promise<string[]>,
+    /** Resolves the OWNER/ADMIN users of a Group who must review an
+     * approval-requesting proposal (ai.action.proposed / decision.proposed). */
+    private readonly approverUserIds: (groupId: string) => string[] | Promise<string[]>,
   ) {}
 
   handles(eventType: string): boolean {
@@ -21,8 +23,12 @@ export class NotificationWorkerConsumer implements OutboxConsumer {
       "message.created",
       "ai.response.completed",
       "ai.action.proposed",
+      "ai.action.approved",
+      "ai.action.rejected",
       "task.assigned",
+      "task.completed",
       "decision.proposed",
+      "decision.approved",
       "artifact.created",
       "github.webhook.received",
       "meeting.ended",
@@ -93,8 +99,46 @@ export class NotificationWorkerConsumer implements OutboxConsumer {
     switch (row.event_type) {
       case "ai.action.proposed":
       case "decision.proposed":
-        // Approval requests go to admins/owner; recipient resolution is
-        // provided by the wiring (repo-backed member lookup).
+        // Approval requests go to the Group's OWNER/ADMIN reviewers (§95A
+        // AI_ACTION_APPROVAL / DECISION_APPROVAL). Previously this was a
+        // no-op `break` — the notification was unreachable.
+        await this.notifyApprovers(
+          row,
+          row.event_type === "ai.action.proposed" ? "AI_ACTION_APPROVAL" : "DECISION_APPROVAL",
+          row.event_type === "ai.action.proposed"
+            ? "Odin action awaits approval"
+            : "A decision awaits approval",
+        );
+        break;
+      case "ai.action.approved":
+        // Notify the action initiator that their proposed action was approved.
+        await this.notifyInitiator(row, "AI_ACTION_APPROVAL", "Your action was approved");
+        break;
+      case "ai.action.rejected":
+        // Notify the action initiator that their proposed action was rejected.
+        await this.notifyInitiator(row, "AI_ACTION_APPROVAL", "Your action was rejected");
+        break;
+      case "task.assigned": {
+        const assignee = row.payload["owner_user_id"] ?? row.payload["assigned_to_user_id"];
+        if (typeof assignee === "string" && assignee) {
+          await this.notifications.notify({
+            recipients: [assignee],
+            group_id: row.group_id ?? "",
+            project_id: (row.payload["project_id"] as string | undefined) ?? null,
+            category: "TASK_ASSIGNMENT",
+            subject_type: "task",
+            subject_id: row.aggregate_id,
+            title: `Task assigned: ${String(row.payload["title"] ?? "Task")}`,
+            delivered_realtime: true,
+          });
+        }
+        break;
+      }
+      case "task.completed":
+      case "decision.approved":
+        // Completion/decision events surface in the activity feed; the
+        // activity builder handles rendering. No explicit per-user
+        // notification beyond the above reachable approval channels.
         break;
       case "member.invited":
         await this.notifications.notify({
@@ -109,6 +153,45 @@ export class NotificationWorkerConsumer implements OutboxConsumer {
       default:
         break;
     }
+  }
+
+  private async notifyApprovers(
+    row: OutboxRow,
+    category: NotificationRow["category"],
+    title: string,
+  ): Promise<void> {
+    if (!row.group_id) return;
+    const reviewers = await this.approverUserIds(row.group_id);
+    if (reviewers.length === 0) return;
+    await this.notifications.notify({
+      recipients: reviewers,
+      group_id: row.group_id,
+      project_id: (row.payload["project_id"] as string | undefined) ?? null,
+      category,
+      subject_type: row.aggregate_type,
+      subject_id: row.aggregate_id,
+      title,
+      delivered_realtime: true,
+    });
+  }
+
+  private async notifyInitiator(
+    row: OutboxRow,
+    category: NotificationRow["category"],
+    title: string,
+  ): Promise<void> {
+    const initiator = row.payload["initiated_by_user_id"] ?? row.actor_id;
+    if (typeof initiator !== "string" || !initiator) return;
+    await this.notifications.notify({
+      recipients: [initiator],
+      group_id: row.group_id ?? "",
+      project_id: (row.payload["project_id"] as string | undefined) ?? null,
+      category,
+      subject_type: row.aggregate_type,
+      subject_id: row.aggregate_id,
+      title,
+      delivered_realtime: true,
+    });
   }
 
   private audienceOf(row: OutboxRow): string[] {

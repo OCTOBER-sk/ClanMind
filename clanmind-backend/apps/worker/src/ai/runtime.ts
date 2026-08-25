@@ -157,7 +157,7 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
   const router = new ModelRouterService(routeRepo);
   const ledger: ToolCallLedger = new SupabaseToolCallLedger(db);
   const actionRepo: ActionRepository = new SupabaseActionRepository(db);
-  const approvalEngine = new ApprovalEngine(actionRepo);
+  const approvalEngine = new ApprovalEngine(actionRepo, deps.outbox);
 
   /** §78A-backed approval gate for HIGH/CRITICAL tool calls (§2.6). */
   const approvals: ApprovalGate = {
@@ -274,8 +274,14 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
   const decisions = new DecisionService(
     new SupabaseDecisionRepository(db),
     approvedDecisionMemoryHook(db, deps.memory),
+    deps.outbox,
+    (projectId) => projectIdToGroupId(db, projectId),
   );
-  const tasks = new TaskService(new SupabaseTaskRepository(db));
+  const tasks = new TaskService(
+    new SupabaseTaskRepository(db),
+    deps.outbox,
+    (projectId) => projectIdToGroupId(db, projectId),
+  );
 
   const executors = new Map<string, ToolExecutor>();
 

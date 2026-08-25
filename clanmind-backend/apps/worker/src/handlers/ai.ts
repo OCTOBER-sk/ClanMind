@@ -6,6 +6,7 @@ import type { Env } from "../env";
 import type { AuthVariables } from "../middleware/auth";
 import { requireAuthenticatedUser } from "../middleware/auth";
 import { getAiRuntime, enforceRateLimit } from "../ai";
+import { assertProjectInGroup } from "../project-guard";
 
 /** §115 step 1 body contract. */
 const startRunBody = z.object({
@@ -51,6 +52,12 @@ export function aiRoutes(): Hono<{ Bindings: Env; Variables: AuthVariables }> {
     const rt = getAiRuntime(c.env, services);
     const byokConfigured = await anyByokEnabled(services.db, groupId);
 
+    // M2/§185 #4: a client-supplied project_id must belong to THIS Group —
+    // never a foreign cross-group reference inserted into the run.
+    if (body.project_id) {
+      await assertProjectInGroup(services.db, body.project_id, groupId);
+    }
+
     const run = await rt.orchestrator.startRun({
       group_id: groupId,
       requester_user_id: user.user_id,
@@ -90,7 +97,17 @@ export function aiRoutes(): Hono<{ Bindings: Env; Variables: AuthVariables }> {
     const user = c.get("user");
     const rt = getAiRuntime(c.env, services);
     const run = await requireRun(rt.runs, c.req.param("runId"));
-    await services.membership.requireMember(run.group_id, user.user_id);
+    const { member } = await services.membership.requireMember(run.group_id, user.user_id);
+    // M4 (BACKEND_AUDIT2 §6): PRIVATE_AI run metadata is not readable
+    // group-wide. Only the run's requester or an OWNER/ADMIN may read it —
+    // otherwise any member could enumerate who ran private Odin sessions,
+    // with which model, and when.
+    if (!canViewRun(user.user_id, member.role, run.requester_user_id)) {
+      throw new AppError(
+        "GROUP_PERMISSION_DENIED",
+        "Only the run's requester or an Owner/Admin can view this run.",
+      );
+    }
     return c.json(run);
   });
 
@@ -122,6 +139,20 @@ async function requireRun(runs: { findById(id: string): Promise<AiRun | null> },
   const run = await runs.findById(runId);
   if (!run) throw new AppError("NOT_FOUND", "AI run not found.");
   return run;
+}
+
+/**
+ * M4 (BACKEND_AUDIT2 §6): authorization predicate for reading AI-run metadata.
+ * A run is visible to its requester, or to an OWNER/ADMIN of the run's Group —
+ * never to an arbitrary member (which would leak PRIVATE_AI run metadata).
+ */
+export function canViewRun(
+  requesterId: string,
+  requesterRole: string,
+  runRequesterId: string,
+): boolean {
+  if (requesterId === runRequesterId) return true;
+  return requesterRole === "OWNER" || requesterRole === "ADMIN";
 }
 
 /** §92/§63: BYOK presence lifts the application-pool exhaustion gate. */

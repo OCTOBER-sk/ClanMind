@@ -55,8 +55,117 @@ function harness() {
       published.push({ event_type: event.event_type, payload: event.payload });
     },
   };
-  return { service: new MessageService(repo, { message_body_max_chars: 8000 }, outbox), messages, published };
+  return { service: new MessageService(repo, { message_body_max_chars: 8000 }, outbox), messages, published, repo, outbox };
 }
+
+describe("M1: edit/delete re-verify ACTIVE Group membership (BACKEND_AUDIT2 §6)", () => {
+  function withActiveGate(active: (groupId: string, userId: string) => boolean) {
+    const h = harness();
+    const service = new MessageService(
+      h.repo,
+      { message_body_max_chars: 8000 },
+      h.outbox,
+      (groupId, userId) => {
+        if (!active(groupId, userId)) {
+          throw Object.assign(new Error("not a member"), { code: "FORBIDDEN" });
+        }
+        return Promise.resolve();
+      },
+    );
+    return { ...h, service };
+  }
+
+  it("sender identity alone is not authorization — a REMOVED member cannot edit (§185 #11)", async () => {
+    const { service, published } = withActiveGate((g, u) => !(g === "g1" && u === "u1"));
+    const sent = await service.send({
+      group_id: "g1",
+      client_message_id: "c1",
+      body: "original",
+      sender_user_id: "u1",
+    });
+
+    await expect(service.edit(sent.id, "u1", "tampered")).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    // No outbox event, no mutation.
+    expect(published).toHaveLength(0);
+  });
+
+  it("a REMOVED member cannot softDelete their old message", async () => {
+    const { service, published } = withActiveGate((g, u) => !(g === "g1" && u === "u1"));
+    const sent = await service.send({
+      group_id: "g1",
+      client_message_id: "c2",
+      body: "old message",
+      sender_user_id: "u1",
+    });
+
+    await expect(service.softDelete(sent.id, "u1")).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    expect(published).toHaveLength(0);
+  });
+
+  it("an ACTIVE member can still edit/delete (positive control)", async () => {
+    const { service, published } = withActiveGate(() => true);
+    const sent = await service.send({
+      group_id: "g1",
+      client_message_id: "c3",
+      body: "fine",
+      sender_user_id: "u1",
+    });
+
+    await service.edit(sent.id, "u1", "updated");
+    await service.softDelete(sent.id, "u1");
+    expect(published.map((e) => e.event_type)).toEqual(["message.edited", "message.deleted"]);
+  });
+});
+
+describe("M2: message project_id must belong to the Group (BACKEND_AUDIT2 §6)", () => {
+  function withProjectGate(belongs: (projectId: string, groupId: string) => boolean) {
+    const h = harness();
+    const service = new MessageService(
+      h.repo,
+      { message_body_max_chars: 8000 },
+      h.outbox,
+      undefined,
+      (projectId, groupId) => {
+        if (!belongs(projectId, groupId)) {
+          throw Object.assign(new Error("not in group"), { code: "FORBIDDEN" });
+        }
+        return Promise.resolve();
+      },
+    );
+    return { ...h, service };
+  }
+
+  it("a foreign project reference is rejected before any write", async () => {
+    const { service, messages } = withProjectGate((p, g) => !(p === "p-foreign" && g === "g1"));
+    await expect(
+      service.send({
+        group_id: "g1",
+        project_id: "p-foreign",
+        client_message_id: "c1",
+        body: "cross-group",
+        sender_user_id: "u1",
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(messages).toHaveLength(0); // fail closed — nothing written
+  });
+
+  it("a same-group project reference sends normally", async () => {
+    const { service, messages } = withProjectGate(() => true);
+    await service.send({
+      group_id: "g1",
+      project_id: "p-own",
+      client_message_id: "c2",
+      body: "fine",
+      sender_user_id: "u1",
+    });
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.project_id).toBe("p-own");
+  });
+});
 
 describe("§123 message outbox events", () => {
   it("edit publishes message.edited with privacy routing fields", async () => {

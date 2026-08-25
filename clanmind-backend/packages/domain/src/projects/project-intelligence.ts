@@ -1,5 +1,6 @@
 import type { ArtifactType } from "@clanmind/contracts";
 import { AppError } from "@clanmind/shared";
+import type { EventOutbox } from "../common/ports";
 
 /** §45 — the closed artifact type registry. */
 export const ARTIFACT_TYPES: ArtifactType[] = [
@@ -208,6 +209,10 @@ export class DecisionService {
   constructor(
     private readonly decisions: DecisionRepository,
     private readonly onApproved: (decision: Decision) => Promise<void>,
+    /** M9: durable outbox so approval/rejection reaches notifications/activity. */
+    private readonly outbox?: EventOutbox,
+    /** M9: project_id → group_id resolver for outbox group scoping. */
+    private readonly groupIdOf?: (projectId: string) => Promise<string | null>,
   ) {}
 
   async propose(input: { project_id: string; title: string; context: string | null; proposed_by: string }): Promise<Decision> {
@@ -240,6 +245,17 @@ export class DecisionService {
     await this.decisions.supersedeOthers(updated.project_id, updated.id);
     // §134: approved decisions become high-priority project memory candidates.
     await this.onApproved(updated);
+    // M9: emit the durable decision.approved event so notification/activity
+    // consumers can surface it.
+    const groupId = this.groupIdOf ? await this.groupIdOf(updated.project_id) : null;
+    await this.outbox?.publish({
+      event_type: "decision.approved",
+      aggregate_type: "decision",
+      aggregate_id: updated.id,
+      group_id: groupId,
+      actor_id: input.approver,
+      payload: { decision_id: updated.id, project_id: updated.project_id, title: updated.title },
+    });
     return updated;
   }
 
@@ -251,6 +267,15 @@ export class DecisionService {
       to: "REJECTED",
     });
     if (!updated) throw new AppError("CONFLICT", "Decision changed; reload and retry.");
+    const groupId = this.groupIdOf ? await this.groupIdOf(updated.project_id) : null;
+    await this.outbox?.publish({
+      event_type: "decision.rejected",
+      aggregate_type: "decision",
+      aggregate_id: updated.id,
+      group_id: groupId,
+      actor_id: null,
+      payload: { decision_id: updated.id, project_id: updated.project_id, title: updated.title },
+    });
     return updated;
   }
 }
@@ -283,13 +308,24 @@ export interface TaskRepository {
 }
 
 export class TaskService {
-  constructor(private readonly tasks: TaskRepository) {}
+  constructor(
+    private readonly tasks: TaskRepository,
+    /** M9: durable outbox so task transitions reach notifications/activity. */
+    private readonly outbox?: EventOutbox,
+    /** M9: project_id → group_id resolver for outbox group scoping. */
+    private readonly groupIdOf?: (projectId: string) => Promise<string | null>,
+  ) {}
 
   async create(input: Parameters<TaskRepository["insert"]>[0]): Promise<Task> {
     if (input.title.trim().length === 0) {
       throw new AppError("VALIDATION_FAILED", "Task title is required.");
     }
-    return this.tasks.insert(input);
+    const task = await this.tasks.insert(input);
+    // M9: a task created with an owner is immediately an assignment.
+    if (task.owner_user_id) {
+      await this.emit("task.assigned", task, task.owner_user_id);
+    }
+    return task;
   }
 
   async findById(id: string): Promise<Task | null> {
@@ -306,8 +342,11 @@ export class TaskService {
     expectedVersion: number;
     patch: Partial<Pick<Task, "title" | "description" | "owner_user_id" | "status" | "priority" | "due_at">>;
   }): Promise<Task> {
+    const before = await this.tasks.findById(input.id);
     const updated = await this.tasks.compareAndUpdate(input);
     if (!updated) throw new AppError("CONFLICT", "Task changed elsewhere; reload and retry.");
+    if (!before) return updated;
+    await this.emitTaskTransitions(before, updated);
     return updated;
   }
 
@@ -337,6 +376,43 @@ export class TaskService {
       for (const dep of await this.tasks.dependenciesOf(current)) stack.push(dep);
     }
     await this.tasks.addDependency(taskId, dependsOnTaskId);
+  }
+
+  /** M9: emit the task lifecycle events the taxonomy promises. */
+  private async emitTaskTransitions(before: Task, after: Task): Promise<void> {
+    // Assignment: owner changed to a real user.
+    if (after.owner_user_id && after.owner_user_id !== before.owner_user_id) {
+      await this.emit("task.assigned", after, after.owner_user_id);
+    }
+    if (after.status === "DONE" && before.status !== "DONE") {
+      await this.emit("task.completed", after, null);
+    }
+    if (after.status === "CANCELLED" && before.status !== "CANCELLED") {
+      await this.emit("task.cancelled", after, null);
+    }
+    // Any other content change is a generic update.
+    await this.emit("task.updated", after, null);
+  }
+
+  private async emit(
+    eventType: "task.assigned" | "task.updated" | "task.completed" | "task.cancelled",
+    task: Task,
+    actorId: string | null,
+  ): Promise<void> {
+    const groupId = this.groupIdOf ? await this.groupIdOf(task.project_id) : null;
+    await this.outbox?.publish({
+      event_type: eventType,
+      aggregate_type: "task",
+      aggregate_id: task.id,
+      group_id: groupId,
+      actor_id: actorId,
+      payload: {
+        task_id: task.id,
+        project_id: task.project_id,
+        title: task.title,
+        status: task.status,
+      },
+    });
   }
 }
 

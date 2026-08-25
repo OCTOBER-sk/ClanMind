@@ -45,7 +45,7 @@ function notifRepo(inserted: { recipient_user_id: string; category: string }[]):
 describe("§95A notification targeting", () => {
   it("a PRIVATE_AI AI_RESPONSE notifies ONLY the owning requester", async () => {
     const inserted: { recipient_user_id: string; category: string }[] = [];
-    const consumer = new NotificationWorkerConsumer(new NotificationService(notifRepo(inserted)), () => []);
+    const consumer = new NotificationWorkerConsumer(new NotificationService(notifRepo(inserted)), () => [], () => []);
 
     await consumer.process(
       row({

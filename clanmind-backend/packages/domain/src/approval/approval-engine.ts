@@ -1,5 +1,6 @@
 import type { RiskLevel } from "@clanmind/contracts";
 import { AppError } from "@clanmind/shared";
+import type { EventOutbox } from "../common/ports";
 
 /** §78A */
 export interface AiAction {
@@ -87,7 +88,11 @@ export async function hashPayload(payload: Record<string, unknown>): Promise<str
 export const DEFAULT_ACTION_TTL_MS = 24 * 60 * 60 * 1000;
 
 export class ApprovalEngine {
-  constructor(private readonly actions: ActionRepository) {}
+  constructor(
+    private readonly actions: ActionRepository,
+    /** M9: durable outbox so approve/reject reach notifications/activity. */
+    private readonly outbox?: EventOutbox,
+  ) {}
 
   async propose(input: {
     group_id: string;
@@ -173,6 +178,23 @@ export class ApprovalEngine {
       executed_at: null,
     });
     await this.actions.setStatus(action.id, "APPROVED");
+    // M9: emit the durable approval event so the AI_ACTION_APPROVAL
+    // notification becomes reachable (§95A category).
+    await this.outbox?.publish({
+      event_type: "ai.action.approved",
+      aggregate_type: "ai_action",
+      aggregate_id: action.id,
+      group_id: action.group_id,
+      actor_id: input.approver_user_id,
+      payload: {
+        action_id: action.id,
+        action_kind: action.action_kind,
+        risk_level: action.risk_level,
+        payload_hash: action.payload_hash,
+        payload_version: action.payload_version,
+        initiated_by_user_id: action.initiated_by_user_id,
+      },
+    });
     return approval;
   }
 
@@ -189,6 +211,20 @@ export class ApprovalEngine {
       throw new AppError("GROUP_PERMISSION_DENIED", "Only Owners and Admins can reject this.");
     }
     await this.actions.setStatus(action.id, "REJECTED");
+    // M9: emit the durable rejection event.
+    await this.outbox?.publish({
+      event_type: "ai.action.rejected",
+      aggregate_type: "ai_action",
+      aggregate_id: action.id,
+      group_id: action.group_id,
+      actor_id: null,
+      payload: {
+        action_id: action.id,
+        action_kind: action.action_kind,
+        risk_level: action.risk_level,
+        initiated_by_user_id: action.initiated_by_user_id,
+      },
+    });
   }
 
   /**
