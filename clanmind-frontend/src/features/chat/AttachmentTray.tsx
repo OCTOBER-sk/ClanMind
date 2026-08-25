@@ -108,7 +108,7 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
             data-testid="attachment-chip"
             data-upload-state={isFailed ? 'failed' : isUploading ? 'uploading' : file.upload_state}
             className={cn(
-              'relative flex items-center gap-2 overflow-hidden rounded-md border px-2 py-1 pr-1.5 text-xs shadow-[var(--shadow-sm)] max-w-[230px]',
+              'relative flex items-center gap-2 overflow-hidden rounded-lg border px-2 py-1.5 pr-1.5 text-[12px] max-w-[240px] transition-colors',
             )}
             style={{
               background: 'var(--color-surface-raised)',
@@ -119,7 +119,7 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
 
             <div className="min-w-0 flex-1">
               <p
-                className="truncate text-[11px] font-medium leading-tight"
+                className="truncate text-[12px] font-medium leading-tight"
                 style={{ color: 'var(--color-text)' }}
                 title={file.file_name}
               >
@@ -153,7 +153,7 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
                 <button
                   type="button"
                   onClick={() => onCancel(file.id)}
-                  className="shrink-0 cursor-pointer rounded px-1 py-0.5 text-[10px] font-semibold hover:bg-[var(--color-surface-hover)]"
+                  className="shrink-0 cursor-pointer rounded px-1 py-0.5 text-[10px] font-semibold hover:bg-[var(--color-surface-hover)] transition-colors"
                   style={{ color: 'var(--color-text-secondary)' }}
                   aria-label={`Cancel upload of ${file.file_name}`}
                 >
@@ -188,7 +188,7 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
                 type="button"
                 onClick={() => onRemove(file.id)}
                 aria-label={`Remove ${file.file_name}`}
-                className="shrink-0 cursor-pointer rounded p-0.5 hover:bg-[var(--color-surface-hover)]"
+                className="shrink-0 cursor-pointer rounded p-0.5 hover:bg-[var(--color-surface-hover)] transition-colors"
                 style={{ color: 'var(--color-text-tertiary)' }}
               >
                 <X className="h-3.5 w-3.5" aria-hidden="true" />

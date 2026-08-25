@@ -74,7 +74,7 @@ export function ThreadPanel({
   return (
     <div
       data-testid="thread-panel"
-      className="flex flex-col h-full border-l text-xs"
+      className="flex flex-col h-full border-l text-[13px]"
       style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
     >
       {/* Thread Header */}
@@ -84,17 +84,17 @@ export function ThreadPanel({
       >
         <div className="flex items-center gap-2">
           <Reply className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />
-          <h3 className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>
+          <h3 className="text-[13px] font-bold" style={{ color: 'var(--color-text)' }}>
             Thread
           </h3>
-          <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+          <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-tertiary)' }}>
             · {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
           </span>
         </div>
         <button
           onClick={onClose}
           aria-label="Close thread"
-          className="p-1 rounded-lg cursor-pointer hover:opacity-80"
+          className="p-1 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors"
           style={{ color: 'var(--color-text-tertiary)' }}
         >
           <X className="w-4 h-4" aria-hidden="true" />
@@ -108,14 +108,14 @@ export function ThreadPanel({
       >
         <div className="flex items-center gap-2 mb-1.5">
           <Avatar name={rootMessage.sender_name} size="sm" isAi={rootMessage.sender_type === 'AI'} />
-          <span className="font-semibold text-xs" style={{ color: 'var(--color-text)' }}>
+          <span className="font-semibold text-[13px]" style={{ color: 'var(--color-text)' }}>
             {rootMessage.sender_name}
           </span>
-          <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+          <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-tertiary)' }}>
             {formatTime(rootMessage.created_at)}
           </span>
         </div>
-        <p className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: deletedRoot ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)', fontStyle: deletedRoot ? 'italic' : undefined }}>
+        <p className="text-[13px] leading-relaxed whitespace-pre-wrap" style={{ color: deletedRoot ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)', fontStyle: deletedRoot ? 'italic' : undefined }}>
           {deletedRoot ? 'This message was deleted.' : rootMessage.body}
         </p>
       </div>
@@ -123,7 +123,7 @@ export function ThreadPanel({
       {/* Replies List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {replies.length === 0 && (
-          <div className="text-[11px] text-center py-6" style={{ color: 'var(--color-text-tertiary)' }}>
+          <div className="text-[12px] text-center py-6" style={{ color: 'var(--color-text-tertiary)' }}>
             No replies yet — start the thread.
           </div>
         )}
@@ -132,15 +132,15 @@ export function ThreadPanel({
             <Avatar name={reply.sender_name} size="sm" isAi={reply.sender_type === 'AI'} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-xs" style={{ color: 'var(--color-text)' }}>
+                <span className="font-semibold text-[13px]" style={{ color: 'var(--color-text)' }}>
                   {reply.sender_name}
                 </span>
-                <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-tertiary)' }}>
                   {formatTime(reply.created_at)}
                 </span>
               </div>
               <p
-                className="text-xs mt-0.5 leading-relaxed whitespace-pre-wrap"
+                className="text-[13px] mt-0.5 leading-relaxed whitespace-pre-wrap"
                 style={{
                   color: reply.deleted ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)',
                   fontStyle: reply.deleted ? 'italic' : undefined,
@@ -159,7 +159,7 @@ export function ThreadPanel({
         style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-hover)' }}
       >
         <div
-          className="relative flex items-center border rounded-lg shadow-[var(--shadow-sm)]"
+          className="relative flex items-center border rounded-lg"
           style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
         >
           <input
@@ -175,14 +175,14 @@ export function ThreadPanel({
             }}
             placeholder={`Reply to ${rootMessage.sender_name}…`}
             aria-label="Reply to thread"
-            className="w-full px-3 py-2 text-xs bg-transparent outline-none"
+            className="w-full px-3 py-2 text-[13px] bg-transparent outline-none"
             style={{ color: 'var(--color-text)' }}
           />
           <button
             onClick={handleSend}
             disabled={!replyText.trim()}
             aria-label="Send reply"
-            className="p-1.5 mr-1 cursor-pointer disabled:opacity-30"
+            className="p-1.5 mr-1 cursor-pointer disabled:opacity-30 transition-opacity"
             style={{ color: 'var(--color-text-tertiary)' }}
           >
             <Send className="w-3.5 h-3.5" aria-hidden="true" />

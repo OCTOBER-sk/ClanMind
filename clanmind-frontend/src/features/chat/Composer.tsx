@@ -412,25 +412,21 @@ export function Composer({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        'relative border rounded-xl transition-all shadow-[var(--shadow-sm)] mx-4 mb-4',
+        'relative border rounded-xl transition-all duration-150 mx-4 mb-4',
         isDragOver
-          ? 'border-[var(--color-info)]'
+          ? 'border-[var(--color-info)] shadow-[0_0_0_1px_var(--color-info)]'
           : visibility !== 'GROUP'
-            ? 'border-[var(--color-info)]'
-            : 'border-[var(--color-border)] focus-within:border-[var(--color-border-strong)]'
+            ? 'border-[var(--color-info)] shadow-[0_0_0_1px_var(--color-info)]'
+            : 'border-[var(--color-border)] focus-within:border-[var(--color-border-strong)] focus-within:shadow-[0_0_0_1px_var(--color-border-strong)]'
       )}
       style={{
         background: 'var(--color-surface-raised)',
-        // §58 — unmistakable privacy state: the whole surface carries it.
-        ...(visibility !== 'GROUP'
-          ? { boxShadow: '0 0 0 1px var(--color-info), var(--shadow-sm)' }
-          : {}),
       }}
     >
       {/* §52 Drag and Drop overlay */}
       {isDragOver && (
         <div
-          className="absolute inset-0 z-40 rounded-xl flex items-center justify-center text-sm font-semibold pointer-events-none"
+          className="absolute inset-0 z-40 rounded-xl flex items-center justify-center text-[13px] font-semibold pointer-events-none"
           style={{ background: 'var(--color-info-bg)', color: 'var(--color-info)' }}
         >
           Drop files to attach
@@ -474,7 +470,7 @@ export function Composer({
       {/* §59 Reply Preview Header */}
       {replyTarget && (
         <div
-          className="flex items-center justify-between px-3 py-1.5 border-b rounded-t-xl text-xs"
+          className="flex items-center justify-between px-3 py-2 border-b rounded-t-xl text-[12px]"
           style={{
             background: 'var(--color-surface)',
             borderColor: 'var(--color-border)',
@@ -483,12 +479,12 @@ export function Composer({
         >
           <span className="truncate">
             Replying to <span className="font-semibold">{replyTarget.senderName}</span>:{' '}
-            <span className="italic">“{replyTarget.preview}”</span>
+            <span className="italic opacity-80">"{replyTarget.preview}"</span>
           </span>
           <button
             onClick={onClearReplyTarget}
             aria-label="Cancel reply"
-            className="p-0.5 rounded cursor-pointer hover:opacity-80"
+            className="p-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity ml-2 shrink-0"
             style={{ color: 'var(--color-text-tertiary)' }}
           >
             <X className="w-3.5 h-3.5" />
@@ -502,7 +498,7 @@ export function Composer({
         <div
           data-testid="privacy-header"
           role="status"
-          className="flex items-center justify-between px-3 py-1.5 border-b rounded-t-xl text-xs font-semibold"
+          className="flex items-center justify-between px-3 py-2 border-b rounded-t-xl text-[12px] font-semibold"
           style={{
             background: 'var(--color-info-bg)',
             borderColor: 'var(--color-border)',
@@ -512,8 +508,8 @@ export function Composer({
           <div className="flex items-center gap-1.5">
             <Lock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
             <span>
-              🔒 Private with{' '}
-              <span data-testid="privacy-recipient" className="underline decoration-dotted">
+              Private with{' '}
+              <span data-testid="privacy-recipient" className="underline decoration-dotted underline-offset-2">
                 {visibility === 'PRIVATE_AI'
                   ? aiName
                   : privateRecipientName || 'Unknown recipient'}
@@ -523,7 +519,7 @@ export function Composer({
           </div>
           <button
             onClick={onClearPrivateMode}
-            className="text-[11px] hover:underline cursor-pointer opacity-80 hover:opacity-100 shrink-0 ml-2"
+            className="text-[11px] hover:underline cursor-pointer opacity-80 hover:opacity-100 transition-opacity shrink-0 ml-2"
           >
             Switch to Public Group
           </button>
@@ -566,7 +562,7 @@ export function Composer({
                 : 'Pick a private recipient first (/private)'
         }
         rows={1}
-        className="w-full px-3.5 py-3 text-xs bg-transparent outline-none resize-none select-text leading-relaxed"
+        className="w-full px-3.5 py-3 text-[13px] bg-transparent outline-none resize-none select-text leading-relaxed placeholder:opacity-40"
         style={{ color: 'var(--color-text)' }}
       />
 
@@ -575,7 +571,7 @@ export function Composer({
         className="flex items-center justify-between px-2.5 py-2 border-t"
         style={{ borderColor: 'var(--color-border)' }}
       >
-        <div className="flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
+        <div className="flex items-center gap-0.5" style={{ color: 'var(--color-text-secondary)' }}>
           <input
             type="file"
             ref={fileInputRef}
@@ -589,7 +585,7 @@ export function Composer({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)]"
+              className="p-1.5 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors"
               aria-label="Attach files"
             >
               <Paperclip className="w-4 h-4" aria-hidden="true" />
@@ -604,7 +600,7 @@ export function Composer({
                 setShowCommands(true);
                 setCommandQuery('');
               }}
-              className="p-1.5 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] text-xs font-mono font-bold"
+              className="p-1.5 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors text-[13px] font-mono font-bold"
               aria-label="Commands"
             >
               /
@@ -619,7 +615,7 @@ export function Composer({
                 setMentionQuery('');
                 openMentionsAtCaret();
               }}
-              className="p-1.5 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)]"
+              className="p-1.5 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors"
               aria-label="Mention a teammate"
             >
               <AtSign className="w-4 h-4" aria-hidden="true" />
@@ -628,7 +624,7 @@ export function Composer({
 
           {/* §267 Project Context Chip */}
           <div
-            className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 ml-2 rounded-md text-[10px] font-medium"
+            className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 ml-2 rounded-md text-[11px] font-medium"
             style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
           >
             <FolderKanban className="w-3 h-3" aria-hidden="true" />
@@ -641,7 +637,7 @@ export function Composer({
           {hasUploadInFlight && (
             <span
               data-testid="upload-send-hint"
-              className="inline-flex items-center gap-1 text-[10px] font-medium"
+              className="inline-flex items-center gap-1 text-[11px] font-medium"
               style={{ color: 'var(--color-info)' }}
             >
               <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
@@ -651,7 +647,7 @@ export function Composer({
           {!hasUploadInFlight && hasFailedUpload && (
             <span
               data-testid="failed-upload-hint"
-              className="inline-flex items-center gap-1 text-[10px] font-medium"
+              className="inline-flex items-center gap-1 text-[11px] font-medium"
               style={{ color: 'var(--color-danger)' }}
             >
               <AlertCircle className="w-3 h-3" aria-hidden="true" />
@@ -662,7 +658,7 @@ export function Composer({
           {/* §183 offline composer status */}
           {isOffline && (
             <span
-              className="inline-flex items-center gap-1 text-[10px] font-medium"
+              className="inline-flex items-center gap-1 text-[11px] font-medium"
               style={{ color: 'var(--color-text-secondary)' }}
             >
               <WifiOff className="w-3 h-3" aria-hidden="true" />
@@ -671,7 +667,7 @@ export function Composer({
           )}
           {syncStatus === 'syncing' && (
             <span
-              className="inline-flex items-center gap-1 text-[10px] font-medium"
+              className="inline-flex items-center gap-1 text-[11px] font-medium"
               style={{ color: 'var(--color-info)' }}
             >
               <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
@@ -687,7 +683,7 @@ export function Composer({
               aria-label="Stop generating"
               title="Stop generating"
               className={cn(
-                'inline-flex items-center justify-center p-2 rounded-lg transition-all select-none cursor-pointer',
+                'inline-flex items-center justify-center p-2 rounded-lg transition-all duration-100 select-none cursor-pointer',
                 'border bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)] active:scale-95'
               )}
               style={{ borderColor: 'var(--color-border-strong)', color: 'var(--color-text)' }}
@@ -710,7 +706,7 @@ export function Composer({
                       : undefined
               }
               className={cn(
-                'inline-flex items-center justify-center p-2 rounded-lg transition-all select-none',
+                'inline-flex items-center justify-center p-2 rounded-lg transition-all duration-100 select-none',
                 canSend
                   ? 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 active:scale-95 cursor-pointer'
                   : 'cursor-not-allowed opacity-40'

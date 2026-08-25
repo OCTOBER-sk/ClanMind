@@ -75,7 +75,7 @@ export const MentionPicker = forwardRef<MentionPickerHandle, MentionPickerProps>
         role="listbox"
         aria-label="Mention a teammate"
         className={cn(
-          'z-50 w-72 rounded-xl border p-1.5 shadow-[var(--shadow-xl)] max-h-56 overflow-y-auto',
+          'z-50 w-72 rounded-xl border p-1 shadow-[var(--shadow-xl)] max-h-56 overflow-y-auto',
           placement ? 'fixed' : 'absolute bottom-full left-4 mb-2'
         )}
         style={
@@ -84,20 +84,20 @@ export const MentionPicker = forwardRef<MentionPickerHandle, MentionPickerProps>
                 left: placement.left,
                 top: placement.top,
                 borderColor: 'var(--color-border)',
-                background: 'var(--color-surface-raised)',
+                background: 'var(--color-surface-elevated)',
               }
-            : { borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }
+            : { borderColor: 'var(--color-border)', background: 'var(--color-surface-elevated)' }
         }
       >
         <div
-          className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider"
+          className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider"
           style={{ color: 'var(--color-text-tertiary)' }}
         >
           Mention Teammate
         </div>
         {filtered.length === 0 ? (
           // §234 mention no results
-          <div className="px-2.5 py-2 text-xs text-center" style={{ color: 'var(--color-text-tertiary)' }}>
+          <div className="px-2.5 py-3 text-[12px] text-center" style={{ color: 'var(--color-text-tertiary)' }}>
             No teammate found.
           </div>
         ) : (
@@ -112,7 +112,7 @@ export const MentionPicker = forwardRef<MentionPickerHandle, MentionPickerProps>
                 onClose();
               }}
               className={cn(
-                'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer',
+                'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors duration-75 text-left cursor-pointer',
                 i === clampedIndex && 'bg-[var(--color-surface-hover)]'
               )}
               style={{ color: 'var(--color-text)' }}

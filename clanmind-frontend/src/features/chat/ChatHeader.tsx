@@ -38,16 +38,16 @@ export function ChatHeader({
       className="flex items-center justify-between px-4 h-12 border-b shrink-0 select-none"
       style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
     >
-      <div className="flex items-center gap-2.5 min-w-0">
+      <div className="flex items-center gap-3 min-w-0">
         <div className="flex items-center gap-2">
           <Hash className="w-4 h-4 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} aria-hidden="true" />
-          <span className="text-sm font-bold truncate" style={{ color: 'var(--color-text)' }}>
+          <span className="text-[13px] font-bold truncate" style={{ color: 'var(--color-text)' }}>
             {groupName}
           </span>
         </div>
         {/* §267 project context chip */}
         <span
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold truncate max-w-[200px]"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium truncate max-w-[200px]"
           style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
         >
           <FolderKanban className="w-3 h-3 shrink-0" aria-hidden="true" />
@@ -55,17 +55,17 @@ export function ChatHeader({
         </span>
       </div>
 
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-1 shrink-0">
         {/* §38 presence — clickable list */}
         {presenceCount > 0 && (
           <Tooltip content="View who is here">
             <button
-              className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium cursor-pointer hover:opacity-80"
+              className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors"
               style={{ color: 'var(--color-text-secondary)' }}
               aria-label={`${presenceCount} teammates here`}
             >
               <Users className="w-3.5 h-3.5" aria-hidden="true" />
-              {presenceCount} teammates here
+              {presenceCount} here
             </button>
           </Tooltip>
         )}
@@ -75,7 +75,7 @@ export function ChatHeader({
           <Tooltip content="Search or jump to…">
             <button
               onClick={onOpenSearch}
-              className="p-1.5 rounded-lg cursor-pointer hover:opacity-80"
+              className="p-1.5 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors"
               style={{ color: 'var(--color-text-secondary)' }}
               aria-label="Search or jump to…"
             >
@@ -88,7 +88,7 @@ export function ChatHeader({
         {meetingEnabled && !isMeetingActive && onStartMeeting && (
           <button
             onClick={onStartMeeting}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-semibold cursor-pointer transition-colors"
             style={{
               color: 'var(--color-danger)',
               background: 'var(--color-danger-bg)',
@@ -102,7 +102,7 @@ export function ChatHeader({
 
         {/* §129 AI identity + §132 status */}
         <span
-          className="hidden lg:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-medium"
+          className="hidden lg:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium"
           style={{ color: 'var(--color-text-tertiary)', background: 'var(--color-surface-hover)' }}
         >
           <AiStatusIndicator

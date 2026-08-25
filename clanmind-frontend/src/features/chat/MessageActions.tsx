@@ -117,8 +117,8 @@ export function MessageActions({
       // §25 "Hover/Focus Actions" — the toolbar must surface for keyboard
       // users too: `hidden group-hover:flex` alone left Reply/React/Copy/More
       // unreachable (display:none removes them from the tab order).
-      className="absolute right-3 -top-3.5 hidden group-hover:flex group-focus-within:flex items-center rounded-lg shadow-[var(--shadow-md)] px-1 py-0.5 z-10 gap-0.5 border"
-      style={{ background: 'var(--color-surface-raised)', borderColor: 'var(--color-border)' }}
+      className="absolute right-3 -top-3.5 hidden group-hover:flex group-focus-within:flex items-center rounded-lg shadow-[var(--shadow-md)] px-0.5 py-0.5 z-10 gap-0 border"
+      style={{ background: 'var(--color-surface-elevated)', borderColor: 'var(--color-border)' }}
     >
       {/* Quick Reaction Popover (§28) */}
       <Popover
@@ -130,7 +130,7 @@ export function MessageActions({
           </IconButton>
         }
       >
-        <div className="flex items-center gap-1.5 p-1">
+        <div className="flex items-center gap-0.5 p-1">
           {QUICK_EMOJIS.map((emoji) => (
             <button
               key={emoji}
@@ -138,7 +138,7 @@ export function MessageActions({
                 onReact(emoji);
                 setIsEmojiPickerOpen(false);
               }}
-              className="text-lg p-1.5 hover:bg-[var(--color-surface-hover)] rounded-md transition-transform hover:scale-110 cursor-pointer"
+              className="text-base p-1.5 hover:bg-[var(--color-surface-hover)] rounded-md transition-all duration-100 hover:scale-110 cursor-pointer"
               aria-label={`React ${emoji}`}
             >
               {emoji}

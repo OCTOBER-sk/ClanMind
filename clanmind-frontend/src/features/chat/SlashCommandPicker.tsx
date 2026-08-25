@@ -122,17 +122,17 @@ export const SlashCommandPickerWithKeyboard = forwardRef<
       ref={listRef}
       role="listbox"
       aria-label="Slash commands"
-      className="absolute bottom-full left-4 mb-2 z-50 w-80 rounded-xl border p-1.5 shadow-[var(--shadow-xl)] max-h-64 overflow-y-auto"
-      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+      className="absolute bottom-full left-4 mb-2 z-50 w-80 rounded-xl border p-1 shadow-[var(--shadow-xl)] max-h-64 overflow-y-auto"
+      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-elevated)' }}
     >
       <div
-        className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider"
+        className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider"
         style={{ color: 'var(--color-text-tertiary)' }}
       >
         Slash Commands
       </div>
       {filtered.length === 0 ? (
-        <div className="px-2.5 py-2 text-xs text-center" style={{ color: 'var(--color-text-tertiary)' }}>
+        <div className="px-2.5 py-3 text-[12px] text-center" style={{ color: 'var(--color-text-tertiary)' }}>
           No commands found.
         </div>
       ) : (
@@ -147,7 +147,7 @@ export const SlashCommandPickerWithKeyboard = forwardRef<
               onClose();
             }}
             className={cn(
-              'w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-xs font-medium text-left cursor-pointer transition-colors',
+              'w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-[12px] font-medium text-left cursor-pointer transition-colors duration-75',
               i === clampedIndex && 'bg-[var(--color-surface-hover)]'
             )}
             style={{ color: 'var(--color-text)' }}

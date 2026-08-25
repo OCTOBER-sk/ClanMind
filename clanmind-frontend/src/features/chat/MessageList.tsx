@@ -391,10 +391,10 @@ export function MessageList({
         {/* §179/§78 group empty state */}
         {isEmpty && (
           <div className="h-full flex flex-col items-center justify-center gap-4 px-8 text-center">
-            <div className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>
+            <div className="text-xl font-bold" style={{ color: 'var(--color-text)' }}>
               Your team is ready.
             </div>
-            <p className="text-sm max-w-md" style={{ color: 'var(--color-text-secondary)' }}>
+            <p className="text-[13px] max-w-md" style={{ color: 'var(--color-text-secondary)' }}>
               Start talking, create a Project or ask {aiName} something.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
@@ -478,7 +478,7 @@ export function MessageList({
       {typingUsers.length > 0 && (
         <div
           role="status"
-          className="px-5 py-1 text-[11px] italic flex items-center gap-1.5 select-none"
+          className="px-5 py-1.5 text-[11px] italic flex items-center gap-1.5 select-none"
           style={{ color: 'var(--color-text-secondary)' }}
         >
           <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
@@ -498,7 +498,7 @@ export function MessageList({
         <button
           onClick={() => scrollToBottom(true)}
           className={cn(
-            'absolute bottom-3 right-8 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-[var(--shadow-lg)] transition-transform hover:scale-105 active:scale-95 cursor-pointer z-30 border',
+            'absolute bottom-3 right-8 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shadow-[var(--shadow-lg)] transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer z-30 border',
             unreadNewCount > 0
               ? 'bg-[var(--color-info)] text-white hover:opacity-90'
               : 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90'
@@ -506,7 +506,7 @@ export function MessageList({
           style={{ borderColor: 'var(--color-border)' }}
         >
           <ArrowDown className="w-3.5 h-3.5" aria-hidden="true" />
-          <span>{unreadNewCount > 0 ? `↓ ${unreadNewCount} new messages` : 'Jump to latest'}</span>
+          <span>{unreadNewCount > 0 ? `${unreadNewCount} new` : 'Jump to latest'}</span>
         </button>
       )}
     </div>
