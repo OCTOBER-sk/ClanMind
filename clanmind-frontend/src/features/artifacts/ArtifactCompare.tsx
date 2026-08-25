@@ -40,7 +40,7 @@ export function ArtifactCompare({ artifactType, versionA, versionB, onClose }: A
   const header = (
     <div className="flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
       <div className="flex min-w-0 items-center gap-2">
-        <GitCompare className="h-4 w-4 shrink-0 text-blue-500" aria-hidden="true" />
+        <GitCompare className="h-4 w-4 shrink-0 text-[var(--color-info)]" aria-hidden="true" />
         <h3 className="truncate text-xs font-bold text-[var(--color-text)]">
           Comparing v{versionB.version_number} → v{versionA.version_number}
         </h3>
@@ -90,21 +90,21 @@ export function ArtifactCompare({ artifactType, versionA, versionB, onClose }: A
             ) : (
               <ul className="space-y-1 text-xs">
                 {d.addedNodes.map((n) => (
-                  <li key={`an-${n.id}`} className="text-emerald-600 dark:text-emerald-400">+ Node · {n.label}</li>
+                  <li key={`an-${n.id}`} className="text-[var(--color-success)]">+ Node · {n.label}</li>
                 ))}
                 {d.removedNodes.map((n) => (
-                  <li key={`rn-${n.id}`} className="text-red-600 dark:text-red-400">− Node · {n.label}</li>
+                  <li key={`rn-${n.id}`} className="text-[var(--color-danger)]">− Node · {n.label}</li>
                 ))}
                 {d.relabeledNodes.map((n) => (
                   <li key={`rl-${n.before}`} className="text-[var(--color-text-secondary)]">~ {n.before} → {n.after}</li>
                 ))}
                 {d.addedEdges.map((e) => (
-                  <li key={`ae-${e.id ?? `${e.source}->${e.target}`}`} className="text-emerald-600 dark:text-emerald-400">
+                  <li key={`ae-${e.id ?? `${e.source}->${e.target}`}`} className="text-[var(--color-success)]">
                     + Connection · {e.source} → {e.target}{e.label ? ` (${e.label})` : ''}
                   </li>
                 ))}
                 {d.removedEdges.map((e) => (
-                  <li key={`re-${e.id ?? `${e.source}->${e.target}`}`} className="text-red-600 dark:text-red-400">
+                  <li key={`re-${e.id ?? `${e.source}->${e.target}`}`} className="text-[var(--color-danger)]">
                     − Connection · {e.source} → {e.target}{e.label ? ` (${e.label})` : ''}
                   </li>
                 ))}
@@ -125,7 +125,7 @@ export function ArtifactCompare({ artifactType, versionA, versionB, onClose }: A
                   <img
                     src={svgDataUrl(diagramToSvg(parsed))}
                     alt={`Diagram preview of version ${v.version_number}`}
-                    className="w-full bg-white"
+                    className="w-full bg-[var(--color-surface)]"
                   />
                 </figure>
               );
@@ -149,22 +149,22 @@ export function ArtifactCompare({ artifactType, versionA, versionB, onClose }: A
             <ul className="space-y-1.5 text-xs">
               {tableDiff.headerChanges.map((c) => (
                 <li key={`h-${c.columnIndex}`}>
-                  Column renamed: <s className="text-red-600 dark:text-red-400">{c.before}</s>{' '}
-                  <span className="text-emerald-600 dark:text-emerald-400">{c.after}</span>
+                  Column renamed: <s className="text-[var(--color-danger)]">{c.before}</s>{' '}
+                  <span className="text-[var(--color-success)]">{c.after}</span>
                 </li>
               ))}
               {tableDiff.cellChanges.map((c) => (
                 <li key={`${c.rowIndex}-${c.columnIndex}`}>
                   Row {c.rowIndex + 1} · {c.header}:{' '}
-                  <s className="text-red-600 dark:text-red-400">{c.before || '—'}</s>{' '}
-                  <span className="text-emerald-600 dark:text-emerald-400">{c.after || '—'}</span>
+                  <s className="text-[var(--color-danger)]">{c.before || '—'}</s>{' '}
+                  <span className="text-[var(--color-success)]">{c.after || '—'}</span>
                 </li>
               ))}
               {tableDiff.addedRowCount > 0 && (
-                <li className="text-emerald-600 dark:text-emerald-400">+ {tableDiff.addedRowCount} row(s) added</li>
+                <li className="text-[var(--color-success)]">+ {tableDiff.addedRowCount} row(s) added</li>
               )}
               {tableDiff.removedRowCount > 0 && (
-                <li className="text-red-600 dark:text-red-400">− {tableDiff.removedRowCount} row(s) removed</li>
+                <li className="text-[var(--color-danger)]">− {tableDiff.removedRowCount} row(s) removed</li>
               )}
             </ul>
           )}
@@ -185,8 +185,8 @@ export function ArtifactCompare({ artifactType, versionA, versionB, onClose }: A
               key={i}
               className={cn(
                 'flex gap-2 px-4 py-px',
-                row.type === 'added' && 'bg-emerald-50/70 dark:bg-emerald-950/25',
-                row.type === 'removed' && 'bg-red-50/70 dark:bg-red-950/20',
+                row.type === 'added' && 'bg-[var(--color-success-bg)]',
+                row.type === 'removed' && 'bg-[var(--color-danger-bg)]',
               )}
             >
               <span className="w-8 shrink-0 text-right text-[var(--color-text-tertiary)]" aria-hidden="true">
@@ -195,8 +195,8 @@ export function ArtifactCompare({ artifactType, versionA, versionB, onClose }: A
               <span
                 className={cn(
                   'w-3 shrink-0',
-                  row.type === 'added' && 'text-emerald-600 dark:text-emerald-400',
-                  row.type === 'removed' && 'text-red-600 dark:text-red-400',
+                  row.type === 'added' && 'text-[var(--color-success)]',
+                  row.type === 'removed' && 'text-[var(--color-danger)]',
                 )}
                 aria-label={row.type === 'added' ? 'added line' : row.type === 'removed' ? 'removed line' : undefined}
               >
@@ -217,7 +217,7 @@ export function ArtifactCompare({ artifactType, versionA, versionB, onClose }: A
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="grid grid-cols-2 gap-3">
           {[versionB, versionA].map((v) => (
-            <div key={v.version_number} className="rounded-lg border border-[var(--color-border)] p-3 text-xs">
+            <div key={v.version_number} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-xs">
               <p className="font-bold text-[var(--color-text)]">Version {v.version_number}</p>
               <dl className="mt-2 space-y-1 text-[var(--color-text-secondary)]">
                 <div><dt className="inline font-semibold">Creator: </dt><dd className="inline">{v.created_by_name}</dd></div>

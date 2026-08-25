@@ -1,5 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { Search, Copy, Check } from 'lucide-react';
+import { copyToClipboard } from '@/tauri/bridge';
 
 export interface TableArtifactViewerProps {
   content: string; // JSON with headers and rows
@@ -29,9 +30,10 @@ export function TableArtifactViewer({ content }: TableArtifactViewerProps) {
     row.some((cell) => cell.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     const csv = [data.headers.join(','), ...data.rows.map((r) => r.join(','))].join('\n');
-    navigator.clipboard.writeText(csv);
+    const ok = await copyToClipboard(csv);
+    if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   };
@@ -39,22 +41,22 @@ export function TableArtifactViewer({ content }: TableArtifactViewerProps) {
   return (
     <div className="flex flex-col h-full bg-[var(--color-surface-raised)] overflow-hidden text-xs">
       {/* Top Toolbar */}
-      <div className="flex items-center justify-between p-3 border-b border-[var(--color-border)] bg-gray-50/50 dark:bg-gray-800/40">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5">
         <div className="relative w-60">
           <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-[var(--color-text-tertiary)]" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search rows…"
-            className="w-full pl-8 pr-3 py-1 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-[var(--color-surface-raised)] outline-none"
+            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] transition-colors"
           />
         </div>
 
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-[var(--color-surface-raised)] font-medium hover:bg-gray-50 cursor-pointer"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text)] font-medium hover:bg-[var(--color-surface-hover)] cursor-pointer transition-colors"
         >
-          {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+          {copied ? <Check className="w-3.5 h-3.5 text-[var(--color-success)]" /> : <Copy className="w-3.5 h-3.5" />}
           <span>{copied ? 'Copied CSV' : 'Copy CSV'}</span>
         </button>
       </div>
@@ -63,7 +65,7 @@ export function TableArtifactViewer({ content }: TableArtifactViewerProps) {
       <div className="flex-1 overflow-auto p-4">
         <table className="w-full text-left border-collapse border border-[var(--color-border)] rounded-lg overflow-hidden">
           <thead>
-            <tr className="bg-[var(--color-surface-hover)] text-[var(--color-text)] font-semibold border-b border-gray-200 dark:border-gray-700">
+            <tr className="bg-[var(--color-surface-hover)] text-[var(--color-text)] font-semibold border-b border-[var(--color-border)]">
               {data.headers.map((h, i) => (
                 <th key={i} className="p-2.5">
                   {h}
@@ -71,14 +73,14 @@ export function TableArtifactViewer({ content }: TableArtifactViewerProps) {
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          <tbody className="divide-y divide-[var(--color-border)]">
             {filteredRows.map((row, rIdx) => (
               <tr
                 key={rIdx}
                 className="hover:bg-[var(--color-surface-hover)] transition-colors font-mono text-[11px]"
               >
                 {row.map((cell, cIdx) => (
-                  <td key={cIdx} className="p-2.5">
+                  <td key={cIdx} className="p-2.5 text-[var(--color-text)]">
                     {cell}
                   </td>
                 ))}

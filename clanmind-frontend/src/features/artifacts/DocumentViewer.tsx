@@ -36,14 +36,14 @@ export function DocumentViewer({ content }: DocumentViewerProps) {
   };
 
   return (
-    <div className="relative flex-1 overflow-y-auto p-6 bg-[var(--color-surface-raised)] select-text leading-relaxed text-xs">
+    <div className="relative flex-1 overflow-y-auto p-6 bg-[var(--color-surface-raised)] select-text leading-relaxed text-[var(--color-text)] text-xs">
       <div className="max-w-3xl mx-auto">
         <div className="flex justify-end mb-4">
           <button
             onClick={handleCopyAll}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] hover:bg-gray-200 dark:hover:bg-gray-700 text-xs font-medium cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-pressed)] text-xs font-medium cursor-pointer transition-colors"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="w-3.5 h-3.5 text-[var(--color-success)]" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copied ? 'Copied' : 'Copy Markdown'}</span>
           </button>
         </div>
@@ -53,17 +53,17 @@ export function DocumentViewer({ content }: DocumentViewerProps) {
           components={{
             a: SafeMarkdownLink,
             h1: ({ children }) => (
-              <h1 className="text-xl font-bold mt-4 mb-3 pb-2 border-b border-[var(--color-border)] text-gray-900 dark:text-white">
+              <h1 className="text-xl font-bold mt-4 mb-3 pb-2 border-b border-[var(--color-border)] text-[var(--color-text)]">
                 {children}
               </h1>
             ),
             h2: ({ children }) => (
-              <h2 className="text-base font-semibold mt-4 mb-2 text-gray-900 dark:text-white">
+              <h2 className="text-base font-semibold mt-4 mb-2 text-[var(--color-text)]">
                 {children}
               </h2>
             ),
             h3: ({ children }) => (
-              <h3 className="text-sm font-semibold mt-3 mb-1.5 text-gray-900 dark:text-white">
+              <h3 className="text-sm font-semibold mt-3 mb-1.5 text-[var(--color-text)]">
                 {children}
               </h3>
             ),
@@ -77,11 +77,11 @@ export function DocumentViewer({ content }: DocumentViewerProps) {
               </div>
             ),
             thead: ({ children }) => (
-              <thead className="bg-[var(--color-surface-hover)] text-gray-900 dark:text-white font-semibold">
+              <thead className="bg-[var(--color-surface-hover)] text-[var(--color-text)] font-semibold">
                 {children}
               </thead>
             ),
-            th: ({ children }) => <th className="p-2.5 border-b border-gray-200 dark:border-gray-700">{children}</th>,
+            th: ({ children }) => <th className="p-2.5 border-b border-[var(--color-border)]">{children}</th>,
             td: ({ children }) => <td className="p-2.5 border-b border-[var(--color-border)]">{children}</td>,
             blockquote: ({ children }) => (
               <blockquote className="border-l-4 border-[var(--color-border-strong)] pl-4 my-3 italic text-[var(--color-text-secondary)]">
@@ -118,7 +118,7 @@ export function DocumentViewer({ content }: DocumentViewerProps) {
                     >
                       {copiedCodeIndex === blockOffset ? (
                         <>
-                          <Check className="h-3 w-3 text-emerald-500" aria-hidden="true" />
+                          <Check className="h-3 w-3 text-[var(--color-success)]" aria-hidden="true" />
                           <span>Copied</span>
                         </>
                       ) : (

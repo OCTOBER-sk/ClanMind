@@ -74,11 +74,11 @@ function ViewerSkeleton() {
 /** §291 isolation fallback — a renderer crash never propagates further. */
 function RendererIsolationFallback({ onExportRaw }: { onExportRaw?: () => void }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
       <p className="max-w-xs text-xs font-semibold text-[var(--color-text)]">
         This artifact cannot be rendered in this version.
       </p>
-      <p className="max-w-xs text-xs text-[var(--color-text-secondary)]">
+      <p className="max-w-xs text-[11px] text-[var(--color-text-secondary)]">
         View raw or export it — everything else in ClanMind keeps working.
       </p>
       {onExportRaw && (
@@ -199,12 +199,12 @@ function ArtifactPanelBody({
 
   const rawView = viewRaw ? (
     <div className="flex-1 overflow-auto p-4 select-text">
-      <div className="mb-2 flex justify-end">
+      <div className="mb-3 flex justify-end">
         <Button size="sm" variant="ghost" onClick={() => setViewRaw(false)}>
           Exit raw view
         </Button>
       </div>
-      <pre className="whitespace-pre-wrap rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 font-mono text-[11px] text-[var(--color-text)]">
+      <pre className="whitespace-pre-wrap rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 font-mono text-[11px] leading-relaxed text-[var(--color-text)]">
         {currentVersion.content || '(no content stored for this version)'}
       </pre>
     </div>
@@ -291,17 +291,17 @@ function ArtifactPanelBody({
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 flex-col border-l border-[var(--color-border)] bg-[var(--color-surface-raised)] transition-all',
+        'flex h-full min-h-0 flex-col border-l border-[var(--color-border)] bg-[var(--color-surface-raised)] transition-all duration-200',
         isFullscreen && 'fixed inset-0 z-50 border-none',
       )}
     >
       {/* ─── Header (§96) ─────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5">
+        <div className="flex min-w-0 items-center gap-2.5">
           <div className="min-w-0">
-            <h2 className="truncate text-xs font-bold text-[var(--color-text)]">{artifact.title}</h2>
-            <div className="flex items-center gap-1.5 text-[10px] text-[var(--color-text-tertiary)]">
-              <span>{artifact.artifact_type}</span>
+            <h2 className="truncate text-[13px] font-semibold text-[var(--color-text)] leading-tight">{artifact.title}</h2>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] leading-tight text-[var(--color-text-tertiary)]">
+              <span className="font-medium uppercase tracking-wider">{artifact.artifact_type}</span>
               <span aria-hidden="true">·</span>
               {/* §102 — version selector popover with per-version actions */}
               <Popover
@@ -310,7 +310,7 @@ function ArtifactPanelBody({
                 align="start"
                 trigger={
                   <button
-                    className="cursor-pointer font-semibold text-[var(--color-text-secondary)] hover:underline"
+                    className="cursor-pointer font-semibold text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text)]"
                     aria-label={`Version ${activeVersionNumber} — open version history`}
                   >
                     v{activeVersionNumber}
@@ -324,7 +324,7 @@ function ArtifactPanelBody({
                       <div
                         key={v.version_number}
                         className={cn(
-                          'mb-1 rounded-lg border p-2 text-left transition-colors',
+                          'mb-1 rounded-lg border p-2.5 text-left transition-colors',
                           isActive ? 'border-[var(--color-border-strong)] bg-[var(--color-surface-hover)]' : 'border-transparent hover:bg-[var(--color-surface-hover)]',
                         )}
                       >

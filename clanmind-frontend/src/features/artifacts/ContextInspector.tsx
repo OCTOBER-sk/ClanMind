@@ -18,22 +18,21 @@ export function ContextInspector({ onClose }: ContextInspectorProps) {
         <button
           onClick={onClose}
           aria-label="Close context inspector"
-          className="p-1 rounded-lg cursor-pointer hover:opacity-80"
-          style={{ color: 'var(--color-text-tertiary)' }}
+          className="p-1 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors text-[var(--color-text-tertiary)]"
         >
           <X className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
 
-      <div className="p-4 space-y-4 overflow-y-auto">
+      <div className="p-4 space-y-3 overflow-y-auto">
         <p className="text-xs text-[var(--color-text-secondary)]">
           Provenance and references actively utilized by Odin for the latest project run:
         </p>
 
         {/* Item 1 */}
-        <div className="p-3 rounded-lg border border-[var(--color-border)] bg-gray-50/60 dark:bg-gray-800/40">
+        <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text)] mb-1">
-            <Bookmark className="w-3.5 h-3.5 text-blue-500" />
+            <Bookmark className="w-3.5 h-3.5 text-[var(--color-info)]" />
             <span>Decision #1: Use SPI with DMA</span>
           </div>
           <p className="text-[11px] text-[var(--color-text-secondary)]">
@@ -42,9 +41,9 @@ export function ContextInspector({ onClose }: ContextInspectorProps) {
         </div>
 
         {/* Item 2 */}
-        <div className="p-3 rounded-lg border border-[var(--color-border)] bg-gray-50/60 dark:bg-gray-800/40">
+        <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text)] mb-1">
-            <FileText className="w-3.5 h-3.5 text-emerald-500" />
+            <FileText className="w-3.5 h-3.5 text-[var(--color-success)]" />
             <span>ICM-42688P Hardware Datasheet Rev 1.2</span>
           </div>
           <p className="text-[11px] text-[var(--color-text-secondary)]">
@@ -53,7 +52,7 @@ export function ContextInspector({ onClose }: ContextInspectorProps) {
         </div>
 
         {/* Item 3 */}
-        <div className="p-3 rounded-lg border border-[var(--color-border)] bg-gray-50/60 dark:bg-gray-800/40">
+        <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text)] mb-1">
             <Globe className="w-3.5 h-3.5 text-purple-500" />
             <span>Web Research: STM32 DMA double-buffering latency</span>

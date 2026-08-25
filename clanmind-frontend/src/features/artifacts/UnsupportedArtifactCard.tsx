@@ -16,8 +16,8 @@ export interface UnsupportedArtifactCardProps {
 export function UnsupportedArtifactCard({ onViewRaw, onExportRaw, onUpdate }: UnsupportedArtifactCardProps) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-xs space-y-4 bg-[var(--color-surface-raised)]">
-      <div className="p-3 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
-        <AlertCircle className="w-8 h-8 text-amber-500" aria-hidden="true" />
+      <div className="p-3 rounded-full bg-[var(--color-warning-bg)] border border-[var(--color-warning)]/20">
+        <AlertCircle className="w-8 h-8 text-[var(--color-warning)]" aria-hidden="true" />
       </div>
 
       <div className="max-w-sm space-y-1">

@@ -194,7 +194,7 @@ function DiagramFlowInner({
   return (
     <>
       {/* §105 zoom controls — keyboard-operable buttons with labels */}
-      <div className="absolute right-3 top-3 z-20 flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)]/90 p-1 shadow-sm backdrop-blur-xs">
+      <div className="absolute right-3 top-3 z-20 flex items-center gap-0.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)]/90 p-1 shadow-sm backdrop-blur-xs">
         <Tooltip content="Zoom in">
           <IconButton aria-label="Zoom in" size="xs" onClick={() => void zoomIn({ duration: 180 })}>
             <Plus className="h-3.5 w-3.5" />
@@ -219,7 +219,7 @@ function DiagramFlowInner({
             <Crosshair className="h-3.5 w-3.5" />
           </IconButton>
         </Tooltip>
-        <span className="px-1 font-mono text-[10px] text-[var(--color-text-tertiary)]" aria-live="off">
+        <span className="px-1.5 font-mono text-[10px] text-[var(--color-text-tertiary)]" aria-live="off">
           {Math.round(zoom * 100)}%
         </span>
       </div>
@@ -341,7 +341,7 @@ export default function DiagramViewer({
   // Broken/absent content never crashes the surface (FE §291).
   if (!parsed || !activeContent) {
     return (
-      <div className="flex h-full flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+      <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
         {livePhase === 'constructing' ? (
           <>
             <div className="spectral-pulse h-10 w-10 rounded-full border-2 border-dashed border-[var(--color-border-strong)]" />
@@ -375,8 +375,7 @@ export default function DiagramViewer({
       {/* §97/§219 — textual build status; the ONLY motion info channel needed */}
       {livePhase === 'constructing' && (
         <div
-          className="flex items-center gap-2 border-t border-[var(--color-border)] px-4 py-1.5 text-[11px] font-medium"
-          style={{ color: 'var(--color-text-secondary)' }}
+          className="flex items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-[11px] font-medium text-[var(--color-text-secondary)]"
           role="status"
         >
           <span className="odin-working inline-block h-1.5 w-1.5 rounded-full" aria-hidden="true" />
@@ -386,9 +385,9 @@ export default function DiagramViewer({
 
       {/* §106/§107 — selection details + Ask Odin with object context */}
       {selectedNode && (
-        <div className="flex items-center justify-between gap-3 border-t border-[var(--color-border)] bg-[var(--color-surface-raised)] p-3 shadow-lg">
+        <div className="flex items-center justify-between gap-3 border-t border-[var(--color-border)] bg-[var(--color-surface-raised)] p-3">
           <div className="min-w-0">
-            <span className="text-[10px] font-bold uppercase text-[var(--color-text-tertiary)]">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)]">
               Selected · {selectedNode.kind ?? 'node'}
             </span>
             <p className="truncate text-xs font-semibold text-[var(--color-text)]">{selectedNode.label}</p>
