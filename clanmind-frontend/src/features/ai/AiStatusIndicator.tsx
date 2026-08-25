@@ -46,16 +46,28 @@ export interface AiStatusIndicatorProps {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Map AiRunStatus → AiStatusKind for callers that only have a run status */
+/**
+ * Map AiRunStatus → AiStatusKind for callers that only have a run status.
+ *
+ * §134A canonical mapping — do NOT invent intermediate UI-only states:
+ *   QUEUED        → working   ("Odin is starting…")
+ *   RUNNING       → working   ("Odin is working…" — pre-tool planning)
+ *   WAITING_TOOL  → working   (tool activity visible via AiToolTimeline;
+ *                              this is NOT waiting for human approval —
+ *                              tool-call-level APPROVED gating handles that)
+ *   STREAMING     → working   (incremental Markdown rendering)
+ *   COMPLETED     → available
+ *   FAILED        → offline   (error card handles recovery UI)
+ *   CANCELLED     → available (AiStoppedStrip handles partial-content state)
+ */
 export function aiRunStatusToKind(runStatus: AiRunStatus | null): AiStatusKind {
   if (!runStatus) return 'available';
   switch (runStatus) {
     case 'QUEUED':
     case 'RUNNING':
+    case 'WAITING_TOOL':
     case 'STREAMING':
       return 'working';
-    case 'WAITING_TOOL':
-      return 'waiting_approval';
     case 'COMPLETED':
     case 'CANCELLED':
       return 'available';

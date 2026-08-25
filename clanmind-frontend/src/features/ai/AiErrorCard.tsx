@@ -63,22 +63,22 @@ export function AiErrorCard({
 }: AiErrorCardProps) {
   return (
     <div
-      className="my-2 p-3 rounded-xl border text-xs space-y-2 max-w-lg"
+      className="my-2 p-3 rounded-lg border text-xs space-y-2 max-w-lg"
       role="alert"
       style={{
         borderColor: 'var(--color-border-strong)',
-        background: 'var(--color-surface)',
+        background: 'var(--color-surface-raised)',
       }}
     >
       <div className="flex items-start gap-2 font-semibold" style={{ color: 'var(--color-danger)' }}>
         <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
         <span>{aiName} couldn&apos;t complete this response.</span>
       </div>
-      <p className="leading-relaxed pl-5" style={{ color: 'var(--color-text-secondary)' }}>
+      <p className="leading-relaxed pl-[1.375rem]" style={{ color: 'var(--color-text-secondary)' }}>
         {providerReasonOf(errorCode, errorMessage)}
       </p>
       {(onRetry || onTryFallback) && (
-        <div className="flex items-center gap-2 pl-5 pt-0.5">
+        <div className="flex items-center gap-2 pl-[1.375rem] pt-0.5">
           {onRetry && (
             <Button
               size="sm"

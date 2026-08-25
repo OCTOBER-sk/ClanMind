@@ -24,9 +24,13 @@ export function AiQuotaCard({
         style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
       >
         <span className="font-medium">
-          Application AI quota reached for this Group. Continuing with configured BYOK provider.
+          Application AI quota reached for this Group. Continuing with your configured provider.
         </span>
-        <span className="font-mono font-bold" style={{ color: 'var(--color-warning)' }}>
+        <span
+          className="font-mono font-bold shrink-0 ml-2"
+          style={{ color: 'var(--color-text-tertiary)' }}
+          title="Running via configured BYOK provider"
+        >
           Odin · BYOK
         </span>
       </div>
@@ -35,7 +39,7 @@ export function AiQuotaCard({
 
   return (
     <div
-      className="my-2 p-4 rounded-xl border text-xs space-y-3"
+      className="my-2 p-4 rounded-lg border text-xs space-y-3"
       style={{
         borderColor: 'var(--color-warning)',
         background: 'var(--color-warning-bg)',
@@ -48,8 +52,8 @@ export function AiQuotaCard({
 
       <p className="leading-relaxed" style={{ color: 'var(--color-text)' }}>
         {isAdminOrOwner
-          ? 'Application AI quota reached for this Group. You can configure Bring Your Own Key (BYOK) in AI Settings to continue immediately.'
-          : 'Application AI quota reached. An administrator can configure BYOK in Group AI Settings to continue.'}
+          ? 'Application AI quota reached. You can configure Bring Your Own Key (BYOK) in AI Settings to continue immediately.'
+          : 'Application AI quota reached. An administrator can configure BYOK to continue.'}
       </p>
 
       {isAdminOrOwner && (

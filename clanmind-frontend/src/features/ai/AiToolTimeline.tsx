@@ -43,29 +43,29 @@ export function AiToolTimeline({
   const renderStatusIcon = (status: AiToolCallStatus) => {
     switch (status) {
       case 'PENDING':
-        return <Clock className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" />;
+        return <Clock className="w-3.5 h-3.5" style={{ color: 'var(--color-text-tertiary)' }} />;
       case 'APPROVED':
-        return <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />;
+        return <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-info)' }} />;
       case 'EXECUTING':
-        return <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin" />;
+        return <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--color-warning)' }} />;
       case 'SUCCEEDED':
-        return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />;
+        return <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />;
       case 'FAILED':
-        return <AlertCircle className="w-3.5 h-3.5 text-red-500" />;
+        return <AlertCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />;
       case 'DENIED':
-        return <XCircle className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" />;
+        return <XCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-text-tertiary)' }} />;
     }
   };
 
   return (
-    <div className="my-2 rounded-lg border border-[var(--color-border)] bg-gray-50/70 dark:bg-gray-900/60 overflow-hidden text-xs">
+    <div className="my-2 rounded-lg border overflow-hidden text-xs" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}>
       {/* Collapsible Header */}
       <button
         onClick={() => {
           userToggledRef.current = true;
           setIsExpanded(!isExpanded);
         }}
-        className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-gray-100/60 dark:hover:bg-gray-800/40 transition-colors cursor-pointer select-none"
+        className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer select-none"
       >
         <div className="flex items-center gap-2 font-semibold text-[var(--color-text-secondary)] text-[11px]">
           {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" /> : <ChevronRight className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" />}
@@ -81,11 +81,12 @@ export function AiToolTimeline({
 
       {/* Expanded Timeline Items */}
       {isExpanded && (
-        <div className="p-3 pt-1 border-t border-gray-200/60 dark:border-gray-800/60 space-y-2 font-mono text-[11px]">
+        <div className="p-3 pt-1 border-t space-y-2 font-mono text-[11px]" style={{ borderColor: 'var(--color-border)' }}>
           {toolCalls.map((call) => (
             <div
               key={call.id}
-              className="flex items-start justify-between p-2 rounded-md bg-white dark:bg-gray-950 border border-[var(--color-border)]/80"
+              className="flex items-start justify-between p-2 rounded-md"
+              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
             >
               <div className="flex items-start gap-2 min-w-0">
                 <span className="mt-0.5 shrink-0">{renderStatusIcon(call.status)}</span>
@@ -106,13 +107,15 @@ export function AiToolTimeline({
                 <div className="flex items-center gap-1.5 shrink-0 ml-2 font-sans">
                   <button
                     onClick={() => onDenyTool?.(call.id)}
-                    className="px-2 py-0.5 rounded text-[10px] font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] cursor-pointer"
+                    className="px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer"
+                    style={{ color: 'var(--color-text-secondary)' }}
                   >
                     Deny
                   </button>
                   <button
                     onClick={() => onApproveTool?.(call.id)}
-                    className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-900 text-white dark:bg-white dark:text-gray-900 cursor-pointer"
+                    className="px-2 py-0.5 rounded text-[10px] font-semibold cursor-pointer"
+                    style={{ background: 'var(--color-primary)', color: 'var(--color-primary-foreground)' }}
                   >
                     Approve Tool
                   </button>

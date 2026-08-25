@@ -201,10 +201,10 @@ function MessageRowInner({
               {message.sender_name}
               {isAi && (
                 <span
-                  className="inline-flex items-center gap-0.5 px-1.5 py-px rounded text-[10px] font-medium"
+                  className="inline-flex items-center gap-0.5 px-1 py-px rounded text-[10px] font-medium"
                   style={{
                     background: 'var(--color-surface-hover)',
-                    color: 'var(--color-text-secondary)',
+                    color: 'var(--color-text-tertiary)',
                   }}
                 >
                   <Sparkles className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
