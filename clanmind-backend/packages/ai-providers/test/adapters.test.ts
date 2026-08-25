@@ -90,4 +90,28 @@ describe("§62 OpenAI-compatible adapter", () => {
     expect(usage.estimated_input_tokens).toBe(100);
     expect(usage.estimated_output_tokens).toBe(50);
   });
+
+  // Regression (live Workers E2E, 2026-08-25): native fetch throws "Illegal
+  // invocation" when a host fetch proxy forwards a bogus `this`. The adapter
+  // must invoke its injectable fetchImpl as a plain call (this === undefined).
+  it("invokes fetchImpl without leaking a method `this`", async () => {
+    let capturedThis: unknown = "unset";
+    const probingFetch: FetchLike = function (this: unknown, url, init) {
+      capturedThis = this;
+      return Promise.resolve(
+        new Response("", { status: 200, headers: { "content-type": "text/event-stream" } }),
+      );
+    };
+    const adapter = new OpenAICompatibleAdapter("openai", "sk-test", "https://x/v1", probingFetch);
+    const events = [];
+    for await (const e of adapter.generate({
+      model_id: "m",
+      messages: [{ role: "user", content: "hi" }],
+      max_tokens: 10,
+    })) {
+      events.push(e);
+    }
+    expect(capturedThis).toBeUndefined();
+    expect(events.length).toBe(0); // no body -> no events, but no throw is the point
+  });
 });

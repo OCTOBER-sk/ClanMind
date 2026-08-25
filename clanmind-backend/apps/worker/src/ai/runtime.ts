@@ -423,10 +423,10 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
     {
       async resolveAdapter(route) {
         const config = await configRepo.findById(route.provider_config_id);
-        if (!config || !config.enabled || !config.credential_ref) return null;
+        if (!config || !config.enabled) return null;
         const apiKey =
           config.kind === "BYOK"
-            ? await secrets.getSecret(config.credential_ref.replace(/^secret:/, ""))
+            ? await secrets.getSecret(config.credential_ref?.replace(/^secret:/, "") ?? "")
             : env.APPLICATION_AI_API_KEY;
         if (!apiKey) return null;
         return new OpenAICompatibleAdapter(

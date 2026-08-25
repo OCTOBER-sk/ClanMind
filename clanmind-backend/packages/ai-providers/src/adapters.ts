@@ -44,7 +44,8 @@ export class OpenAICompatibleAdapter implements ModelProviderAdapter {
   }
 
   async listModels(): Promise<ModelDescriptor[]> {
-    const res = await this.fetchImpl(`${this.baseUrl}/models`, {
+    const fetcher = this.fetchImpl; // plain call — never leak `this` to native fetch
+    const res = await fetcher(`${this.baseUrl}/models`, {
       headers: this.headers(),
     });
     if (!res.ok) throw httpError(res.status);
@@ -57,7 +58,8 @@ export class OpenAICompatibleAdapter implements ModelProviderAdapter {
   }
 
   async *generate(request: ModelRequest): AsyncIterable<ModelEvent> {
-    const res = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
+    const fetcher = this.fetchImpl; // plain call — never leak `this` to native fetch
+    const res = await fetcher(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({

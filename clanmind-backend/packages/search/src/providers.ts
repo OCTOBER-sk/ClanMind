@@ -37,7 +37,8 @@ export class TavilyProvider implements SearchProvider {
   ) {}
 
   async search(request: SearchRequest): Promise<SearchResponse> {
-    const res = await this.fetchImpl("https://api.tavily.com/search", {
+    const fetcher = this.fetchImpl; // plain call — never leak `this` to native fetch
+    const res = await fetcher("https://api.tavily.com/search", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -72,7 +73,8 @@ export class ExaProvider implements SearchProvider {
   ) {}
 
   async search(request: SearchRequest): Promise<SearchResponse> {
-    const res = await this.fetchImpl("https://api.exa.ai/search", {
+    const fetcher = this.fetchImpl; // plain call — never leak `this` to native fetch
+    const res = await fetcher("https://api.exa.ai/search", {
       method: "POST",
       headers: {
         "content-type": "application/json",
