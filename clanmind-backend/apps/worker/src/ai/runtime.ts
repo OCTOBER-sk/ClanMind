@@ -7,6 +7,7 @@ import {
   ContextEngine,
   DecisionService,
   INJECTION_POLICY_TEXT,
+  AGENT_BEHAVIOR_POLICY_TEXT,
   ModelRouterService,
   PrivateConversationService,
   ProviderConfigService,
@@ -523,15 +524,18 @@ async function safeRead<T>(read: () => Promise<T>): Promise<T | null> {
 /**
  * §60 fixed slices, assembled in PROMPT_ASSEMBLY_ORDER:
  *
- *   1. SYSTEM_SAFETY           — platform policy incl. §89 injection text;
- *   2. ODIN_IDENTITY           — the Group's ai_agents row (§30);
- *   3. GROUP_POLICY            — Group settings (name/description/status)
- *                                plus the agent's mode_policy;
- *   4. PROJECT_POLICY          — ENABLED project_instructions rows (§29),
- *                                priority order, active project only;
- *   5. TASK_SKILL_INSTRUCTIONS — enabled skill definitions (§34 precedence:
- *                                project override beats Group; built-ins on
- *                                by default).
+ *   1. SYSTEM_SAFETY            — platform policy incl. §89 injection text;
+ *   2. AGENT_BEHAVIOR_POLICY    — consolidated behavioral rules (§2.6, §54,
+ *                                  §57, §66–§69, §70, §74, §79, §88–§89,
+ *                                  §121, §134–§136, §139, FE §222/§224–§226);
+ *   3. ODIN_IDENTITY            — the Group's ai_agents row (§30);
+ *   4. GROUP_POLICY             — Group settings (name/description/status)
+ *                                  plus the agent's mode_policy;
+ *   5. PROJECT_POLICY           — ENABLED project_instructions rows (§29),
+ *                                  priority order, active project only;
+ *   6. TASK_SKILL_INSTRUCTIONS  — enabled skill definitions (§34 precedence:
+ *                                  project override beats Group; built-ins on
+ *                                  by default).
  *
  * USER_PREFERENCES has no backing store yet and is intentionally absent.
  * Safety is unconditional; every DB-sourced slice degrades gracefully when
@@ -544,6 +548,9 @@ export async function buildFixedSlices(
 ): Promise<{ label: string; content: string }[]> {
   const slices: { label: string; content: string }[] = [
     { label: "SYSTEM_SAFETY", content: SYSTEM_SAFETY_POLICY },
+    // AGENT_BEHAVIOR_POLICY sits immediately after SYSTEM_SAFETY per §60
+    // and is a FIXED slice (§54A.1) — never truncated, never overridable.
+    { label: "AGENT_BEHAVIOR_POLICY", content: AGENT_BEHAVIOR_POLICY_TEXT },
   ];
 
   // §30 Odin identity + §24/§25 Group settings + mode policy.

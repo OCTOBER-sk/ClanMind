@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  AGENT_BEHAVIOR_POLICY_TEXT,
   ContextEngine,
   INJECTION_POLICY_TEXT,
   PROMPT_ASSEMBLY_ORDER,
@@ -115,7 +116,27 @@ describe("§60 fixed-slice construction (H1)", () => {
     // The §89 policy text is embedded VERBATIM — it finally has a consumer.
     expect(slices[0]?.content).toContain(INJECTION_POLICY_TEXT);
     // Even with no Group/agent/instructions readable, safety never degrades.
-    expect(slices).toHaveLength(2); // safety + default Odin identity
+    // Now includes AGENT_BEHAVIOR_POLICY as the second fixed slice.
+    expect(slices.length).toBeGreaterThanOrEqual(3); // safety + behavior policy + default Odin identity
+  });
+
+  it("includes AGENT_BEHAVIOR_POLICY immediately after SYSTEM_SAFETY (§60 fixed-slice order)", async () => {
+    const slices = await buildFixedSlices(fakeDb({}), agentService(null), {
+      group_id: G1,
+      project_id: null,
+    });
+    expect(slices[1]?.label).toBe("AGENT_BEHAVIOR_POLICY");
+    expect(slices[1]?.content).toBe(AGENT_BEHAVIOR_POLICY_TEXT);
+    // The policy must contain all nine consolidated behavioral rules.
+    expect(slices[1]?.content).toContain("CLARIFY vs ACT");
+    expect(slices[1]?.content).toContain("TOOL and SKILL SELECTION");
+    expect(slices[1]?.content).toContain("RESEARCH ESCALATION");
+    expect(slices[1]?.content).toContain("ARTIFACT CREATION");
+    expect(slices[1]?.content).toContain("MEMORY RULES");
+    expect(slices[1]?.content).toContain("GITHUB WORKFLOW");
+    expect(slices[1]?.content).toContain("PROACTIVITY");
+    expect(slices[1]?.content).toContain("FAILURE and RETRY");
+    expect(slices[1]?.content).toContain("OUTPUT DISCIPLINE");
   });
 
   it("builds ODIN_IDENTITY from the ai_agents row (§30)", async () => {
@@ -234,7 +255,7 @@ describe("§60 fixed-slice construction (H1)", () => {
 
     // Labels follow the §60 assembly order where present.
     const labels = slices.map((s) => s.label);
-    const orderPositions = ["SYSTEM_SAFETY", "ODIN_IDENTITY", "GROUP_POLICY", "PROJECT_POLICY"].map(
+    const orderPositions = ["SYSTEM_SAFETY", "AGENT_BEHAVIOR_POLICY", "ODIN_IDENTITY", "GROUP_POLICY", "PROJECT_POLICY"].map(
       (label) => labels.indexOf(label),
     );
     expect(orderPositions).toEqual([...orderPositions].sort((a, b) => a - b));

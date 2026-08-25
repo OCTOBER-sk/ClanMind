@@ -125,3 +125,68 @@ describe("§34 precedence", () => {
     expect(order).toHaveLength(3);
   });
 });
+
+describe("§54/§57 skill-selection heuristic", () => {
+  it("selects deep_research for a deep research query", async () => {
+    const r = repos();
+    const svc = new SkillService(r.skillRepo, r.enablement);
+    await svc.seedBuiltIns();
+
+    // "deep" + "research" matches deep_research more specifically than web_research
+    const match = await svc.selectBestMatchingSkill("g1", null, "perform deep research analysis on this topic");
+    expect(match?.slug).toBe("deep_research");
+  });
+
+  it("selects meeting_facilitation for a meeting query", async () => {
+    const r = repos();
+    const svc = new SkillService(r.skillRepo, r.enablement);
+    await svc.seedBuiltIns();
+
+    const match = await svc.selectBestMatchingSkill("g1", null, "facilitate this meeting and identify action items");
+    expect(match?.slug).toBe("meeting_facilitation");
+  });
+
+  it("selects project_planning for a planning query", async () => {
+    const r = repos();
+    const svc = new SkillService(r.skillRepo, r.enablement);
+    await svc.seedBuiltIns();
+
+    const match = await svc.selectBestMatchingSkill("g1", null, "plan the project architecture and decomposition");
+    expect(match?.slug).toBe("project_planning");
+  });
+
+  it("returns null for vague queries that don't match any skill", async () => {
+    const r = repos();
+    const svc = new SkillService(r.skillRepo, r.enablement);
+    await svc.seedBuiltIns();
+
+    const match = await svc.selectBestMatchingSkill("g1", null, "hi");
+    expect(match).toBeNull();
+  });
+
+  it("returns null when all matching skills are disabled", async () => {
+    const r = repos();
+    const svc = new SkillService(r.skillRepo, r.enablement);
+    await svc.seedBuiltIns();
+    // Disable all built-ins at group level
+    for (const skill of r.skills) {
+      await r.enablement.setGroup("g1", skill.id, false, {});
+    }
+
+    const match = await svc.selectBestMatchingSkill("g1", null, "research current information");
+    expect(match).toBeNull();
+  });
+
+  it("respects project override: disables a skill that would otherwise match", async () => {
+    const r = repos();
+    const svc = new SkillService(r.skillRepo, r.enablement);
+    await svc.seedBuiltIns();
+    const deep = r.skills.find((s) => s.slug === "deep_research")!;
+
+    // Disable deep_research at project level
+    await r.enablement.setProject("p1", deep.id, false, {});
+
+    const match = await svc.selectBestMatchingSkill("g1", "p1", "deep research the codebase");
+    expect(match?.slug).not.toBe("deep_research");
+  });
+});

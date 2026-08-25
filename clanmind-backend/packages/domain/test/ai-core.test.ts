@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  AGENT_BEHAVIOR_POLICY_TEXT,
   ContextEngine,
   INJECTION_POLICY_TEXT,
+  PROMPT_ASSEMBLY_ORDER,
   ToolLoopGuard,
   ToolRegistry,
   approvalRequiredForRisk,
@@ -150,6 +152,127 @@ describe("§2.6/§56 Tool Registry", () => {
 
   it("the injection policy text is present (§89)", () => {
     expect(INJECTION_POLICY_TEXT).toContain("data, not authority");
+  });
+
+  it("HIGH-risk tool always gets requires_approval corrected to true (§2.6)", () => {
+    const registry = new ToolRegistry();
+    // Attempt to register a HIGH-risk tool with requires_approval=false
+    registry.register({
+      ...githubTool,
+      requires_approval: false,
+    });
+    // The registry must correct this per §2.6
+    expect(registry.get("github.create_branch")?.requires_approval).toBe(true);
+  });
+
+  it("CRITICAL-risk tool always gets requires_approval corrected to true (§2.6)", () => {
+    const registry = new ToolRegistry();
+    const criticalTool: ToolDefinition = {
+      ...githubTool,
+      name: "github.merge_pr",
+      risk_level: "CRITICAL",
+      requires_approval: false, // wrong per §2.6
+    };
+    registry.register(criticalTool);
+    expect(registry.get("github.merge_pr")?.requires_approval).toBe(true);
+  });
+
+  it("LOW-risk tool gets requires_approval corrected to false if incorrectly set (§2.6)", () => {
+    const registry = new ToolRegistry();
+    registry.register({
+      ...githubTool,
+      name: "web.search",
+      risk_level: "LOW",
+      requires_approval: true, // wrong per §2.6
+    });
+    expect(registry.get("web.search")?.requires_approval).toBe(false);
+  });
+
+  it("MEDIUM-risk tool requires approval (§2.6)", () => {
+    expect(approvalRequiredForRisk("MEDIUM")).toBe(true);
+  });
+
+  it("canInvoke returns correct gate results for tool permission checks", () => {
+    const registry = new ToolRegistry();
+    registry.register({
+      name: "task.create",
+      version: "1",
+      description: "Create task",
+      input_schema: {},
+      output_schema: {},
+      risk_level: "MEDIUM",
+      requires_approval: true,
+      allowed_modes: ["ASSIST", "ACT"],
+      allowed_roles: ["OWNER", "ADMIN", "MEMBER"],
+      timeout_ms: 5000,
+      retry_policy: "never",
+    });
+    // Guest cannot create tasks
+    expect(registry.canInvoke("task.create", { mode: "ACT", role: "GUEST" }).allowed).toBe(false);
+    expect(registry.canInvoke("task.create", { mode: "ACT", role: "GUEST" }).reason).toBe("role_not_allowed");
+    // Member can
+    expect(registry.canInvoke("task.create", { mode: "ACT", role: "MEMBER" }).allowed).toBe(true);
+    // ASSIST mode works too
+    expect(registry.canInvoke("task.create", { mode: "ASSIST", role: "MEMBER" }).allowed).toBe(true);
+    // FACILITATE mode does not
+    expect(registry.canInvoke("task.create", { mode: "FACILITATE", role: "MEMBER" }).allowed).toBe(false);
+  });
+});
+
+describe("§60 AGENT_BEHAVIOR_POLICY", () => {
+  it("is included in PROMPT_ASSEMBLY_ORDER between SYSTEM_SAFETY and ODIN_IDENTITY", () => {
+    const order = PROMPT_ASSEMBLY_ORDER as readonly string[];
+    const safetyIdx = order.indexOf("SYSTEM_SAFETY");
+    const policyIdx = order.indexOf("AGENT_BEHAVIOR_POLICY");
+    const identityIdx = order.indexOf("ODIN_IDENTITY");
+    expect(safetyIdx).toBeGreaterThanOrEqual(0);
+    expect(policyIdx).toBe(safetyIdx + 1);
+    expect(identityIdx).toBe(policyIdx + 1);
+  });
+
+  it("contains all nine consolidated behavioral rules", () => {
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("CLARIFY vs ACT");
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("TOOL and SKILL SELECTION");
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("RESEARCH ESCALATION");
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("ARTIFACT CREATION");
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("MEMORY RULES");
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("GITHUB WORKFLOW");
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("PROACTIVITY");
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("FAILURE and RETRY");
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("OUTPUT DISCIPLINE");
+  });
+
+  it("references spec sections verbatim in the policy text", () => {
+    // §2.6 risk model
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("§2.6");
+    // §58 built-in skill description
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("§58");
+    // §69 citation integrity
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("§69");
+    // §74 artifact engine
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("§74");
+    // §139 branch safety
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("§139");
+    // §88 secret sanitization
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("§88");
+    // §89 injection defense
+    expect(AGENT_BEHAVIOR_POLICY_TEXT).toContain("§89");
+  });
+
+  it("is treated as a fixed slice by the ContextEngine (never truncated)", () => {
+    const engine = new ContextEngine(
+      [
+        { label: "SYSTEM_SAFETY", content: "safety" },
+        { label: "AGENT_BEHAVIOR_POLICY", content: AGENT_BEHAVIOR_POLICY_TEXT },
+        { label: "ODIN_IDENTITY", content: "identity" },
+      ],
+      100, // very small budget
+    );
+    const assembled = engine.assemble({ candidates: [], explicitReferences: [] });
+    // Fixed slices are always included regardless of budget
+    expect(assembled.fixed).toHaveLength(3);
+    expect(assembled.fixed[1]?.label).toBe("AGENT_BEHAVIOR_POLICY");
+    expect(assembled.fixed[1]?.content).toBe(AGENT_BEHAVIOR_POLICY_TEXT);
   });
 });
 

@@ -159,4 +159,47 @@ export class SkillService {
   static resolvedInstructionOrder(systemPolicy: string, skillInstructions: string[]): string[] {
     return [systemPolicy, ...skillInstructions];
   }
+
+  /**
+   * Deterministic skill-selection heuristic (§54/§57/§58). Returns the
+   * best-matching enabled skill for a user query by matching keywords
+   * from the query against each skill's description and slug. Returns
+   * null when no skill meaningfully matches — ordinary chat is never
+   * forced into a skill.
+   *
+   * This is the deterministic core that grounds behavior in code rather
+   * than relying solely on the prompt layer.
+   */
+  async selectBestMatchingSkill(
+    groupId: string,
+    projectId: string | null,
+    query: string,
+  ): Promise<Skill | null> {
+    const enabled = await this.resolveEnabled(groupId, projectId);
+    if (enabled.length === 0) return null;
+
+    const queryTerms = query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((t) => t.length > 3); // ignore short/common words
+
+    if (queryTerms.length === 0) return null;
+
+    let bestSkill: Skill | null = null;
+    let bestScore = 0;
+    // Minimum threshold: at least one query term must match a skill's
+    // description or slug to avoid false positives on vague queries.
+    const MIN_MATCH_THRESHOLD = 1;
+
+    for (const skill of enabled) {
+      const haystack = `${skill.slug} ${skill.description}`.toLowerCase();
+      const matchCount = queryTerms.filter((term) => haystack.includes(term)).length;
+      if (matchCount >= MIN_MATCH_THRESHOLD && matchCount > bestScore) {
+        bestScore = matchCount;
+        bestSkill = skill;
+      }
+    }
+
+    return bestSkill;
+  }
 }
