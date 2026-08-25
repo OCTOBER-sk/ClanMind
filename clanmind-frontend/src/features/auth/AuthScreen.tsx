@@ -137,6 +137,10 @@ function LoginView({
     <div className="space-y-6 animate-[fade-in_200ms_ease-out]">
       <div className="flex flex-col items-center gap-3">
         <ClanMindLogo size="md" variant="calm" showWordmark />
+        {/* §33 — "Welcome back" greeting for returning users */}
+        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+          Welcome back
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>

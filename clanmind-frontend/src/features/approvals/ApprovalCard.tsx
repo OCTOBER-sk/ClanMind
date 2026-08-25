@@ -341,10 +341,17 @@ export function ApprovalCard({
   // ─── §164A.3 PROPOSED (rare/transient) & WAITING_APPROVAL (active card) ───
   const isActive = action.status === 'WAITING_APPROVAL';
 
+  // §164A.1 — risk-tiered border emphasis: CRITICAL/HIGH get a stronger
+  // border to communicate severity without making every approve button red.
+  const riskBorderColor =
+    action.risk_level === 'CRITICAL' ? 'var(--color-danger)' :
+    action.risk_level === 'HIGH' ? 'var(--color-warning)' :
+    'var(--color-border)';
+
   return (
     <div
       className="p-4 rounded-xl border shadow-[var(--shadow-sm)] text-xs space-y-3"
-      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+      style={{ borderColor: riskBorderColor, background: 'var(--color-surface-raised)' }}
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
@@ -400,7 +407,12 @@ export function ApprovalCard({
           <Button size="sm" variant="ghost" disabled={isRejecting} onClick={handleReject}>
             Reject
           </Button>
-          <Button size="sm" variant="primary" isLoading={isApproving} onClick={handleApprove}>
+          <Button
+            size="sm"
+            variant={action.risk_level === 'CRITICAL' ? 'danger' : 'primary'}
+            isLoading={isApproving}
+            onClick={handleApprove}
+          >
             Approve
           </Button>
         </div>

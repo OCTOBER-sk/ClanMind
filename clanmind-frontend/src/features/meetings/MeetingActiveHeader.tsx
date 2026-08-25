@@ -28,17 +28,37 @@ export function MeetingActiveHeader({
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 bg-rose-500 text-white shadow-md z-30 select-none">
+    <div
+      className="flex items-center justify-between px-4 py-2 z-30 select-none"
+      style={{
+        background: 'var(--color-surface-elevated)',
+        borderBottom: '1px solid var(--color-border-strong)',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 font-bold text-xs tracking-wider">
-          <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
-          <span>MEETING IN PROGRESS</span>
+          {/* §52 — active meeting indicator: spectral pulse for a first-class live state */}
+          <span className="w-2.5 h-2.5 rounded-full spectral-active animate-pulse" />
+          <span style={{ color: 'var(--color-text)' }}>MEETING IN PROGRESS</span>
         </div>
-        <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-rose-600/60">
+        <span
+          className="text-xs font-mono font-medium px-2 py-0.5 rounded"
+          style={{
+            color: 'var(--color-text-secondary)',
+            background: 'var(--color-surface-hover)',
+          }}
+        >
           {formatTime(elapsedSeconds)}
         </span>
         {isPaused && (
-          <span className="text-[10px] uppercase font-bold tracking-widest bg-yellow-400 text-yellow-950 px-1.5 py-0.5 rounded">
+          <span
+            className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded"
+            style={{
+              color: 'var(--color-warning)',
+              background: 'var(--color-warning-bg)',
+            }}
+          >
             PAUSED
           </span>
         )}
@@ -49,7 +69,6 @@ export function MeetingActiveHeader({
           <Button
             size="sm"
             variant="outline"
-            className="text-white border-white/60 hover:bg-white/10"
             leftIcon={<Play className="w-3.5 h-3.5 fill-current" />}
             onClick={onResume}
           >
@@ -59,7 +78,6 @@ export function MeetingActiveHeader({
           <Button
             size="sm"
             variant="outline"
-            className="text-white border-white/60 hover:bg-white/10"
             leftIcon={<Pause className="w-3.5 h-3.5" />}
             onClick={onPause}
           >
@@ -69,8 +87,7 @@ export function MeetingActiveHeader({
 
         <Button
           size="sm"
-          variant="secondary"
-          className="bg-white text-rose-600 hover:bg-gray-100"
+          variant="danger"
           leftIcon={<Square className="w-3.5 h-3.5 fill-current" />}
           onClick={onEnd}
         >
