@@ -1057,20 +1057,20 @@ export function AppShell() {
         />
       ) : rightPanelMode === 'approval' ? (
         <div
-          className="flex flex-col h-full border-l text-xs"
-          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+          className="flex flex-col h-full text-xs"
+          style={{ background: 'var(--color-surface)' }}
         >
           <div
-            className="flex items-center justify-between px-4 py-3 border-b"
-            style={{ borderColor: 'var(--color-border)' }}
+            className="flex items-center justify-between px-4 py-3 shrink-0"
+            style={{ borderBottom: '1px solid var(--color-border)' }}
           >
-            <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
               Approvals
             </h3>
             <button
               onClick={closeRightPanel}
               aria-label="Close approvals panel"
-              className="p-1 cursor-pointer hover:opacity-80"
+              className="p-1 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] focus-visible:shadow-[var(--focus-ring)] outline-none transition-colors"
               style={{ color: 'var(--color-text-tertiary)' }}
             >
               <X className="w-4 h-4" aria-hidden="true" />

@@ -98,7 +98,7 @@ export function PanelResizer({
     >
       <div
         aria-hidden="true"
-        className="h-full w-0.5 transition-colors group-hover:bg-[var(--color-info)] group-focus-visible:bg-[var(--color-info)]"
+        className="h-full w-0.5 transition-colors group-hover:bg-[var(--color-text-tertiary)] group-focus-visible:bg-[var(--color-text-secondary)]"
         style={{ background: 'var(--color-border)' }}
       />
     </div>

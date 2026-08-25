@@ -193,13 +193,13 @@ export function TopBar({
         {activeProject && (
           <>
             <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
-            {/* Project Switcher (§16) */}
+            {/* Project Switcher (§16) — monochrome: no persistent colored accent */}
             <Dropdown
               align="start"
               trigger={
                 <button
                   className="font-semibold truncate max-w-[140px] cursor-pointer hover:underline rounded-md outline-none focus-visible:shadow-[var(--focus-ring)]"
-                  style={{ color: 'var(--color-info)' }}
+                  style={{ color: 'var(--color-text)' }}
                 >
                   {activeProject.name}
                 </button>
@@ -210,15 +210,14 @@ export function TopBar({
         )}
       </div>
 
-      {/* Center: Global Search Trigger (§61, §175) */}
+      {/* Center: Global Search Trigger (§61, §175) — monochrome, restrained */}
       <div className="hidden md:flex items-center justify-center flex-1 max-w-sm px-4">
         <button
           onClick={onOpenSearch}
           aria-label="Search or jump to"
-          className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer outline-none focus-visible:shadow-[var(--focus-ring)]"
+          className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer outline-none focus-visible:shadow-[var(--focus-ring)]"
           style={{
-            borderColor: 'var(--color-border)',
-            background: 'var(--color-surface)',
+            background: 'var(--color-surface-hover)',
             color: 'var(--color-text-tertiary)',
           }}
         >
@@ -228,7 +227,7 @@ export function TopBar({
           </span>
           <kbd
             className="font-mono text-[10px] px-1.5 py-0.5 rounded"
-            style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
+            style={{ background: 'var(--color-surface)', color: 'var(--color-text-secondary)' }}
           >
             Ctrl+K
           </kbd>
@@ -237,14 +236,15 @@ export function TopBar({
 
       {/* Right Actions */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* §165A.2: hidden entirely when meeting_mode flag is off */}
+        {/* §165A.2: hidden entirely when meeting_mode flag is off.
+            Monochrome button — red is reserved for destructive actions (§8). */}
         {meetingEnabled && !isMeetingActive && (
           <button
             onClick={onStartMeeting}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors outline-none focus-visible:shadow-[var(--focus-ring)]"
             style={{
-              color: 'var(--color-danger)',
-              background: 'var(--color-danger-bg)',
+              color: 'var(--color-text)',
+              background: 'var(--color-surface-hover)',
               border: '1px solid var(--color-border)',
             }}
           >

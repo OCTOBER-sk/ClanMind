@@ -82,8 +82,10 @@ const TEAM_ITEMS: NavItem[] = [
 const CHAT_ITEM: NavItem = { id: 'chat', label: 'Chat', icon: <MessageSquare className="w-4 h-4" /> };
 const SETTINGS_ITEM: NavItem = { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" /> };
 
+/* §19 monochrome-first selected state: strong contrast + subtle surface,
+   never a persistent colored block. Idle: quiet surface on hover only. */
 const activeNavClass =
-  'bg-[var(--color-primary)] text-[var(--color-primary-foreground)] shadow-[var(--shadow-sm)]';
+  'bg-[var(--color-surface-hover)] text-[var(--color-text)] font-bold';
 const idleNavClass = 'hover:bg-[var(--color-surface-hover)]';
 const RAIL_WIDTH_COLLAPSED_PX = 56;
 
@@ -219,12 +221,12 @@ export const LeftNav = React.memo(function LeftNav({
                       className={cn(
                         'w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer text-left',
                         isActive
-                          ? 'bg-[var(--color-info-bg)] border-l-2 border-[var(--color-info)]'
+                          ? 'bg-[var(--color-surface-hover)] border-l-2 border-[var(--color-text)]'
                           : cn(idleNavClass, 'border-l-2 border-transparent')
                       )}
                       style={
                         isActive
-                          ? { color: 'var(--color-info)' }
+                          ? { color: 'var(--color-text)' }
                           : { color: 'var(--color-text-secondary)' }
                       }
                     >
