@@ -164,7 +164,9 @@ export class GroupRoom implements DurableObject {
     const token = url.searchParams.get("token") ?? "";
     let userId: string;
     try {
-      const user = await verifySupabaseJwt(token, this.env.SUPABASE_JWT_SECRET);
+      const user = await verifySupabaseJwt(token, this.env.SUPABASE_JWT_SECRET, {
+        supabaseUrl: this.env.SUPABASE_URL,
+      });
       userId = user.user_id;
     } catch {
       return new Response("unauthorized", { status: 401 });

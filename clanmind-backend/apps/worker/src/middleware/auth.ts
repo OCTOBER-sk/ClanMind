@@ -25,7 +25,9 @@ export async function requireAuthenticatedUser(
   if (!token) {
     throw new AppError("UNAUTHENTICATED", "Authentication required.");
   }
-  const user = await verifySupabaseJwt(token, c.env.SUPABASE_JWT_SECRET);
+  const user = await verifySupabaseJwt(token, c.env.SUPABASE_JWT_SECRET, {
+    supabaseUrl: c.env.SUPABASE_URL,
+  });
   c.set("user", user);
   return applyIdempotency(c, next);
 }
