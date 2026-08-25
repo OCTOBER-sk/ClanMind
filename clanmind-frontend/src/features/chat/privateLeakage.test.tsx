@@ -90,7 +90,12 @@ describe('PRIVATE-LEAKAGE — cache gate (realtime dispatch → store)', () => {
     expect(useChatStore.getState().messages).toHaveLength(0);
   });
 
-  it('does NOT cache a foreign PRIVATE_AI thread', () => {
+  it('does NOT cache a foreign PRIVATE_AI thread (audit 0.12: `private_to:"ai"` must not admit it)', () => {
+    // Audit probe — the original synthetic payload omitted `private_to`, so
+    // it never exercised the `recipientId === 'ai'` gate hole. With the
+    // controller sending `private_to:'ai'` (useChatController) and the demo
+    // hub fanning private rows room-wide, a foreign PRIVATE_AI row carrying
+    // the literal 'ai' recipient must STILL be refused entry to this device.
     dispatchRealtimeEvent(
       envelope('message.created', {
         message: {
@@ -98,6 +103,7 @@ describe('PRIVATE-LEAKAGE — cache gate (realtime dispatch → store)', () => {
           group_id: 'g1',
           visibility: 'PRIVATE_AI',
           sender_user_id: 'userC',
+          recipient_id: 'ai',
           body: 'SECRET-AI — someone else’s private AI answer',
           client_message_id: 'op_foreign_ai',
           server_sequence: 2,
@@ -108,6 +114,28 @@ describe('PRIVATE-LEAKAGE — cache gate (realtime dispatch → store)', () => {
     expect(
       useChatStore.getState().messages.some((m) => m.id === 'msg_foreign_ai'),
     ).toBe(false);
+    expect(useChatStore.getState().messages).toHaveLength(0);
+  });
+
+  it('still caches the user’s OWN private AI thread (requester is participant)', () => {
+    dispatchRealtimeEvent(
+      envelope('message.created', {
+        message: {
+          id: 'msg_own_ai',
+          group_id: 'g1',
+          visibility: 'PRIVATE_AI',
+          sender_user_id: ME,
+          recipient_id: 'ai',
+          body: 'my own private AI question',
+          client_message_id: 'op_own_ai',
+          server_sequence: 5,
+          created_at: new Date().toISOString(),
+        },
+      }),
+    );
+    expect(
+      useChatStore.getState().messages.some((m) => m.id === 'msg_own_ai'),
+    ).toBe(true);
   });
 
   it('still caches the user’s OWN private messages and plain GROUP messages', () => {
@@ -230,5 +258,48 @@ describe('PRIVATE-LEAKAGE — view filter (GROUP render + §176 search corpus)',
     );
     expect(corpus.some((m) => m.visibility !== 'GROUP')).toBe(false);
     expect(corpus.map((m) => m.body)).toEqual(['PUBLIC-GROUP-PLAN']);
+  });
+
+  it('audit probe — a foreign PRIVATE_AI row never renders in MY PRIVATE_AI view; my own does', () => {
+    // Simulates the audit's cross-user leak even with a POLLUTED cache: a
+    // teammate B's private AI message has reached device A. It must NOT
+    // appear in A's /private AI conversation, while A's own private AI rows
+    // still render (structural participation check via store scoping).
+    const polluted = [
+      message({ id: 'my_q', body: 'MY-OWN-AI-Q', visibility: 'PRIVATE_AI', sender_id: ME, recipient_id: 'ai' }),
+      message({ id: 'my_a', body: 'MY-OWN-AI-A', visibility: 'PRIVATE_AI', sender_id: 'odin_ai', recipient_id: ME }),
+      message({
+        id: 'b_private_ai',
+        body: 'B-PRIVATE-AI-SECRET',
+        visibility: 'PRIVATE_AI',
+        sender_id: 'userB',
+        recipient_id: 'ai',
+      }),
+    ];
+    const scoped = filterMessagesForScope(mergeMessages([], polluted), {
+      groupId: 'g1',
+      visibility: 'PRIVATE_AI',
+      currentUserId: ME,
+    });
+
+    render(
+      <MessageList
+        messages={scoped}
+        currentUserId={ME}
+        typingUsers={[]}
+        onReply={() => {}}
+        onReact={() => {}}
+        onEditSave={() => {}}
+        onDelete={() => {}}
+        onTogglePin={() => {}}
+        onCreateTask={() => {}}
+        onCreateDecision={() => {}}
+        onUseAsContext={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('MY-OWN-AI-Q')).toBeInTheDocument();
+    expect(screen.getByText('MY-OWN-AI-A')).toBeInTheDocument();
+    expect(screen.queryByText('B-PRIVATE-AI-SECRET')).not.toBeInTheDocument();
   });
 });

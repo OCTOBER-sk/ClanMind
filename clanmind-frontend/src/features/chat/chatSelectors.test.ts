@@ -108,6 +108,22 @@ describe('filterMessagesForScope — FE rule 26 private isolation', () => {
     expect(visible.map((m) => m.id)).toEqual(['ai_mine']);
   });
 
+  it('PRIVATE_AI scope drops a foreign requester’s thread (audit 0.12 structural check)', () => {
+    const foreignAi = message({
+      id: 'ai_foreign',
+      visibility: 'PRIVATE_AI',
+      sender_id: 'carol',
+      recipient_id: 'ai',
+      body: 'carol’s private AI thread',
+    });
+    const visible = filterMessagesForScope([foreignAi, myAi], {
+      groupId: 'g1',
+      visibility: 'PRIVATE_AI',
+      currentUserId: 'me',
+    });
+    expect(visible.map((m) => m.id)).toEqual(['ai_mine']);
+  });
+
   it('messages of other groups never leak into any scope', () => {
     const otherGroup = message({ id: 'other_g', group_id: 'g2' });
     for (const visibility of ['GROUP', 'PRIVATE_PAIR', 'PRIVATE_AI'] as const) {

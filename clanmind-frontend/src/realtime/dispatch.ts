@@ -245,9 +245,15 @@ function privateEventIncludesMe(payload: Record<string, unknown>): boolean {
     payload.recipient_user_id,
     payload.private_to,
   );
-  if (senderId === me) return true;
-  // PRIVATE_AI threads belong to exactly one requester + the AI identity.
-  return recipientId === me || recipientId === 'ai';
+  // A private row only enters this device's cache when the local user
+  // demonstrably participates: they authored it, or the server explicitly
+  // addressed it to them. PRIVATE_AI threads belong to exactly one requester
+  // + the AI identity — the literal `'ai'` recipient is NEVER sufficient on
+  // its own, because the demo hub fans private rows out room-wide and any
+  // member's thread would otherwise hydrate every device's shared cache
+  // (audit 0.12/7.16/25.8). A foreign PRIVATE_AI row carrying
+  // `recipient_id: 'ai'` is therefore dropped, not admitted.
+  return senderId === me || recipientId === me;
 }
 
 function firstString(...values: unknown[]): string | null {

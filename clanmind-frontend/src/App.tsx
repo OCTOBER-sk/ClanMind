@@ -53,7 +53,7 @@ export function App() {
 
   // Real connectivity → SyncBanner truth (FE §185). Realtime is initialised
   // at boot: demo installs its hub + socket (src/mocks); LIVE mode bootstraps
-  // workspace data from the real backend and connects the group room.
+  // group data from the real backend and connects the group room.
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
@@ -67,7 +67,7 @@ export function App() {
         }
         const live = await import('@/live/liveRuntime');
         if (cancelled) return;
-        await live.bootstrapLiveWorkspace();
+        await live.bootstrapLiveGroups();
         if (cancelled) return;
         const { useGroupStore } = await import('@/state/useGroupStore');
         live.ensureLiveRealtime(useGroupStore.getState().activeGroup?.id);

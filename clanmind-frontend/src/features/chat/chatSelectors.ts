@@ -44,9 +44,14 @@ export function filterMessagesForScope(
         // even if the cache was polluted (defense-in-depth over the gate).
         return isGroupVisible(m);
       case 'PRIVATE_AI':
-        // Requester + Odin only; other users' private AI threads must never
-        // surface even if they somehow reached this device's cache.
-        return m.visibility === 'PRIVATE_AI';
+        // Requester + Odin only. Structural participation check (not visual):
+        // only rows the local user authored, or that the server addressed to
+        // them, may render here — other users' private AI threads must never
+        // surface even if they somehow reached this device's cache (audit
+        // 0.12/7.16/25.8).
+        if (m.visibility !== 'PRIVATE_AI') return false;
+        const aiMe = scope.currentUserId;
+        return m.sender_id === aiMe || m.recipient_id === aiMe;
       case 'PRIVATE_PAIR': {
         if (m.visibility !== 'PRIVATE_PAIR') return false;
         const me = scope.currentUserId;

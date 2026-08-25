@@ -524,17 +524,33 @@ export function AppShell() {
     if (activeAiMessageId) stopAiRun(activeAiMessageId);
   }, [activeAiMessageId, stopAiRun]);
 
-  // ─── §190 drafts: persist per account:group:project scope; restore on switch ───
-  const scopeKey = `${user?.id ?? 'anon'}:${groupForRoute?.id ?? 'none'}:${projectForRoute?.id ?? 'group'}`;
+  // ─── §190 drafts: persist per account:group:project:privacy scope; restore
+  // on switch. The privacy components (visibility + recipient) are REQUIRED
+  // (audit 7.19): text composed under 🔒 PRIVATE_AI/PRIVATE_PAIR must never
+  // survive into a GROUP-scope composer or become sendable to the channel —
+  // each privacy boundary holds its own draft and read marker.
+  const scopeKey = `${user?.id ?? 'anon'}:${groupForRoute?.id ?? 'none'}:${projectForRoute?.id ?? 'group'}:${visibility}:${privateRecipientId ?? 'none'}`;
+
+  // The scope that currently owns the in-memory composer text. Persistence is
+  // gated on this ownership so a scope transition (group/project/visibility/
+  // recipient) NEVER writes the old scope's text into the new scope's draft —
+  // otherwise private text composed under 🔒 could survive a "Switch to Public
+  // Group" and become sendable to the channel (audit 7.19). The previous
+  // scope's draft is already persisted on every keystroke while it owned the
+  // text, so switching away loses nothing.
+  const composerScopeRef = useRef(scopeKey);
 
   useEffect(() => {
+    if (composerScopeRef.current !== scopeKey) {
+      // Scope transition: adopt the new scope's draft instead of persisting
+      // the previous scope's in-memory text under the new key.
+      composerScopeRef.current = scopeKey;
+      loadDraft(scopeKey);
+      return;
+    }
+    // Same scope: persist keystrokes as they happen.
     saveDraft(scopeKey, composerText);
-  }, [composerText, scopeKey, saveDraft]);
-
-  useEffect(() => {
-    loadDraft(scopeKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopeKey]);
+  }, [composerText, scopeKey, saveDraft, loadDraft]);
 
   // ─── §183/§186A.2 offline replay ─────────────────────────────────────────
   // The P3-era timer that "confirmed" queued messages without sending them
@@ -920,14 +936,14 @@ export function AppShell() {
   );
 
   if (!user || !groupForRoute) {
-    // Live mode before the workspace query resolves; demo hydrates instantly.
+    // Live mode before the group/project context resolves; demo hydrates instantly.
     return (
       <div
         className="h-screen w-screen flex items-center justify-center text-sm"
         style={{ background: 'var(--color-background)', color: 'var(--color-text-secondary)' }}
         role="status"
       >
-        Loading workspace…
+        Loading your groups…
       </div>
     );
   }

@@ -1,5 +1,5 @@
 /**
- * LIVE-mode runtime — workspace bootstrap + realtime wiring for the real
+ * LIVE-mode runtime — group bootstrap + realtime wiring for the real
  * backend. Loaded ONLY when __DEMO_MODE__ is false; demo mode keeps its
  * deterministic hub (src/mocks) behind the compile gate.
  *
@@ -96,7 +96,7 @@ let bootstrapped = false;
  * authenticated shell. Idempotent per session; failures throw so App can
  * keep the user on cached local state (FE §182 offline-equivalent).
  */
-export async function bootstrapLiveWorkspace(): Promise<void> {
+export async function bootstrapLiveGroups(): Promise<void> {
   if (bootstrapped) return;
   bootstrapped = true;
 
