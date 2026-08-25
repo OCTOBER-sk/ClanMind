@@ -7,6 +7,9 @@ import { Button } from '@/design-system/components/Button';
  * A failure inside Chat, Garage, Artifact, GitHub or Settings must
  * never crash the rest of the shell ("Do not allow one broken artifact
  * to break chat" — §325 #9).
+ *
+ * §94/§65 — focus management: after recovery, focus returns to the
+ * feature's main content area (or the app's main target for global).
  */
 interface ErrorBoundaryProps {
   /** Feature name shown in the fallback, e.g. "Chat" */
@@ -42,6 +45,15 @@ export class ErrorBoundary extends React.Component<
 
   private handleRestart = () => {
     window.location.reload();
+  };
+
+  private handleTryAgain = () => {
+    this.setState({ hasError: false, message: '' });
+    // §94 — after recovering from a feature error, move focus to the
+    // main content area so keyboard/screen-reader users land somewhere useful.
+    requestAnimationFrame(() => {
+      document.getElementById('cm-main-content')?.focus({ preventScroll: true });
+    });
   };
 
   private handleCopyDiagnostics = async () => {
@@ -106,7 +118,7 @@ export class ErrorBoundary extends React.Component<
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => this.setState({ hasError: false, message: '' })}
+          onClick={this.handleTryAgain}
         >
           Try again
         </Button>

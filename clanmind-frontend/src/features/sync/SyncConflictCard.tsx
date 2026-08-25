@@ -36,6 +36,8 @@ export function SyncConflictCard({ conflict, onResolve }: SyncConflictCardProps)
 
   return (
     <div
+      role="alert"
+      aria-label={`Sync conflict: ${title}`}
       className="p-4 rounded-xl border text-xs space-y-3 shadow-[var(--shadow-sm)]"
       style={{ borderColor: 'var(--color-warning)', background: 'var(--color-warning-bg)' }}
     >
@@ -47,6 +49,7 @@ export function SyncConflictCard({ conflict, onResolve }: SyncConflictCardProps)
         <span
           className="text-[10px] uppercase font-mono px-2 py-0.5 rounded"
           style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
+          aria-label={`Entity type: ${conflict.entity_type}`}
         >
           {conflict.entity_type}
         </span>

@@ -48,6 +48,7 @@ import { ContextInspector } from '@/features/artifacts/ContextInspector';
 import { ResearchDrawer } from '@/features/ai/ResearchDrawer';
 import { SyncConflictCard } from '@/features/sync/SyncConflictCard';
 import { SyncBanner } from '@/features/sync/SyncBanner';
+import { LiveAnnouncer } from '@/features/sync/LiveAnnouncer';
 import { resolveConflictThroughSync } from '@/sync/outbox';
 import { GarageView } from '@/features/garage/GarageView';
 import { ProjectOverview } from '@/features/projects/ProjectOverview';
@@ -261,6 +262,10 @@ export function AppShell() {
   // Keep store selection aligned with the route (single source of truth = URL).
   useEffect(() => {
     if (groupForRoute && activeGroup?.id !== groupForRoute.id) {
+      // §99 — before adopting the new Group, wipe stale group-scoped state
+      // so no cross-Group privacy leakage occurs during the transition.
+      useChatStore.getState().resetForGroupSwitch();
+      useProjectDataStore.getState().clearGroupScopedData();
       setActiveGroup(groupForRoute);
     }
     if (projectForRoute && activeProject?.id !== projectForRoute.id) {
@@ -1139,6 +1144,9 @@ export function AppShell() {
       >
         Skip to main content
       </a>
+
+      {/* §218/§65 — global screen-reader announcer for sync state transitions */}
+      <LiveAnnouncer />
 
       {/* §309A.2 CLIENT_UPDATE_REQUIRED — blocking, full-screen state */}
       {protocolMismatch?.isRequired && (

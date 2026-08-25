@@ -60,6 +60,13 @@ export interface ProjectDataState {
    * (§164A.2); they only contribute to pending counts in the GitHub panel.
    */
   applyGithubActionRows: (rows: GithubActionItem[]) => void;
+  /**
+   * §99/§60 — clear group-scoped runtime state on Group switch to prevent
+   * stale notifications, activity events, and AI actions from the previous
+   * Group leaking into the new context. Server-authoritative data (tasks,
+   * decisions, memories) is replaced by the controllers on route change.
+   */
+  clearGroupScopedData: () => void;
 }
 
 export const useProjectDataStore = create<ProjectDataState>((set) => ({
@@ -176,4 +183,15 @@ export const useProjectDataStore = create<ProjectDataState>((set) => ({
         return { ...a, status: row.status as AiAction['status'], risk_level: row.risk_level as AiAction['risk_level'] };
       }),
     })),
+
+  // §99 — wipe group-scoped runtime data on Group switch. This prevents stale
+  // notifications, activity events, and AI actions from one Group leaking into
+  // the next Group's UI. The controllers re-fetch for the new Group on route
+  // change; this just prevents the old data from being visible during the gap.
+  clearGroupScopedData: () =>
+    set({
+      notifications: [],
+      activityEvents: [],
+      aiActions: [],
+    }),
 }));

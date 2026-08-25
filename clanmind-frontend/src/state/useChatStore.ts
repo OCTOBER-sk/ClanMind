@@ -67,6 +67,14 @@ export interface ChatState {
   confirmPendingMessage: (clientMessageId: string) => void;
   /** Mark a pending message as failed */
   failPendingMessage: (clientMessageId: string) => void;
+  /**
+   * §99/§79 — reset group-scoped state on Group switch to prevent privacy
+   * leakage from stale local state. Clears: typing indicators, reply target,
+   * composer attachments, and resets privacy scope to GROUP. Drafts are
+   * preserved (keyed by scope). Messages are NOT cleared — they accumulate
+   * across the session and are filtered by `filterMessagesForScope`.
+   */
+  resetForGroupSwitch: () => void;
 }
 
 // §190 drafts persist per Group × Project scope; §39 last-read markers persist too.
@@ -202,6 +210,20 @@ export const useChatStore = create<ChatState>()(
         (p) => p.clientMessageId !== clientMessageId
       ),
     })),
+  resetForGroupSwitch: () =>
+    set({
+      // §99 — clear ephemeral state that could leak across Groups
+      typingUsers: [],
+      replyTarget: null,
+      composerAttachments: [],
+      // §79 — reset privacy scope to GROUP; the old recipient/visibility
+      // from a private conversation in the previous Group must not persist.
+      visibility: 'GROUP',
+      privateRecipientId: undefined,
+      privateRecipientName: undefined,
+      // composerText is NOT reset here — the scopeKey mechanism in AppShell
+      // handles draft save/load on scope transitions.
+    }),
     }),
     {
       name: 'cm_chat',

@@ -90,13 +90,14 @@ export function SyncDiagnosticsView({
       </div>
 
       {/* §285 — Connection / Protocol version / Last sequence / Pending+Conflicts */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" role="group" aria-label="Connection metrics">
         {metricCard(
           'Connection',
           <p className="font-semibold capitalize flex items-center gap-1.5">
             <span
               className="w-2 h-2 rounded-full"
               style={{ background: status === 'connected' ? 'var(--color-success)' : 'var(--color-warning)' }}
+              aria-hidden="true"
             />
             {status}
           </p>

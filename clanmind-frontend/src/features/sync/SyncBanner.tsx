@@ -31,6 +31,9 @@ export function SyncBanner() {
 
   if (status === 'connected' && !justSynced) return null;
 
+  // §65 — the banner itself is a polite live region; the parent LiveAnnouncer
+  // handles cross-component announcements, but the visual banner must also be
+  // announced when it becomes visible (screen readers should hear the state).
   const base =
     'h-7 px-3 text-[11px] font-medium flex items-center gap-1.5 border-b select-none';
 
@@ -38,6 +41,8 @@ export function SyncBanner() {
     return (
       <div
         role="status"
+        aria-live="polite"
+        aria-atomic="true"
         className={`${base} border-[var(--color-border)]`}
         style={{ color: 'var(--color-warning)', background: 'var(--color-warning-bg)' }}
       >
@@ -51,6 +56,8 @@ export function SyncBanner() {
     return (
       <div
         role="status"
+        aria-live="polite"
+        aria-atomic="true"
         className={`${base} border-[var(--color-border)]`}
         style={{ color: 'var(--color-text-secondary)', background: 'var(--color-surface)' }}
       >
@@ -64,6 +71,8 @@ export function SyncBanner() {
     return (
       <div
         role="status"
+        aria-live="polite"
+        aria-atomic="true"
         className={`${base} border-[var(--color-border)]`}
         style={{ color: 'var(--color-info)', background: 'var(--color-info-bg)' }}
       >
@@ -76,6 +85,8 @@ export function SyncBanner() {
   return (
     <div
       role="status"
+      aria-live="polite"
+      aria-atomic="true"
       className={`${base} border-[var(--color-border)]`}
       style={{ color: 'var(--color-success)', background: 'var(--color-success-bg)' }}
     >
