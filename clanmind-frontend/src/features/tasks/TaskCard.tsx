@@ -43,19 +43,26 @@ export function TaskCard({
     <div
       data-testid="task-card"
       className={cn(
-        'p-4 rounded-xl border bg-[var(--color-surface-raised)] shadow-2xs transition-colors text-xs',
-        isTerminal ? 'border-[var(--color-border)] opacity-75' : 'border-[var(--color-border)] hover:border-gray-400 dark:hover:border-gray-600',
-        overdue && 'border-amber-300 dark:border-amber-700/60',
+        'p-3 rounded-lg border transition-colors text-xs',
+        isTerminal
+          ? 'opacity-60'
+          : 'hover:border-[var(--color-border-strong)]',
+        overdue && 'border-[var(--color-warning)]',
       )}
+      style={{
+        borderColor: 'var(--color-border)',
+        background: 'var(--color-surface-raised)',
+      }}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="min-w-0 flex-1 space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span
               className={cn(
-                'font-semibold text-[var(--color-text)]',
-                isTerminal && 'line-through decoration-gray-400',
+                'font-semibold',
+                isTerminal && 'line-through decoration-[var(--color-text-tertiary)]',
               )}
+              style={{ color: 'var(--color-text)' }}
             >
               {task.title}
             </span>
@@ -74,19 +81,20 @@ export function TaskCard({
           </div>
 
           {task.description && (
-            <p className="text-[var(--color-text-secondary)] leading-relaxed line-clamp-2">
+            <p className="leading-relaxed line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>
               {task.description}
             </p>
           )}
 
-          <div className="flex items-center gap-4 flex-wrap pt-0.5 text-[10px] text-[var(--color-text-tertiary)]">
+          <div className="flex items-center gap-3 flex-wrap pt-0.5 text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
             {/* §119 owner — assignment via the compact select beside it */}
             <span className="flex items-center gap-1" data-testid="task-owner">
               <UserIcon className="w-3 h-3" aria-hidden="true" /> {ownerName(task, members)}
             </span>
             {due && (
               <span
-                className={cn('flex items-center gap-1', overdue && 'font-semibold text-amber-600 dark:text-amber-400')}
+                className={cn('flex items-center gap-1', overdue && 'font-semibold')}
+                style={{ color: overdue ? 'var(--color-warning)' : undefined }}
               >
                 <Calendar className="w-3 h-3" aria-hidden="true" /> {due}
               </span>
@@ -95,7 +103,8 @@ export function TaskCard({
               <button
                 type="button"
                 onClick={() => onNavigateToDecision?.(task.related_decision_id!)}
-                className="flex items-center gap-1 font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                className="flex items-center gap-1 font-medium hover:underline cursor-pointer"
+                style={{ color: 'var(--color-text)' }}
                 data-testid="related-decision-link"
               >
                 <Link2 className="w-3 h-3" aria-hidden="true" />
@@ -106,7 +115,7 @@ export function TaskCard({
         </div>
 
         {/* Compact interactions (§119) */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           {!isTerminal && task.status !== 'IN_PROGRESS' && (
             <button
               type="button"
@@ -114,7 +123,8 @@ export function TaskCard({
               title="Mark in progress"
               disabled={disabled}
               onClick={() => onSetStatus?.(task, 'IN_PROGRESS')}
-              className="p-1.5 rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-1.5 rounded-md border transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
             >
               <svg viewBox="0 0 12 12" className="w-3 h-3" aria-hidden="true">
                 <circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -128,7 +138,8 @@ export function TaskCard({
               title="Mark done"
               disabled={disabled}
               onClick={() => onComplete?.(task)}
-              className="p-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-1.5 rounded-md border transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-success)' }}
             >
               <Check className="w-3 h-3" aria-hidden="true" />
             </button>
@@ -138,7 +149,8 @@ export function TaskCard({
             value={task.status}
             disabled={disabled}
             onChange={(e) => onSetStatus?.(task, e.target.value as Task['status'])}
-            className="px-2 py-1 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] font-semibold text-[var(--color-text-secondary)] outline-none cursor-pointer disabled:opacity-50"
+            className="px-2 py-1 rounded-md border text-[11px] font-semibold outline-none cursor-pointer disabled:opacity-50"
+            style={{ borderColor: 'var(--color-border-strong)', background: 'var(--color-surface-raised)', color: 'var(--color-text-secondary)' }}
           >
             <option value="TODO">To Do</option>
             <option value="IN_PROGRESS">In Progress</option>
@@ -150,7 +162,8 @@ export function TaskCard({
             value={task.owner_user_id ?? ''}
             disabled={disabled}
             onChange={(e) => onAssign?.(task, e.target.value === '' ? null : e.target.value)}
-            className="max-w-32 px-2 py-1 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] font-semibold text-[var(--color-text-secondary)] outline-none cursor-pointer disabled:opacity-50"
+            className="max-w-28 px-2 py-1 rounded-md border text-[11px] font-semibold outline-none cursor-pointer disabled:opacity-50"
+            style={{ borderColor: 'var(--color-border-strong)', background: 'var(--color-surface-raised)', color: 'var(--color-text-secondary)' }}
           >
             <option value="">Unassigned</option>
             {members.map((m) => (

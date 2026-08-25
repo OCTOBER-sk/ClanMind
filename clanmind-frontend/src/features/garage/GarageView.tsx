@@ -162,8 +162,8 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
   ];
 
   const renderEmpty = (message: string, hint: string) => (
-    <div className="py-16 text-center text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
-      <Folder className="mx-auto mb-2 h-10 w-10 opacity-40" aria-hidden="true" />
+    <div className="py-12 text-center text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+      <Folder className="mx-auto mb-2 h-8 w-8 opacity-40" aria-hidden="true" />
       <p className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>{message}</p>
       <p className="mt-1">{hint}</p>
     </div>
@@ -173,22 +173,22 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
     <div className="flex h-full flex-col overflow-hidden" style={{ background: 'var(--color-background)' }}>
       {/* Header */}
       <div
-        className="flex flex-col items-start justify-between gap-3 border-b p-6 sm:flex-row sm:items-center"
+        className="flex flex-col items-start justify-between gap-3 border-b px-6 py-4 sm:flex-row sm:items-center"
         style={{ borderColor: 'var(--color-border)' }}
       >
         <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--color-text)' }}>
+          <h1 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
             Project Garage
           </h1>
-          <p className="mt-0.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-            The project library — artifacts, research findings, and technical references.
+          <p className="mt-0.5 text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
+            Artifacts, research findings, and technical references.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           {/* §90 view mode — remembered locally */}
           <div
-            className="flex items-center rounded-lg border p-1"
+            className="flex items-center rounded-md border p-0.5"
             style={{ background: 'var(--color-surface-hover)', borderColor: 'var(--color-border)' }}
             role="group"
             aria-label="View mode"
@@ -198,24 +198,24 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
               aria-label="Grid view"
               aria-pressed={viewMode === 'grid'}
               className={cn(
-                'cursor-pointer rounded-md p-1.5 transition-colors',
-                viewMode === 'grid' && 'bg-[var(--color-surface-raised)] shadow-[var(--shadow-sm)]',
+                'cursor-pointer rounded p-1.5 transition-colors',
+                viewMode === 'grid' && 'bg-[var(--color-surface-raised)]',
               )}
               style={{ color: viewMode === 'grid' ? 'var(--color-text)' : 'var(--color-text-tertiary)' }}
             >
-              <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+              <LayoutGrid className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
             <button
               onClick={() => setGarageList()}
               aria-label="List view"
               aria-pressed={viewMode === 'list'}
               className={cn(
-                'cursor-pointer rounded-md p-1.5 transition-colors',
-                viewMode === 'list' && 'bg-[var(--color-surface-raised)] shadow-[var(--shadow-sm)]',
+                'cursor-pointer rounded p-1.5 transition-colors',
+                viewMode === 'list' && 'bg-[var(--color-surface-raised)]',
               )}
               style={{ color: viewMode === 'list' ? 'var(--color-text)' : 'var(--color-text-tertiary)' }}
             >
-              <List className="h-4 w-4" aria-hidden="true" />
+              <List className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </div>
 
@@ -225,24 +225,24 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
             leftIcon={<FolderOpen className="h-3.5 w-3.5" />}
             onClick={() => void handleAddFolder()}
           >
-            Connect local folder
+            Connect folder
           </Button>
         </div>
       </div>
 
       {/* Sections & search */}
       <div
-        className="flex items-center justify-between gap-3 overflow-x-auto border-b px-6 py-3"
+        className="flex items-center justify-between gap-3 overflow-x-auto border-b px-6 py-2.5"
         style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {SECTIONS.map((s) => (
             <button
               key={s.id}
               onClick={() => setSection(s.id)}
               aria-pressed={section === s.id}
               className={cn(
-                'shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-colors',
+                'shrink-0 cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors',
                 section === s.id
                   ? 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)]'
                   : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]',
@@ -253,18 +253,18 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
           ))}
         </div>
 
-        <div className="relative w-56 shrink-0">
+        <div className="relative w-48 shrink-0">
           <Search
-            className="absolute left-3 top-2.5 h-3.5 w-3.5"
+            className="absolute left-2.5 top-2 h-3.5 w-3.5"
             style={{ color: 'var(--color-text-tertiary)' }}
             aria-hidden="true"
           />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter garage items…"
+            placeholder="Filter…"
             aria-label="Filter garage items"
-            className="w-full rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none"
+            className="w-full rounded-md border py-1.5 pl-7 pr-2.5 text-[11px] outline-none"
             style={{
               borderColor: 'var(--color-border)',
               background: 'var(--color-surface-raised)',
@@ -300,7 +300,7 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
             )
           )
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             {visibleArtifacts.map((artifact) => {
               const preview = previewFor(artifact);
               return (
@@ -315,7 +315,7 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
                       onOpenArtifact(artifact);
                     }
                   }}
-                  className="group relative flex cursor-pointer flex-col rounded-xl border p-4 transition-all hover:border-[var(--color-border-strong)]"
+                  className="group relative flex cursor-pointer flex-col rounded-lg border p-3 transition-all hover:border-[var(--color-border-strong)]"
                   style={{
                     borderColor: 'var(--color-border)',
                     background: 'var(--color-surface-raised)',
@@ -327,12 +327,12 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
                       src={preview.url}
                       alt=""
                       aria-hidden="true"
-                      className="mb-3 h-24 w-full rounded-lg border object-contain object-left-top bg-white p-1"
-                      style={{ borderColor: 'var(--color-border)' }}
+                      className="mb-2 h-20 w-full rounded-md border object-contain object-left-top p-0.5"
+                      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
                     />
                   ) : (
                     <p
-                      className="mb-3 line-clamp-2 rounded-lg border p-2.5 text-[11px] italic"
+                      className="mb-2 line-clamp-2 rounded-md border p-2 text-[10px] italic"
                       style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-tertiary)', background: 'var(--color-surface)' }}
                     >
                       {preview.excerpt}
@@ -342,14 +342,14 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <span
-                        className="rounded-md p-1.5"
+                        className="rounded p-1"
                         style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
                         aria-hidden="true"
                       >
                         {DIAGRAM_FAMILY.has(artifact.artifact_type) || artifact.artifact_type === 'CODE' ? (
-                          <FileCode className="h-4 w-4" />
+                          <FileCode className="h-3.5 w-3.5" />
                         ) : (
-                          <FileText className="h-4 w-4" />
+                          <FileText className="h-3.5 w-3.5" />
                         )}
                       </span>
                       <Badge variant="neutral" size="sm">
@@ -390,13 +390,13 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
                     </div>
                   </div>
 
-                  <h3 className="mt-2 line-clamp-2 text-xs font-bold" style={{ color: 'var(--color-text)' }}>
+                  <h3 className="mt-1.5 line-clamp-2 text-xs font-bold" style={{ color: 'var(--color-text)' }}>
                     {artifact.title}
                   </h3>
 
                   {/* §88 metadata row */}
                   <div
-                    className="mt-3 flex items-center justify-between border-t pt-3 text-[10px]"
+                    className="mt-2 flex items-center justify-between border-t pt-2 text-[10px]"
                     style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-tertiary)' }}
                   >
                     <span className="truncate">
@@ -405,7 +405,7 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
                     <span className="flex shrink-0 items-center gap-1.5">
                       {artifact.used_as_context && (
                         <span className="flex items-center gap-1 font-medium" style={{ color: 'var(--color-warning)' }}>
-                          <Sparkles className="h-2.5 w-2.5" aria-hidden="true" /> Used by Odin
+                          <Sparkles className="h-2.5 w-2.5" aria-hidden="true" /> Odin
                         </span>
                       )}
                       {artifact.pinned && (
@@ -420,11 +420,11 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
         ) : (
           /* §89 list columns */
           <div
-            className="overflow-hidden rounded-xl border"
+            className="overflow-hidden rounded-lg border"
             style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
           >
             <div
-              className="grid grid-cols-[minmax(0,3fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_32px] gap-2 border-b px-3.5 py-2 text-[10px] font-bold uppercase tracking-wide"
+              className="grid grid-cols-[minmax(0,3fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_32px] gap-2 border-b px-3 py-2 text-[10px] font-bold uppercase tracking-wide"
               style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-tertiary)', background: 'var(--color-surface)' }}
             >
               <span>Name</span>
@@ -447,7 +447,7 @@ export function GarageView({ artifacts, onOpenArtifact }: GarageViewProps) {
                       onOpenArtifact(artifact);
                     }
                   }}
-                  className="grid cursor-pointer grid-cols-[minmax(0,3fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_32px] items-center gap-2 px-3.5 py-2.5 text-xs transition-colors hover:bg-[var(--color-surface-hover)]"
+                  className="grid cursor-pointer grid-cols-[minmax(0,3fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_32px] items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-surface-hover)]"
                   style={{ color: 'var(--color-text)', borderColor: 'var(--color-border)' }}
                 >
                   <span className="flex min-w-0 items-center gap-2">

@@ -64,19 +64,19 @@ export function ProjectOverview({
   );
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 bg-gray-50/40 dark:bg-gray-950 space-y-6">
+    <div className="flex-1 overflow-y-auto p-6 space-y-5" style={{ background: 'var(--color-background)' }}>
       {/* Goal Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-2xl font-bold text-[var(--color-text)]">
+            <h1 className="text-lg font-bold" style={{ color: 'var(--color-text)' }}>
               {project.name}
             </h1>
             <Badge variant="neutral" size="sm">
               {project.project_type}
             </Badge>
           </div>
-          <p className="text-xs text-[var(--color-text-secondary)] max-w-2xl leading-relaxed">
+          <p className="text-xs max-w-2xl leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
             {project.goal || project.description}
           </p>
         </div>
@@ -91,34 +91,39 @@ export function ProjectOverview({
       />
 
       {/* 2-Column Summary: Tasks & Decisions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Active Tasks Box */}
-        <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm space-y-3">
+        <div
+          className="p-4 rounded-lg border space-y-2.5"
+          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+        >
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-xs text-[var(--color-text)] flex items-center gap-2">
-              <CheckSquare className="w-4 h-4 text-blue-500" aria-hidden="true" />
+            <h3 className="font-bold text-xs flex items-center gap-1.5" style={{ color: 'var(--color-text)' }}>
+              <CheckSquare className="w-3.5 h-3.5" style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />
               <span>Active Tasks ({openTasks.length})</span>
             </h3>
             <button
               onClick={() => onNavigateToSection('tasks')}
-              className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+              className="text-[11px] font-semibold hover:underline cursor-pointer"
+              style={{ color: 'var(--color-text-secondary)' }}
             >
               View all
             </button>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {openTasks.slice(0, 3).map((task) => (
               <div
                 key={task.id}
-                className="p-2.5 rounded-lg bg-[var(--color-surface-hover)] border border-[var(--color-border)] text-xs flex items-center justify-between"
+                className="p-2 rounded-md text-xs flex items-center justify-between"
+                style={{ background: 'var(--color-surface-hover)' }}
               >
                 <div className="truncate pr-2">
-                  <p className="font-medium text-[var(--color-text)] truncate">
+                  <p className="font-medium truncate" style={{ color: 'var(--color-text)' }}>
                     {task.title}
                   </p>
-                  <span className="text-[10px] text-[var(--color-text-tertiary)]">
-                    Owner: {ownerName(task, members)}
+                  <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                    {ownerName(task, members)}
                   </span>
                 </div>
                 <Badge
@@ -130,7 +135,7 @@ export function ProjectOverview({
               </div>
             ))}
             {openTasks.length === 0 && (
-              <p className="text-[11px] text-[var(--color-text-tertiary)]">
+              <p className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
                 No active tasks — everything is done or cancelled.
               </p>
             )}
@@ -138,28 +143,33 @@ export function ProjectOverview({
         </div>
 
         {/* Open Decisions Box */}
-        <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm space-y-3">
+        <div
+          className="p-4 rounded-lg border space-y-2.5"
+          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+        >
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-xs text-[var(--color-text)] flex items-center gap-2">
-              <Bookmark className="w-4 h-4 text-emerald-500" aria-hidden="true" />
-              <span>Open Decisions ({openDecisions.length})</span>
+            <h3 className="font-bold text-xs flex items-center gap-1.5" style={{ color: 'var(--color-text)' }}>
+              <Bookmark className="w-3.5 h-3.5" style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />
+              <span>Decisions ({openDecisions.length})</span>
             </h3>
             <button
               onClick={() => onNavigateToSection('decisions')}
-              className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+              className="text-[11px] font-semibold hover:underline cursor-pointer"
+              style={{ color: 'var(--color-text-secondary)' }}
             >
               View all
             </button>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {(openDecisions.length > 0 ? openDecisions : approvedDecisions).slice(0, 3).map((dec) => (
               <div
                 key={dec.id}
-                className="p-2.5 rounded-lg bg-[var(--color-surface-hover)] border border-[var(--color-border)] text-xs"
+                className="p-2 rounded-md text-xs"
+                style={{ background: 'var(--color-surface-hover)' }}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-[var(--color-text)] truncate pr-2">
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="font-bold truncate pr-2" style={{ color: 'var(--color-text)' }}>
                     {decisionLabels.get(dec.id) ?? 'Decision'}: {dec.title}
                   </span>
                   <Badge variant={dec.status === 'APPROVED' ? 'success' : 'warning'} size="sm">
@@ -167,12 +177,12 @@ export function ProjectOverview({
                   </Badge>
                 </div>
                 {dec.rationale && (
-                  <p className="text-[11px] text-[var(--color-text-secondary)] line-clamp-1">{dec.rationale}</p>
+                  <p className="text-[11px] line-clamp-1" style={{ color: 'var(--color-text-secondary)' }}>{dec.rationale}</p>
                 )}
               </div>
             ))}
             {openDecisions.length === 0 && approvedDecisions.length === 0 && (
-              <p className="text-[11px] text-[var(--color-text-tertiary)]">
+              <p className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
                 Nothing proposed yet — ask {aiName} to draft one.
               </p>
             )}
@@ -182,37 +192,40 @@ export function ProjectOverview({
 
       {/* Recent Artifacts Section (§83) */}
       {artifacts.filter((a) => a.project_id === project.id).length > 0 && (
-        <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm space-y-3">
+        <div
+          className="p-4 rounded-lg border space-y-2.5"
+          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+        >
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-xs text-[var(--color-text)] flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-500" aria-hidden="true" />
-              <span>Recent Artifacts ({artifacts.filter((a) => a.project_id === project.id).length})</span>
+            <h3 className="font-bold text-xs flex items-center gap-1.5" style={{ color: 'var(--color-text)' }}>
+              <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />
+              <span>Artifacts ({artifacts.filter((a) => a.project_id === project.id).length})</span>
             </h3>
             <button
               onClick={() => onNavigateToSection('garage')}
-              className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+              className="text-[11px] font-semibold hover:underline cursor-pointer"
+              style={{ color: 'var(--color-text-secondary)' }}
             >
               Open Garage
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             {artifacts
               .filter((a) => a.project_id === project.id)
               .slice(0, 3)
               .map((art) => (
-                // §7 keyboard access — navigates on click, so it must be a
-                // real button operable by Enter/Space, not a bare click-div.
                 <button
                   key={art.id}
                   type="button"
                   onClick={() => onNavigateToSection('garage')}
-                  className="p-3 rounded-lg bg-[var(--color-surface-hover)] border border-[var(--color-border)] text-xs cursor-pointer hover:border-gray-300 dark:hover:border-gray-700 transition-colors text-left w-full focus-visible:shadow-[var(--focus-ring)] outline-none"
+                  className="p-2.5 rounded-md text-xs cursor-pointer transition-colors text-left w-full"
+                  style={{ background: 'var(--color-surface-hover)' }}
                 >
-                  <span className="block font-semibold text-[var(--color-text)] truncate mb-1">
+                  <span className="block font-semibold truncate mb-0.5" style={{ color: 'var(--color-text)' }}>
                     {art.title}
                   </span>
-                  <span className="flex items-center justify-between text-[10px] text-[var(--color-text-tertiary)]">
+                  <span className="flex items-center justify-between text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
                     <Badge variant="neutral" size="sm">{art.artifact_type}</Badge>
                     <span>v{art.current_version}</span>
                   </span>
@@ -224,26 +237,30 @@ export function ProjectOverview({
 
       {/* GitHub status + recent activity — one compact row each (§83) */}
       {(githubSummary || recentActivity.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {githubSummary && (
             <button
               onClick={() => onNavigateToSection('github')}
-              className="flex items-center justify-between p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm text-xs cursor-pointer hover:border-gray-400 dark:hover:border-gray-600 transition-colors text-left"
+              className="flex items-center justify-between p-3 rounded-lg border text-xs cursor-pointer transition-colors text-left"
+              style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
             >
-              <span className="flex items-center gap-2 font-semibold text-[var(--color-text)] min-w-0">
-                <GitBranch className="w-4 h-4 shrink-0 text-purple-500" aria-hidden="true" />
+              <span className="flex items-center gap-2 font-semibold min-w-0" style={{ color: 'var(--color-text)' }}>
+                <GitBranch className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />
                 <span className="truncate">{githubSummary.repoFullName}</span>
               </span>
               <Badge variant="neutral" size="sm">{githubSummary.statusLabel}</Badge>
             </button>
           )}
           {recentActivity.length > 0 && (
-            <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm text-xs space-y-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] block">
+            <div
+              className="p-3 rounded-lg border text-xs space-y-1"
+              style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+            >
+              <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: 'var(--color-text-tertiary)' }}>
                 Recent Activity
               </span>
               {recentActivity.map((n) => (
-                <p key={n.id} className="truncate text-[var(--color-text-secondary)]">
+                <p key={n.id} className="truncate" style={{ color: 'var(--color-text-secondary)' }}>
                   · {n.title}
                 </p>
               ))}

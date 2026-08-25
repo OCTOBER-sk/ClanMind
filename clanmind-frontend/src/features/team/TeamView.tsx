@@ -1,9 +1,18 @@
-﻿import React, { useState } from 'react';
+﻿/**
+ * §21 Team view — compact disciplined rows, not oversized empty cards.
+ *
+ * Anatomy per row: Avatar · Name/Role · Presence · Actions
+ * Grid is tight; no giant card interiors wasting viewport space.
+ */
+
+import React, { useState } from 'react';
 import { MessageSquare, Edit3, UserPlus } from 'lucide-react';
 import { Avatar } from '@/design-system/components/Avatar';
 import { Button } from '@/design-system/components/Button';
 import { Badge } from '@/design-system/components/Badge';
-import type { GroupMember } from '@/types';
+import { EmptyState } from '@/design-system/components/EmptyState';
+import { Skeleton } from '@/design-system/components/Skeleton';
+import type { GroupMember, PresenceState } from '@/types';
 
 export interface TeamViewProps {
   members: GroupMember[];
@@ -11,7 +20,24 @@ export interface TeamViewProps {
   onSetNickname: (userId: string, nickname: string) => void;
   onStartPrivateChat: (member: GroupMember) => void;
   onInviteTeammate: () => void;
+  isLoading?: boolean;
+  error?: string | null;
 }
+
+const ROLE_BADGE: Record<string, 'spectral' | 'info' | 'neutral'> = {
+  OWNER: 'spectral',
+  ADMIN: 'info',
+  MEMBER: 'neutral',
+  GUEST: 'neutral',
+};
+
+/** §19 — presence label; no colored dots, just text + avatar dot. */
+const PRESENCE_LABEL: Record<PresenceState, string> = {
+  ONLINE: 'Online',
+  IDLE: 'Idle',
+  AWAY: 'Away',
+  OFFLINE: 'Offline',
+};
 
 export function TeamView({
   members,
@@ -19,6 +45,8 @@ export function TeamView({
   onSetNickname,
   onStartPrivateChat,
   onInviteTeammate,
+  isLoading,
+  error,
 }: TeamViewProps) {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [tempNickname, setTempNickname] = useState('');
@@ -36,13 +64,18 @@ export function TeamView({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[var(--color-surface-raised)] overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--color-background)' }}>
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-[var(--color-border)]">
+      <div
+        className="flex items-center justify-between gap-3 border-b px-6 py-4"
+        style={{ borderColor: 'var(--color-border)' }}
+      >
         <div>
-          <h1 className="text-xl font-bold text-[var(--color-text)]">Team Roster</h1>
-          <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Members of this Group and their designated roles.
+          <h1 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
+            Team
+          </h1>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+            {members.length} member{members.length !== 1 ? 's' : ''} · Group members and roles.
           </p>
         </div>
         <Button
@@ -51,87 +84,143 @@ export function TeamView({
           leftIcon={<UserPlus className="w-3.5 h-3.5" />}
           onClick={onInviteTeammate}
         >
-          Invite Teammate
+          Invite
         </Button>
       </div>
 
-      {/* Member Cards Grid */}
-      <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {members.map((member) => {
-          const nickname = memberNicknames[member.user_id] || member.user.name;
-          const isEditing = editingUserId === member.user_id;
+      {/* Error banner */}
+      {error && (
+        <div
+          role="alert"
+          className="px-6 py-2 text-xs border-b"
+          style={{ color: 'var(--color-danger)', background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+        >
+          {error}
+        </div>
+      )}
 
-          return (
-            <div
-              key={member.user_id}
-              className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-2xs space-y-4 text-xs"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar name={member.user.name} size="lg" presence="ONLINE" />
-                  <div>
-                    {isEditing ? (
-                      <div className="flex items-center gap-1">
-                        <input
-                          value={tempNickname}
-                          onChange={(e) => setTempNickname(e.target.value)}
-                          className="px-2 py-0.5 text-xs rounded border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)]"
-                          autoFocus
-                        />
-                        <button
-                          onClick={() => handleSaveNickname(member.user_id)}
-                          className="text-xs font-semibold text-blue-600 cursor-pointer"
-                        >
-                          Save
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="font-bold text-[var(--color-text)] text-sm">
-                          {nickname}
-                        </h3>
-                        <button
-                          onClick={() => handleStartEdit(member)}
-                          aria-label={`Set personal nickname for ${member.user.name}`}
-                          className="p-0.5 cursor-pointer hover:opacity-80"
-                          style={{ color: 'var(--color-text-tertiary)' }}
-                        >
-                          <Edit3 className="w-3 h-3" aria-hidden="true" />
-                        </button>
-                      </div>
-                    )}
-                    <p className="text-[11px] text-[var(--color-text-tertiary)]">{member.user.email}</p>
-                  </div>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto" aria-busy={isLoading}>
+        {isLoading && members.length === 0 ? (
+          /* §64 — skeleton loading, not universal spinner */
+          <div className="p-6 space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'var(--color-surface)' }}>
+                <Skeleton variant="circular" className="h-8 w-8 shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton variant="text" className="h-3 w-28" />
+                  <Skeleton variant="text" className="h-2.5 w-20" />
                 </div>
-
-                <Badge
-                  variant={
-                    member.role === 'OWNER'
-                      ? 'spectral'
-                      : member.role === 'ADMIN'
-                      ? 'info'
-                      : 'neutral'
-                  }
-                  size="sm"
-                >
-                  {member.role}
-                </Badge>
+                <Skeleton variant="text" className="h-5 w-14 rounded-full" />
               </div>
-
-              {/* Actions */}
-              <div className="pt-2 border-t border-[var(--color-border)] flex justify-end">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  leftIcon={<MessageSquare className="w-3.5 h-3.5" />}
-                  onClick={() => onStartPrivateChat(member)}
-                >
-                  Private Chat
-                </Button>
-              </div>
+            ))}
+          </div>
+        ) : members.length === 0 ? (
+          <EmptyState
+            icon={<UserPlus className="w-8 h-8" />}
+            title="No team members yet"
+            description="Invite teammates to collaborate on projects and share AI context."
+            actions={
+              <Button size="sm" variant="primary" leftIcon={<UserPlus className="w-3.5 h-3.5" />} onClick={onInviteTeammate}>
+                Invite Teammate
+              </Button>
+            }
+          />
+        ) : (
+          /* §21 — compact row layout, not oversized cards */
+          <div className="px-6 py-3">
+            {/* Column headers */}
+            <div
+              className="grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] gap-3 px-3 py-2 text-[10px] font-bold uppercase tracking-wide"
+              style={{ color: 'var(--color-text-tertiary)' }}
+            >
+              <span>Member</span>
+              <span>Role</span>
+              <span>Status</span>
+              <span className="text-right">Actions</span>
             </div>
-          );
-        })}
+
+            {/* Rows */}
+            <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+              {members.map((member) => {
+                const nickname = memberNicknames[member.user_id] || member.user.name;
+                const isEditing = editingUserId === member.user_id;
+                const presence: PresenceState = 'ONLINE'; // placeholder — real presence from realtime
+
+                return (
+                  <div
+                    key={member.user_id}
+                    className="grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] items-center gap-3 px-3 py-2.5 rounded-md transition-colors hover:bg-[var(--color-surface-hover)]"
+                  >
+                    {/* Avatar + Name */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Avatar name={member.user.name} size="sm" presence={presence} />
+                      <div className="min-w-0">
+                        {isEditing ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              value={tempNickname}
+                              onChange={(e) => setTempNickname(e.target.value)}
+                              className="px-2 py-0.5 text-xs rounded-md border outline-none min-w-0"
+                              style={{ borderColor: 'var(--color-border-strong)', background: 'var(--color-surface-raised)', color: 'var(--color-text)' }}
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleSaveNickname(member.user_id)}
+                              className="text-xs font-semibold shrink-0 cursor-pointer"
+                              style={{ color: 'var(--color-text)' }}
+                            >
+                              Save
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold truncate" style={{ color: 'var(--color-text)' }}>
+                              {nickname}
+                            </span>
+                            <button
+                              onClick={() => handleStartEdit(member)}
+                              aria-label={`Set personal nickname for ${member.user.name}`}
+                              className="p-0.5 cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
+                              style={{ color: 'var(--color-text-tertiary)' }}
+                            >
+                              <Edit3 className="w-3 h-3" aria-hidden="true" />
+                            </button>
+                          </div>
+                        )}
+                        <p className="text-[10px] truncate" style={{ color: 'var(--color-text-tertiary)' }}>
+                          {member.user.email}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Role badge */}
+                    <Badge variant={ROLE_BADGE[member.role] ?? 'neutral'} size="sm">
+                      {member.role}
+                    </Badge>
+
+                    {/* Presence — text label, not colored dot overload */}
+                    <span className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
+                      {PRESENCE_LABEL[presence]}
+                    </span>
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        leftIcon={<MessageSquare className="w-3 h-3" />}
+                        onClick={() => onStartPrivateChat(member)}
+                      >
+                        Private
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -29,13 +29,16 @@ export function ProjectPulse({
   }, [project.pulse_progress]);
 
   return (
-    <div className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm space-y-4">
+    <div
+      className="p-4 rounded-lg border space-y-3"
+      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+    >
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-tertiary)]">
+        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-tertiary)' }}>
           PROJECT PULSE
         </span>
-        <span className="text-xs font-mono font-bold text-[var(--color-text)]">
-          {project.pulse_progress}% Complete
+        <span className="text-xs font-mono font-bold" style={{ color: 'var(--color-text)' }}>
+          {project.pulse_progress}%
         </span>
       </div>
 
@@ -47,31 +50,40 @@ export function ProjectPulse({
         )}
       </div>
 
-      {/* Status Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
-        <div className="p-3 rounded-lg bg-[var(--color-surface-hover)] border border-[var(--color-border)]">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] block mb-1">
-            Current Focus
+      {/* Status Grid — compact, semantic colors */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+        <div
+          className="p-2.5 rounded-md"
+          style={{ background: 'var(--color-surface-hover)' }}
+        >
+          <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
+            Focus
           </span>
-          <p className="font-semibold text-[var(--color-text)]">
+          <p className="font-semibold" style={{ color: 'var(--color-text)' }}>
             {project.current_focus || 'Not set yet'}
           </p>
         </div>
 
-        <div className="p-3 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 block mb-1">
-            Blocked On
+        <div
+          className="p-2.5 rounded-md"
+          style={{ background: 'var(--color-surface-hover)' }}
+        >
+          <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
+            Blocked
           </span>
-          <p className="font-semibold text-amber-900 dark:text-amber-200">
+          <p className="font-semibold" style={{ color: 'var(--color-text)' }}>
             {project.blocked_reason || 'Nothing blocked'}
           </p>
         </div>
 
-        <div className="p-3 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 block mb-1">
+        <div
+          className="p-2.5 rounded-md"
+          style={{ background: 'var(--color-surface-hover)' }}
+        >
+          <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
             Next
           </span>
-          <p className="font-semibold text-blue-900 dark:text-blue-200">
+          <p className="font-semibold" style={{ color: 'var(--color-text)' }}>
             {project.next_step || 'No next step captured'}
           </p>
         </div>
@@ -80,9 +92,12 @@ export function ProjectPulse({
       {/* §84 Odin notice — computed from the real decision log, never a
           hardcoded count. Hidden entirely when nothing needs review. */}
       {unresolvedDecisionCount > 0 && (
-        <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--color-surface-hover)] text-xs">
-          <div className="flex items-center gap-2 text-[var(--color-text-secondary)]">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" aria-hidden="true" />
+        <div
+          className="flex items-center justify-between p-2.5 rounded-md text-xs"
+          style={{ background: 'var(--color-surface-hover)' }}
+        >
+          <div className="flex items-center gap-2" style={{ color: 'var(--color-text-secondary)' }}>
+            <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
             <span>
               {aiName}: {unresolvedDecisionCount} unresolved{' '}
               {unresolvedDecisionCount === 1 ? 'decision needs' : 'decisions need'} attention.
@@ -90,7 +105,8 @@ export function ProjectPulse({
           </div>
           <button
             onClick={onNavigateToDecisions}
-            className="font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+            className="font-semibold hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+            style={{ color: 'var(--color-text)' }}
           >
             Review <ArrowRight className="w-3 h-3" aria-hidden="true" />
           </button>

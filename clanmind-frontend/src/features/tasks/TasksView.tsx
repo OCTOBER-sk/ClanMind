@@ -6,9 +6,11 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, CheckSquare } from 'lucide-react';
 import { TaskCard } from './TaskCard';
 import { Button } from '@/design-system/components/Button';
+import { EmptyState } from '@/design-system/components/EmptyState';
+import { Skeleton } from '@/design-system/components/Skeleton';
 import { cn } from '@/design-system/utils';
 import type { GroupMember, Task, TaskStatus } from '@/types';
 
@@ -59,12 +61,17 @@ export function TasksView({
   const openCount = tasks.filter((t) => t.status === 'TODO' || t.status === 'IN_PROGRESS').length;
 
   return (
-    <div className="flex flex-col h-full bg-[var(--color-surface-raised)] overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--color-background)' }}>
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-[var(--color-border)]">
+      <div
+        className="flex items-center justify-between gap-3 border-b px-6 py-4"
+        style={{ borderColor: 'var(--color-border)' }}
+      >
         <div>
-          <h1 className="text-xl font-bold text-[var(--color-text)]">Tasks</h1>
-          <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+          <h1 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
+            Tasks
+          </h1>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
             {openCount} open · actionable work linked to team decisions.
           </p>
         </div>
@@ -78,8 +85,11 @@ export function TasksView({
         </Button>
       </div>
 
-      {/* Filter Chips */}
-      <div className="flex items-center gap-2 px-6 py-3 border-b border-[var(--color-border)]">
+      {/* Filter Chips — semantic tokens, no hardcoded dark/light */}
+      <div
+        className="flex items-center gap-1.5 overflow-x-auto px-6 py-2.5 border-b"
+        style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
+      >
         {FILTERS.map((f) => {
           const count =
             f.key === 'all' ? tasks.length : tasks.filter((t) => t.status === f.key).length;
@@ -90,10 +100,10 @@ export function TasksView({
               aria-pressed={filterStatus === f.key}
               data-testid={`filter-${f.key}`}
               className={cn(
-                'px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer',
+                'shrink-0 px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer',
                 filterStatus === f.key
-                  ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                  : 'text-[var(--color-text-secondary)] hover:bg-gray-200 dark:hover:bg-gray-800',
+                  ? 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]',
               )}
             >
               {f.label} ({count})
@@ -102,19 +112,42 @@ export function TasksView({
         })}
       </div>
 
+      {/* Error — §64: what happened, what is safe, next action */}
       {error && (
         <div
           role="alert"
-          className="px-6 py-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-b border-red-100 dark:border-red-900"
+          className="px-6 py-2.5 text-xs border-b flex items-center justify-between gap-3"
+          style={{ color: 'var(--color-danger)', background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
         >
-          {error}
+          <span>{error}</span>
+          <Button size="sm" variant="ghost" onClick={onAddTask}>
+            Retry
+          </Button>
         </div>
       )}
 
       {/* Task List */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-3" aria-busy={isLoading}>
+      <div className="flex-1 overflow-y-auto p-6 space-y-2" aria-busy={isLoading}>
+        {/* §64 — skeleton loading, not universal spinner */}
         {isLoading && filteredTasks.length === 0 ? (
-          <p className="text-center py-12 text-[var(--color-text-tertiary)] text-xs">Loading tasks…</p>
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="p-4 rounded-lg border space-y-2"
+                style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <Skeleton variant="text" className="h-3.5 w-40" />
+                  <Skeleton variant="text" className="h-4 w-14 rounded-full" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <Skeleton variant="text" className="h-2.5 w-20" />
+                  <Skeleton variant="text" className="h-2.5 w-16" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : filteredTasks.length === 0 ? (
           <EmptyTasks filterStatus={filterStatus} onAddTask={onAddTask} />
         ) : (
@@ -149,20 +182,23 @@ function EmptyTasks({
   onAddTask: () => void;
 }) {
   return (
-    <div className="text-center py-12 space-y-1" data-testid="tasks-empty">
-      <p className="text-sm font-semibold text-[var(--color-text)]">
-        {filterStatus === 'all'
-          ? 'No tasks in this project yet.'
-          : `No ${filterStatus.replace('_', ' ').toLowerCase()} tasks.`}
-      </p>
-      <p className="text-xs text-[var(--color-text-secondary)] max-w-sm mx-auto leading-relaxed">
-        Tasks track the concrete work your decisions create — assign owners and due dates so nothing drifts.
-      </p>
-      {filterStatus === 'all' && (
-        <Button size="sm" variant="ghost" onClick={onAddTask} className="mt-2">
-          Create the first task
-        </Button>
-      )}
+    <div data-testid="tasks-empty">
+      <EmptyState
+        icon={<CheckSquare className="w-8 h-8" />}
+        title={
+          filterStatus === 'all'
+            ? 'No tasks in this project yet.'
+            : `No ${filterStatus.replace('_', ' ').toLowerCase()} tasks.`
+        }
+        description="Tasks track the concrete work your decisions create — assign owners and due dates so nothing drifts."
+        actions={
+          filterStatus === 'all' ? (
+            <Button size="sm" variant="ghost" onClick={onAddTask}>
+              Create the first task
+            </Button>
+          ) : undefined
+        }
+      />
     </div>
   );
 }

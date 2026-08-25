@@ -7,10 +7,12 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { Check, Plus, Sparkles } from 'lucide-react';
+import { Check, Plus, Sparkles, Lock, Users, Folder } from 'lucide-react';
 import { Button } from '@/design-system/components/Button';
 import { Badge } from '@/design-system/components/Badge';
 import { Dialog } from '@/design-system/components/Dialog';
+import { EmptyState } from '@/design-system/components/EmptyState';
+import { Skeleton } from '@/design-system/components/Skeleton';
 import type { MemoryCandidate, MemoryCardType, MemoryEntry, MemoryScope } from '@/types';
 
 export interface MemoryViewProps {
@@ -28,10 +30,10 @@ export interface MemoryViewProps {
 
 type Section = Extract<'project' | 'group' | 'private', string>;
 
-const SECTIONS: Array<{ key: Section; label: string; scope: MemoryScope }> = [
-  { key: 'project', label: 'Project Memory', scope: 'PROJECT' },
-  { key: 'group', label: 'Group Memory', scope: 'GROUP' },
-  { key: 'private', label: 'Your Private Memory', scope: 'USER_PRIVATE' },
+const SECTIONS: Array<{ key: Section; label: string; scope: MemoryScope; icon: React.ReactNode }> = [
+  { key: 'project', label: 'Project Memory', scope: 'PROJECT', icon: <Folder className="w-3 h-3" aria-hidden="true" /> },
+  { key: 'group', label: 'Group Memory', scope: 'GROUP', icon: <Users className="w-3 h-3" aria-hidden="true" /> },
+  { key: 'private', label: 'Your Private Memory', scope: 'USER_PRIVATE', icon: <Lock className="w-3 h-3" aria-hidden="true" /> },
 ];
 
 /** FE §116 card-type vocabulary; unknown backend types render verbatim. */
@@ -71,13 +73,18 @@ export function MemoryView({
   );
 
   return (
-    <div className="flex flex-col h-full bg-[var(--color-surface-raised)] overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--color-background)' }}>
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-[var(--color-border)]">
+      <div
+        className="flex items-center justify-between gap-3 border-b px-6 py-4"
+        style={{ borderColor: 'var(--color-border)' }}
+      >
         <div>
-          <h1 className="text-xl font-bold text-[var(--color-text)]">Memory</h1>
-          <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-            Scoped, privacy-aware context {aiName} retains across sessions.
+          <h1 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
+            Memory
+          </h1>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+            Scoped context {aiName} retains across sessions.
           </p>
         </div>
         <Button
@@ -92,23 +99,25 @@ export function MemoryView({
 
       {/* §117 — Odin's uncertain candidates */}
       {pendingCandidates.length > 0 && (
-        <div className="p-4 bg-amber-50/70 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800/60 text-xs">
-          <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300 mb-2">
-            <Sparkles className="w-4 h-4 text-amber-500" aria-hidden="true" />
-            <span>
-              {aiName} noticed a possible project memory
-            </span>
+        <div
+          className="px-6 py-3 border-b text-xs"
+          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+        >
+          <div className="flex items-center gap-2 font-bold mb-2" style={{ color: 'var(--color-text)' }}>
+            <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
+            <span>{aiName} noticed a possible memory</span>
           </div>
           <div className="space-y-2">
             {pendingCandidates.map((cand) => (
               <div
                 key={cand.id}
-                className="flex items-center justify-between p-2.5 rounded-lg bg-[var(--color-surface-raised)] border border-amber-200 dark:border-amber-800 shadow-2xs"
+                className="flex items-center justify-between p-2.5 rounded-lg border"
+                style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
                 data-testid="memory-candidate"
               >
                 <div className="min-w-0 pr-2">
-                  <p className="font-medium text-[var(--color-text)]">“{cand.content}”</p>
-                  <p className="text-[10px] text-[var(--color-text-tertiary)] mt-0.5">
+                  <p className="font-medium" style={{ color: 'var(--color-text)' }}>&ldquo;{cand.content}&rdquo;</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
                     {Math.round(cand.confidence * 100)}% confident · suggests{' '}
                     {cand.recommended_scope === 'USER_PRIVATE'
                       ? 'your private'
@@ -135,46 +144,68 @@ export function MemoryView({
         </div>
       )}
 
-      {/* §116 tabs */}
-      <div className="px-6 pt-3 border-b border-[var(--color-border)]">
-        <div className="flex items-center gap-4">
+      {/* §116 tabs — icon + text for scope clarity */}
+      <div
+        className="px-6 pt-2 border-b"
+        style={{ borderColor: 'var(--color-border)' }}
+      >
+        <div className="flex items-center gap-3">
           {SECTIONS.map((s) => (
             <button
               key={s.key}
               onClick={() => setActiveSection(s.key)}
               aria-current={activeSection === s.key}
               data-testid={`memory-section-${s.key}`}
-              className={`pb-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer ${
-                activeSection === s.key
-                  ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white'
-                  : 'border-transparent text-[var(--color-text-secondary)] hover:text-gray-900 dark:hover:text-gray-100'
-              }`}
+              className="flex items-center gap-1.5 pb-2.5 text-[11px] font-semibold border-b-2 transition-colors cursor-pointer"
+              style={{
+                borderColor: activeSection === s.key ? 'var(--color-text)' : 'transparent',
+                color: activeSection === s.key ? 'var(--color-text)' : 'var(--color-text-secondary)',
+              }}
             >
+              {s.icon}
               {s.label}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Error — §64 */}
       {error && (
         <div
           role="alert"
-          className="px-6 py-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-b border-red-100 dark:border-red-900"
+          className="px-6 py-2.5 text-xs border-b"
+          style={{ color: 'var(--color-danger)', background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
         >
           {error}
         </div>
       )}
 
       {/* Memories list */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-3" aria-busy={isLoading}>
+      <div className="flex-1 overflow-y-auto p-6 space-y-2" aria-busy={isLoading}>
+        {/* §64 — skeleton loading */}
         {isLoading && sectionRows.length === 0 ? (
-          <p className="text-center py-12 text-[var(--color-text-tertiary)] text-xs">Loading memories…</p>
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="p-4 rounded-lg border space-y-2"
+                style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <Skeleton variant="text" className="h-4 w-16 rounded-full" />
+                  <Skeleton variant="text" className="h-3 w-12" />
+                </div>
+                <Skeleton variant="text" className="h-3 w-full" />
+                <Skeleton variant="text" className="h-2.5 w-2/3" />
+              </div>
+            ))}
+          </div>
         ) : sectionRows.length === 0 ? (
-          <div className="text-center py-12 space-y-1" data-testid="memory-empty">
-            <p className="text-sm font-semibold text-[var(--color-text)]">
+          <div data-testid="memory-empty" className="text-center py-12 space-y-1">
+            <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
               No {SECTIONS.find((s) => s.key === activeSection)?.label.toLowerCase()} yet.
             </p>
-            <p className="text-xs text-[var(--color-text-secondary)] max-w-sm mx-auto leading-relaxed">
+            <p className="text-xs max-w-sm mx-auto leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
               Memories keep decisions, constraints and conventions alive across sessions. Save one
               yourself or let {aiName} propose candidates from chat.
             </p>
@@ -227,7 +258,7 @@ function RememberForm({
       }}
     >
       <div>
-        <span className="block font-semibold mb-1 text-[var(--color-text-secondary)]">Remember in:</span>
+        <span className="block font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>Remember in:</span>
         <div className="flex gap-1.5" role="radiogroup" aria-label="Memory scope">
           {(inProject
             ? (['PROJECT', 'GROUP', 'USER_PRIVATE'] as const)
@@ -239,11 +270,12 @@ function RememberForm({
               role="radio"
               aria-checked={scope === s}
               onClick={() => setScope(s)}
-              className={`px-2.5 py-1 rounded-lg border font-semibold cursor-pointer ${
-                scope === s
-                  ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
-                  : 'border-[var(--color-border-strong)] text-[var(--color-text-secondary)]'
-              }`}
+              className="px-2.5 py-1 rounded-md border font-semibold cursor-pointer transition-colors"
+              style={{
+                borderColor: scope === s ? 'var(--color-text)' : 'var(--color-border-strong)',
+                background: scope === s ? 'var(--color-text)' : 'transparent',
+                color: scope === s ? 'var(--color-background)' : 'var(--color-text-secondary)',
+              }}
             >
               {s === 'PROJECT' ? 'Project' : s === 'GROUP' ? 'Group' : 'Private'}
             </button>
@@ -253,7 +285,8 @@ function RememberForm({
       <div>
         <label
           htmlFor="memory-type"
-          className="block font-semibold mb-1 text-[var(--color-text-secondary)]"
+          className="block font-semibold mb-1"
+          style={{ color: 'var(--color-text-secondary)' }}
         >
           Type
         </label>
@@ -261,7 +294,8 @@ function RememberForm({
           id="memory-type"
           value={memoryType}
           onChange={(e) => setMemoryType(e.target.value as MemoryCardType)}
-          className="w-full px-3 py-1.5 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] text-[var(--color-text)] outline-none"
+          className="w-full px-3 py-1.5 rounded-md border text-xs outline-none"
+          style={{ borderColor: 'var(--color-border-strong)', background: 'var(--color-surface-raised)', color: 'var(--color-text)' }}
         >
           {CARD_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -273,7 +307,8 @@ function RememberForm({
       <div>
         <label
           htmlFor="memory-content"
-          className="block font-semibold mb-1 text-[var(--color-text-secondary)]"
+          className="block font-semibold mb-1"
+          style={{ color: 'var(--color-text-secondary)' }}
         >
           Content
         </label>
@@ -284,7 +319,8 @@ function RememberForm({
           rows={3}
           maxLength={2000}
           placeholder="e.g. We will use PostgreSQL for all new services."
-          className="w-full px-3 py-1.5 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] text-[var(--color-text)] outline-none"
+          className="w-full px-3 py-1.5 rounded-md border text-xs outline-none resize-none"
+          style={{ borderColor: 'var(--color-border-strong)', background: 'var(--color-surface-raised)', color: 'var(--color-text)' }}
         />
       </div>
       <div className="flex justify-end gap-2 pt-2">
@@ -305,9 +341,10 @@ function RememberForm({
  */
 function MemoryCardRow({ memory }: { memory: MemoryEntry }) {
   const isTypedVocabulary = CARD_TYPES.includes(memory.memory_type as MemoryCardType);
+  const scopeLabel = memory.scope_type === 'USER_PRIVATE' ? 'Private' : memory.scope_type;
   const provenance = [
     `Source: ${sourceLabel(memory)}`,
-    `Scope: ${memory.scope_type === 'USER_PRIVATE' ? 'Private' : memory.scope_type}`,
+    `Scope: ${scopeLabel}`,
     `Created ${new Date(memory.created_at).toLocaleDateString()}`,
     `Updated ${new Date(memory.updated_at).toLocaleDateString()}`,
   ];
@@ -315,16 +352,25 @@ function MemoryCardRow({ memory }: { memory: MemoryEntry }) {
   return (
     <div
       data-testid="memory-card"
-      className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-2xs space-y-2 text-xs"
+      className="p-3 rounded-lg border space-y-2 text-xs"
+      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
     >
       <div className="flex items-center justify-between gap-2">
-        <Badge variant="neutral" size="sm">
-          {isTypedVocabulary ? memory.memory_type : memory.memory_type || 'FACT'}
-        </Badge>
-        <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-tertiary)]">{memory.scope_type}</span>
+        <div className="flex items-center gap-2">
+          <Badge variant="neutral" size="sm">
+            {isTypedVocabulary ? memory.memory_type : memory.memory_type || 'FACT'}
+          </Badge>
+          {/* §50 — scope icon + text, not color-only */}
+          <span className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+            {memory.scope_type === 'USER_PRIVATE' && <Lock className="w-2.5 h-2.5" aria-hidden="true" />}
+            {memory.scope_type === 'GROUP' && <Users className="w-2.5 h-2.5" aria-hidden="true" />}
+            {memory.scope_type === 'PROJECT' && <Folder className="w-2.5 h-2.5" aria-hidden="true" />}
+            {memory.scope_type === 'USER_PRIVATE' ? 'Private' : memory.scope_type}
+          </span>
+        </div>
       </div>
-      <p className="text-[var(--color-text)] leading-relaxed">{memory.content}</p>
-      <ul className="pt-1 border-t border-[var(--color-border)] text-[10px] text-[var(--color-text-tertiary)] flex flex-wrap gap-x-3 gap-y-0.5">
+      <p style={{ color: 'var(--color-text)' }}>{memory.content}</p>
+      <ul className="pt-1 border-t text-[10px] flex flex-wrap gap-x-3 gap-y-0.5" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-tertiary)' }}>
         {provenance.map((line) => (
           <li key={line}>{line}</li>
         ))}
