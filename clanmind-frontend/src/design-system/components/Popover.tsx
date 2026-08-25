@@ -30,7 +30,7 @@ export function Popover({
           side={side}
           sideOffset={6}
           className={cn(
-            'z-50 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-3 shadow-[var(--shadow-xl)] outline-none animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+            'z-50 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3 shadow-[var(--shadow-lg)] outline-none animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
             className
           )}
         >

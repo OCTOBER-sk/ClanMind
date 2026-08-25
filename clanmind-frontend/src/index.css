@@ -10,6 +10,7 @@
   --color-cm-bg: var(--color-background);
   --color-cm-surface: var(--color-surface);
   --color-cm-surface-raised: var(--color-surface-raised);
+  --color-cm-surface-elevated: var(--color-surface-elevated);
   --color-cm-surface-hover: var(--color-surface-hover);
   --color-cm-surface-pressed: var(--color-surface-pressed);
 
@@ -46,52 +47,72 @@
   --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
   --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
 
-  /* Radius scale */
-  --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
+  /* Radius scale — §11: shell 0-6px, inputs 4-8px, cards 6-10px */
+  --radius-sm: 0.25rem;  /* 4px — inputs, small controls */
+  --radius-md: 0.5rem;   /* 8px — buttons, inputs, cards */
+  --radius-lg: 0.75rem;  /* 12px — cards, panels */
+  --radius-xl: 1rem;     /* 16px — large surfaces */
+  --radius-2xl: 1.5rem;  /* 24px — dialog centering, sheet */
 
-  /* Shadow scale */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -1px rgb(0 0 0 / 0.06);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.05);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04);
+  /* Shadow scale — §13: restrained, popover/dialog/dropdown only */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-md: 0 2px 4px -1px rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 4px 8px -2px rgb(0 0 0 / 0.08), 0 2px 4px -1px rgb(0 0 0 / 0.04);
+  --shadow-xl: 0 8px 16px -4px rgb(0 0 0 / 0.1), 0 4px 8px -2px rgb(0 0 0 / 0.04);
+
+  /* Typography tokens — §9 */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-code: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace;
+
+  /* Font weights */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Line heights */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+
+  /* Icon sizes — §14 */
+  --icon-xs: 16px;
+  --icon-sm: 18px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
 }
 
 @layer base {
   /* ─── Light mode ─── */
   :root {
-    /* Surfaces */
+    /* Surfaces — §7.2: primarily white/off-white */
     --color-background: #ffffff;
-    --color-surface: #f9fafb;
-    --color-surface-raised: #ffffff;
-    --color-surface-hover: #f3f4f6;
-    --color-surface-pressed: #e5e7eb;
+    --color-surface: #fafafa;
+    --color-surface-raised: #f5f5f5;
+    --color-surface-elevated: #ffffff;
+    --color-surface-hover: #f0f0f0;
+    --color-surface-pressed: #e5e5e5;
 
-    /* Borders */
-    --color-border: #e5e7eb;
-    --color-border-strong: #d1d5db;
+    /* Borders — §12: surface contrast preferred over competing borders */
+    --color-border: #e5e5e5;
+    --color-border-strong: #d4d4d4;
 
     /* Text — §222 WCAG 2.2 AA: every text token ≥4.5:1 on its surfaces.
-       tertiary was #9ca3af (2.54:1) — raised to gray-500 (4.83:1 on white). */
-    --color-text: #111827;
-    --color-text-secondary: #4b5563;
-    --color-text-tertiary: #6b7280;
-    --color-text-disabled: #d1d5db;
+       #000000 on #ffffff = 21:1; #555555 on #ffffff = 7.46:1;
+       #737373 on #ffffff = 4.74:1, on #fafafa = 4.54:1 (AA-safe tertiary);
+       #aaaaaa is disabled — exempt from AA per §222. */
+    --color-text: #000000;
+    --color-text-secondary: #555555;
+    --color-text-tertiary: #737373;
+    --color-text-disabled: #aaaaaa;
 
-    /* Semantic — §222 AA when rendered as text (4.5:1 on white and on the
-       matching -bg tint). Values keep their hue identity; dark mode already
-       passed and is unchanged. */
+    /* Semantic — §8: black/white primary; red = destructive only */
     --color-primary: #111827;
     --color-primary-foreground: #ffffff;
     --color-success: #047857;
     --color-success-bg: #ecfdf5;
     --color-warning: #b45309;
     --color-warning-bg: #fffbeb;
-    /* red-700 — red-600 (#dc2626) measured 4.41:1 on the danger-bg tint,
-       just under AA; 700 clears it on white, tint and every surface. */
     --color-danger: #b91c1c;
     --color-danger-bg: #fef2f2;
     --color-info: #2563eb;
@@ -115,25 +136,30 @@
 
   /* ─── Dark mode ─── */
   .dark {
-    --color-background: #090a0f;
-    --color-surface: #11131a;
-    --color-surface-raised: #181b24;
-    --color-surface-hover: #212530;
-    --color-surface-pressed: #2a2f3d;
+    /* Surfaces — §7.1: true black, not navy */
+    --color-background: #000000;
+    --color-surface: #080808;
+    --color-surface-raised: #101010;
+    --color-surface-elevated: #181818;
+    --color-surface-hover: #1a1a1a;
+    --color-surface-pressed: #222222;
 
-    --color-border: #232733;
-    --color-border-strong: #373e4f;
+    /* Borders — §12: subtle surface contrast */
+    --color-border: #1a1a1a;
+    --color-border-strong: #2a2a2a;
 
-    --color-text: #f9fafb;
-    --color-text-secondary: #9ca3af;
-    /* §222 — #6b7280 measured 3.56–4.09:1 on dark surfaces; slate-tone
-       lifted to ≥5.6:1 on every dark surface while staying dimmer than
-       secondary (#9ca3af) so the three-step hierarchy survives. */
-    --color-text-tertiary: #8b95a4;
-    --color-text-disabled: #4b5563;
+    /* Text — §222 WCAG 2.2 AA: ≥4.5:1 on every dark surface.
+       #ffffff on #000000 = 21:1; #A0A0A0 on #000000 = 9.57:1;
+       #7D7D7D on #000000 = 5.10:1, on #080808 = 4.53:1 (AA-safe tertiary);
+       #454545 = 3.48:1 → disabled exempt. */
+    --color-text: #ffffff;
+    --color-text-secondary: #a0a0a0;
+    --color-text-tertiary: #7d7d7d;
+    --color-text-disabled: #454545;
 
-    --color-primary: #f9fafb;
-    --color-primary-foreground: #090a0f;
+    /* Semantic — §8: spectral only for AI-active events */
+    --color-primary: #ffffff;
+    --color-primary-foreground: #000000;
     --color-success: #34d399;
     --color-success-bg: rgba(16, 185, 129, 0.12);
     --color-warning: #fbbf24;
@@ -143,7 +169,8 @@
     --color-info: #60a5fa;
     --color-info-bg: rgba(59, 130, 246, 0.12);
 
-    --focus-ring: 0 0 0 2px #090a0f, 0 0 0 4px #60a5fa;
+    /* Focus ring — monochrome, not blue */
+    --focus-ring: 0 0 0 2px #000000, 0 0 0 4px #ffffff;
   }
 
   /* ─── Global resets ─── */
@@ -162,14 +189,7 @@
     margin: 0;
     padding: 0;
     height: 100%;
-    font-family:
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      Roboto,
-      Helvetica,
-      Arial,
-      sans-serif;
+    font-family: var(--font-ui);
     color: var(--color-text);
     background-color: var(--color-background);
     -webkit-font-smoothing: antialiased;
@@ -191,21 +211,12 @@
     -webkit-user-select: text;
   }
 
-  /* Code font */
+  /* Code font — §9: single mono family, clear distinction from prose */
   code,
   pre,
   kbd,
   samp {
-    font-family:
-      "JetBrains Mono",
-      "Fira Code",
-      "Cascadia Code",
-      ui-monospace,
-      SFMono-Regular,
-      Menlo,
-      Monaco,
-      "Courier New",
-      monospace;
+    font-family: var(--font-code);
     font-size: 0.8125rem; /* 13px */
     font-variant-ligatures: contextual;
   }

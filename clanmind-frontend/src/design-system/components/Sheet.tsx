@@ -50,7 +50,7 @@ export function Sheet({
         <DialogPrimitive.Content
           aria-label={title}
           className={cn(
-            'fixed z-50 flex flex-col overflow-hidden border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-xl)] outline-none',
+            'fixed z-50 flex flex-col overflow-hidden border-[var(--color-border)] bg-[var(--color-surface-elevated)] shadow-[var(--shadow-xl)] outline-none',
             side === 'right' ? 'sheet-panel-right' : 'sheet-panel-left',
             sideClasses[side],
             className,

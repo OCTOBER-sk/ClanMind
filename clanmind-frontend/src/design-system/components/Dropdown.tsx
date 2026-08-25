@@ -37,7 +37,7 @@ export function Dropdown({
           side={side}
           sideOffset={5}
           className={cn(
-            'z-50 min-w-[180px] overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-1 shadow-[var(--shadow-lg)] animate-in fade-in-80 zoom-in-95',
+            'z-50 min-w-[180px] overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-1 shadow-[var(--shadow-lg)] animate-in fade-in-80 zoom-in-95',
             className
           )}
         >

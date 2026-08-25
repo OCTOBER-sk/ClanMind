@@ -152,7 +152,7 @@ export function CommandPalette({
     >
       <div
         ref={dialogRef}
-        className="w-full max-w-xl bg-[var(--color-surface-raised)] rounded-2xl shadow-[var(--shadow-xl)] border border-[var(--color-border)] overflow-hidden"
+        className="w-full max-w-xl bg-[var(--color-surface-elevated)] rounded-[var(--radius-xl)] shadow-[var(--shadow-xl)] border border-[var(--color-border)] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

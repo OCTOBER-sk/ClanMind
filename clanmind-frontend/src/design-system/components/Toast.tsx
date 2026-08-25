@@ -119,7 +119,7 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: () => void
       // a role on Toast.Root by default, so both are declared here.
       role={variant === 'error' ? 'alert' : 'status'}
       className={cn(
-        'flex items-start gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)]',
+        'flex items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-elevated)]',
         'px-4 py-3 shadow-[var(--shadow-lg)]',
         'data-[state=open]:animate-[toast-slide-in_200ms_ease-out]',
         'data-[state=closed]:animate-[toast-slide-out_150ms_ease-in]',

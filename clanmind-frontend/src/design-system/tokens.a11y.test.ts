@@ -194,11 +194,11 @@ describe('design tokens — every referenced CSS variable is defined', () => {
 
   it.each([
     ['light', '#ffffff'],
-    ['dark', '#090a0f'],
+    ['dark', '#000000'],
   ])('%s: --color-primary-foreground contrasts with --color-primary (AA)', (_theme, fg) => {
     // The primary/foreground pair is THE fix target of blocker 3; assert the
     // real ratio so future palette edits cannot reintroduce invisibility.
-    const primary = _theme === 'light' ? '#111827' : '#f9fafb';
+    const primary = _theme === 'light' ? '#111827' : '#ffffff';
     expect(contrast(fg, primary)).toBeGreaterThanOrEqual(4.5);
   });
 });
