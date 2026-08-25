@@ -6,12 +6,13 @@
  */
 
 import React, { useState } from 'react';
-import { MessageSquare, Edit3, UserPlus } from 'lucide-react';
+import { MessageSquare, Edit3, UserPlus, Sparkles } from 'lucide-react';
 import { Avatar } from '@/design-system/components/Avatar';
 import { Button } from '@/design-system/components/Button';
 import { Badge } from '@/design-system/components/Badge';
 import { EmptyState } from '@/design-system/components/EmptyState';
 import { Skeleton } from '@/design-system/components/Skeleton';
+import odinAvatar from '@/assets/brand/odin-avatar.png';
 import type { GroupMember, PresenceState } from '@/types';
 
 export interface TeamViewProps {
@@ -142,6 +143,32 @@ export function TeamView({
 
             {/* Rows */}
             <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+              {/* AI Teammate row — Odin */}
+              <div
+                className="grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] items-center gap-3 px-3 py-2.5 rounded-md"
+                style={{ background: 'var(--color-surface)' }}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Avatar name="Odin" src={odinAvatar} size="sm" isAi />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-semibold truncate" style={{ color: 'var(--color-text)' }}>
+                        Odin
+                      </span>
+                      <Sparkles className="w-3 h-3 shrink-0" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
+                    </div>
+                    <p className="text-[10px] truncate" style={{ color: 'var(--color-text-tertiary)' }}>
+                      AI Teammate
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="spectral" size="sm">AI</Badge>
+                <span className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
+                  Available
+                </span>
+                <div />
+              </div>
+
               {members.map((member) => {
                 const nickname = memberNicknames[member.user_id] || member.user.name;
                 const isEditing = editingUserId === member.user_id;

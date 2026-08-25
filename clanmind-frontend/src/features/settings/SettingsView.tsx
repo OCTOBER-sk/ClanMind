@@ -19,6 +19,7 @@ import {
   BarChart3,
   Trash2,
 } from 'lucide-react';
+import odinAvatar from '@/assets/brand/odin-avatar.png';
 import { Button } from '@/design-system/components/Button';
 import { Switch } from '@/design-system/components/Switch';
 import { Badge } from '@/design-system/components/Badge';
@@ -508,11 +509,18 @@ export function SettingsView({
               <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
                 AI Identity &amp; Behavior
               </h3>
-              <div className="space-y-1">
-                <label className="block text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-                  AI Name
-                </label>
-                <Input value={ctl.aiName} onChange={(e) => ctl.setAiName(e.target.value)} maxLength={20} aria-label="AI Name" />
+              <div className="flex items-center gap-3">
+                <img
+                  src={odinAvatar}
+                  alt="Odin"
+                  className="w-10 h-10 rounded-full object-cover shrink-0 dark:invert"
+                />
+                <div className="space-y-1 flex-1">
+                  <label className="block text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                    AI Name
+                  </label>
+                  <Input value={ctl.aiName} onChange={(e) => ctl.setAiName(e.target.value)} maxLength={20} aria-label="AI Name" />
+                </div>
               </div>
 
               {/* §168 personality presets + custom instructions */}

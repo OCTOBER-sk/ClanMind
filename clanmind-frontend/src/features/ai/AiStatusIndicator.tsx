@@ -19,6 +19,7 @@ import {
   Circle,
 } from 'lucide-react';
 import { cn } from '@/design-system/utils';
+import odinAvatar from '@/assets/brand/odin-avatar.png';
 import type { AiRunStatus } from '@/types';
 
 // ─── Public types ───────────────────────────────────────────────────────────
@@ -187,6 +188,13 @@ export const AiStatusIndicator = memo(function AiStatusIndicator({
       aria-label={`${aiName} \u00b7 ${displayLabel}`}
       className={cn('inline-flex items-center gap-1.5 select-none', className)}
     >
+      {/* Odin avatar — compact, rounded, monochrome */}
+      <img
+        src={odinAvatar}
+        alt={aiName}
+        className="w-4 h-4 rounded-full object-cover shrink-0 dark:invert"
+      />
+
       {/* Status icon — spectral for active states */}
       <span className="inline-flex shrink-0" style={{ color: spectral ? undefined : colorVar }}>
         {spectral ? (

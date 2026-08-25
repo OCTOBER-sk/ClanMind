@@ -12,11 +12,12 @@ import {
   Search,
   LayoutPanelTop,
 } from 'lucide-react';
+import clanmindMark from '@/assets/brand/clanmind-mark.png';
+import odinAvatar from '@/assets/brand/odin-avatar.png';
 import { Button } from '@/design-system/components/Button';
 import { Badge } from '@/design-system/components/Badge';
 import { Input } from '@/design-system/components/Input';
 import { Textarea } from '@/design-system/components/Textarea';
-import { ClanMindLogo } from '@/design-system/components/ClanMindLogo';
 import { useToast } from '@/design-system/components/Toast';
 import { copyToClipboard } from '@/tauri/bridge';
 
@@ -46,7 +47,7 @@ const STEP_LABELS = [
 ];
 
 const AI_AVATARS = [
-  { id: 'odin-default', gradient: 'linear-gradient(135deg,#111827,#374151)', label: 'Default' },
+  { id: 'odin-default', src: odinAvatar, label: 'Default' },
   { id: 'odin-aurora', gradient: 'linear-gradient(135deg,#ff5f6d,#7e57c2)', label: 'Aurora' },
   { id: 'odin-ocean', gradient: 'linear-gradient(135deg,#0ea5e9,#6366f1)', label: 'Ocean' },
   { id: 'odin-ember', gradient: 'linear-gradient(135deg,#f59e0b,#ef4444)', label: 'Ember' },
@@ -129,7 +130,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       >
         {/* Logo & Tagline Header */}
         <div className="flex items-center justify-between pb-2">
-          <ClanMindLogo size="md" variant="spectral" showWordmark />
+          <img
+            src={clanmindMark}
+            alt="ClanMind"
+            className="h-6 w-auto dark:invert"
+          />
           <span className="text-[11px] font-medium" style={{ color: 'var(--color-text-tertiary)' }}>
             A shared project room for people + AI
           </span>
@@ -373,13 +378,21 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                       onClick={() => setAiAvatar(a.id)}
                       aria-label={`Avatar ${a.label}`}
                       aria-pressed={aiAvatar === a.id}
-                      className="w-10 h-10 rounded-full cursor-pointer transition-transform focus-visible:shadow-[var(--focus-ring)]"
+                      className="w-10 h-10 rounded-full cursor-pointer transition-transform focus-visible:shadow-[var(--focus-ring)] overflow-hidden"
                       style={{
-                        background: a.gradient,
+                        background: 'src' in a ? undefined : a.gradient,
                         outline: aiAvatar === a.id ? '2px solid var(--color-primary)' : 'none',
                         outlineOffset: '2px',
                       }}
-                    />
+                    >
+                      {'src' in a && (
+                        <img
+                          src={a.src}
+                          alt={a.label}
+                          className="w-full h-full object-cover dark:invert"
+                        />
+                      )}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -681,7 +694,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         {step === 7 && (
           <div className="space-y-5 text-center">
             <div className="flex flex-col items-center gap-3 pt-2">
-              <ClanMindLogo size="lg" variant="spectral" showWordmark={false} />
+              <img
+                src={clanmindMark}
+                alt="ClanMind"
+                className="h-10 w-auto dark:invert"
+              />
               <h1 className="text-2xl font-bold">Your team is ready.</h1>
               <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
                 Start talking, create a Project or ask {aiName} something.

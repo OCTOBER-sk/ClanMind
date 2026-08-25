@@ -14,11 +14,11 @@ import {
   Archive,
   Menu,
 } from 'lucide-react';
+import clanmindMark from '@/assets/brand/clanmind-mark.png';
 import { Avatar } from '@/design-system/components/Avatar';
 import { Tooltip } from '@/design-system/components/Tooltip';
 import { Dropdown } from '@/design-system/components/Dropdown';
 import { Popover } from '@/design-system/components/Popover';
-import { ClanMindLogo } from '@/design-system/components/ClanMindLogo';
 import type { Group, Project, User } from '@/types';
 
 export interface TopBarProps {
@@ -173,7 +173,11 @@ export function TopBar({
             </button>
           </Tooltip>
         )}
-        <ClanMindLogo size="sm" showWordmark={true} variant={isMeetingActive ? 'spectral' : 'calm'} />
+        <img
+          src={clanmindMark}
+          alt="ClanMind"
+          className="h-5 w-auto dark:invert"
+        />
         <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
 
         {/* Group Switcher (§15) */}

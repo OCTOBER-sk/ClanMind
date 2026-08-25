@@ -96,24 +96,40 @@ export function Avatar({
         )}
       >
         {isAi ? (
-          // Odin identity — §129, §131, §275
-          <div
-            className={cn(
-              'w-full h-full flex items-center justify-center',
-              isAiActive
-                ? 'odin-working'
-                : 'bg-[var(--color-surface-hover)]',
-            )}
-            aria-label={`${name} (AI)`}
-          >
-            <Sparkles
+          // Odin identity — §129, §131, §275 — image when provided, fallback Sparkles
+          src ? (
+            <div
               className={cn(
-                sz.fallback === 'text-[9px]' ? 'w-3 h-3' : sz.fallback === 'text-[10px]' ? 'w-3.5 h-3.5' : 'w-4 h-4',
-                isAiActive ? 'text-white' : 'text-[var(--color-text-tertiary)]',
+                'w-full h-full flex items-center justify-center overflow-hidden',
+                isAiActive && 'odin-working',
               )}
-              aria-hidden="true"
-            />
-          </div>
+              aria-label={`${name} (AI)`}
+            >
+              <img
+                src={src}
+                alt={name}
+                className="w-full h-full object-cover dark:invert"
+              />
+            </div>
+          ) : (
+            <div
+              className={cn(
+                'w-full h-full flex items-center justify-center',
+                isAiActive
+                  ? 'odin-working'
+                  : 'bg-[var(--color-surface-hover)]',
+              )}
+              aria-label={`${name} (AI)`}
+            >
+              <Sparkles
+                className={cn(
+                  sz.fallback === 'text-[9px]' ? 'w-3 h-3' : sz.fallback === 'text-[10px]' ? 'w-3.5 h-3.5' : 'w-4 h-4',
+                  isAiActive ? 'text-white' : 'text-[var(--color-text-tertiary)]',
+                )}
+                aria-hidden="true"
+              />
+            </div>
+          )
         ) : (
           <>
             <RadixAvatar.Image

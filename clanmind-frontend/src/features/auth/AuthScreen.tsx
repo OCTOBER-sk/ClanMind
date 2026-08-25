@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { ClanMindLogo } from '@/design-system/components/ClanMindLogo';
+import clanmindMark from '@/assets/brand/clanmind-mark.png';
 import { Button } from '@/design-system/components/Button';
 import { Input } from '@/design-system/components/Input';
 import { ApiError } from '@/api/errors';
@@ -56,7 +56,11 @@ function FirstLaunchView({
     <div className="text-center space-y-8 animate-[fade-in_300ms_ease-out]">
       {/* Logo */}
       <div className="flex flex-col items-center gap-3">
-        <ClanMindLogo size="lg" variant="calm" showWordmark />
+        <img
+          src={clanmindMark}
+          alt="ClanMind"
+          className="h-10 w-auto dark:invert"
+        />
         {/* Spectral accent line — §69 */}
         <div className="h-px w-32 spectral-active rounded-full opacity-60" />
       </div>
@@ -136,7 +140,11 @@ function LoginView({
   return (
     <div className="space-y-6 animate-[fade-in_200ms_ease-out]">
       <div className="flex flex-col items-center gap-3">
-        <ClanMindLogo size="md" variant="calm" showWordmark />
+        <img
+          src={clanmindMark}
+          alt="ClanMind"
+          className="h-8 w-auto dark:invert"
+        />
         {/* §33 — "Welcome back" greeting for returning users */}
         <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
           Welcome back
@@ -271,7 +279,11 @@ function SignupView({ onLogin }: { onLogin: () => void }) {
   return (
     <div className="space-y-6 animate-[fade-in_200ms_ease-out]">
       <div className="flex flex-col items-center gap-3">
-        <ClanMindLogo size="md" variant="calm" showWordmark />
+        <img
+          src={clanmindMark}
+          alt="ClanMind"
+          className="h-8 w-auto dark:invert"
+        />
         <p className="text-sm text-[var(--color-text-secondary)]">Create your account</p>
       </div>
 
@@ -363,7 +375,11 @@ function ForgotPasswordView({ onBack }: { onBack: () => void }) {
   return (
     <div className="space-y-6 animate-[fade-in_200ms_ease-out]">
       <div className="flex flex-col items-center gap-3">
-        <ClanMindLogo size="md" variant="calm" showWordmark />
+        <img
+          src={clanmindMark}
+          alt="ClanMind"
+          className="h-8 w-auto dark:invert"
+        />
       </div>
 
       {sent ? (

@@ -13,6 +13,7 @@ import { Button } from '@/design-system/components/Button';
 import { copyToClipboard } from '@/tauri/bridge';
 import { SafeMarkdownLink } from '@/tauri/externalLinks';
 import { formatBytes } from '@/config/limits';
+import odinAvatar from '@/assets/brand/odin-avatar.png';
 import type { Message, AiRun, GroupRole } from '@/types';
 
 export interface MessageRowProps {
@@ -163,7 +164,7 @@ function MessageRowInner({
         {!isConsecutive ? (
           <Avatar
             name={message.sender_name}
-            src={message.sender_avatar}
+            src={isAi ? odinAvatar : message.sender_avatar}
             size="md"
             isAi={isAi}
             isAiActive={isAi && isStreaming}
