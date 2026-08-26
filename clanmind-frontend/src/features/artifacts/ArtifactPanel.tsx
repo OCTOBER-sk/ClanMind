@@ -8,6 +8,8 @@
  */
 
 import { Suspense, lazy, memo, useEffect, useRef, useState } from 'react';
+import { fetchArtifact } from '@/api/endpoints/artifacts';
+import { useArtifactStore } from '@/state/useArtifactStore';
 import {
   Download,
   GitCompare,
@@ -108,6 +110,16 @@ function ArtifactPanelBody({
   const { toast } = useToast();
   const { togglePin, toggleContext, restoreVersion, exportAs } = useArtifactController();
 
+  // §109 — fetch full artifact with versions when panel opens
+  useEffect(() => {
+    if (!artifact.id) return;
+    fetchArtifact(artifact.id).then((full) => {
+      if (full && full.versions.length > 0) {
+        useArtifactStore.getState().mergeArtifactVersion(full);
+      }
+    }).catch(() => {});
+  }, [artifact.id]);
+
   const currentVersion: ArtifactVersion =
     artifact.versions.find((v) => v.version_number === activeVersionNumber) ??
     artifact.versions[0] ?? {
@@ -200,11 +212,11 @@ function ArtifactPanelBody({
   const rawView = viewRaw ? (
     <div className="flex-1 overflow-auto p-4 select-text">
       <div className="mb-3 flex justify-end">
-        <Button size="sm" variant="ghost" onClick={() => setViewRaw(false)}>
+        <Button size="sm" variant="ghost" onClick={() => setViewRaw(false)} aria-label="Exit raw content view">
           Exit raw view
         </Button>
       </div>
-      <pre className="whitespace-pre-wrap rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 font-mono text-[11px] leading-relaxed text-[var(--color-text)]">
+      <pre className="whitespace-pre-wrap rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 font-mono text-[11px] leading-relaxed text-[var(--color-text)]" role="textbox" aria-readonly="true" aria-label="Raw artifact content">
         {currentVersion.content || '(no content stored for this version)'}
       </pre>
     </div>
@@ -400,8 +412,16 @@ function ArtifactPanelBody({
         </div>
       </div>
 
-      {/* ─── Body (§291 isolated viewers; §100 completion glow once) ──────── */}
-      <div className={cn('flex min-h-0 flex-1 flex-col overflow-hidden', glowing && 'completion-glow')}>
+      {/* ─── Body (§291 isolated viewers; §100 completion glow once; §41 spectral border during construction) ──────── */}
+      <div
+        className={cn(
+          'flex min-h-0 flex-1 flex-col overflow-hidden',
+          glowing && 'completion-glow',
+          isConstructing && 'spectral-border',
+        )}
+        role={isConstructing ? 'status' : undefined}
+        aria-label={isConstructing ? `Artifact under construction: ${construction?.statusText ?? 'Building…'}` : undefined}
+      >
         {renderViewer()}
       </div>
     </div>

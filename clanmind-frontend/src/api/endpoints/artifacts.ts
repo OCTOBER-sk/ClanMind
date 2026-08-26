@@ -32,7 +32,7 @@ export function mapArtifactRow(row: ArtifactRow): Artifact {
     version_number: v.version_number,
     // Inline content when the server provides it; otherwise EMPTY — renderers
     // must treat empty content as unavailable, never fabricate a preview.
-    content: typeof v.content === 'string' ? v.content : '',
+    content: typeof v.content === 'string' ? v.content : (typeof v.content_ref === 'string' ? v.content_ref : ''),
     created_by_id: v.created_by_user_id ?? v.created_by_ai_id ?? undefined,
     created_by_name: v.created_by_ai_id
       ? aiName
@@ -89,7 +89,11 @@ export async function fetchProjectArtifacts(projectId: string): Promise<Artifact
 /** BE §109 — one artifact with its version history. */
 export async function fetchArtifact(artifactId: string): Promise<Artifact | null> {
   const raw = await api.get(`/artifacts/${encodeURIComponent(artifactId)}`);
-  const parsed = ArtifactRowSchema.safeParse(raw);
+  // BE returns { artifact: {...}, versions: [...] } — merge versions into artifact
+  const merged = raw && typeof raw === 'object' && 'artifact' in raw
+    ? { ...(raw as any).artifact, versions: (raw as any).versions ?? [] }
+    : raw;
+  const parsed = ArtifactRowSchema.safeParse(merged);
   return parsed.success ? mapArtifactRow(parsed.data) : null;
 }
 
