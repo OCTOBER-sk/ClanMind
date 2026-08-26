@@ -111,12 +111,16 @@ export const useArtifactStore = create<ArtifactState>((set) => ({
       // Append only versions the store has never seen (idempotent replays).
       const known = new Set(existing.versions.map((v) => v.version_number));
       const fresh = incoming.versions.filter((v) => !known.has(v.version_number));
-      if (fresh.length === 0 && incoming.current_version <= existing.current_version) {
+      if (fresh.length === 0 && (incoming.current_version || 0) <= (existing.current_version || 0)) {
         return {};
       }
       const mergedVersions =
         fresh.length > 0 ? [...existing.versions, ...fresh] : existing.versions;
-      const currentVersion = Math.max(existing.current_version, incoming.current_version);
+      const currentVersion = Math.max(
+        existing.current_version || 0,
+        incoming.current_version || 0,
+        ...mergedVersions.map((v) => v.version_number),
+      );
       const merged: Artifact = {
         ...existing,
         versions: mergedVersions,
