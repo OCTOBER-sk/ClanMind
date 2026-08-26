@@ -126,7 +126,9 @@ function ArtifactPanelBody({
   const effectiveVersions = fetchedVersions.length > 0 ? fetchedVersions : artifact.versions;
 
   const currentVersion: ArtifactVersion =
-    effectiveVersions.find((v) => v.version_number === activeVersionNumber) ??
+    (activeVersionNumber && activeVersionNumber > 0
+      ? effectiveVersions.find((v) => v.version_number === activeVersionNumber)
+      : null) ??
     effectiveVersions[effectiveVersions.length - 1] ??
     effectiveVersions[0] ?? {
       version_number: artifact.current_version,
