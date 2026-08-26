@@ -94,14 +94,45 @@ export async function fetchArtifact(artifactId: string): Promise<Artifact | null
     ? (raw as any).artifact
     : raw;
   // Fetch versions separately (BE §109)
-  let versions: any[] = [];
+  let rawVersions: any[] = [];
   try {
     const verResp = await api.get(`/artifacts/${encodeURIComponent(artifactId)}/versions`);
-    versions = (verResp as any)?.items ?? [];
+    rawVersions = (verResp as any)?.items ?? [];
   } catch { /* versions unavailable */ }
-  const merged = { ...art, versions };
-  const parsed = ArtifactRowSchema.safeParse(merged);
-  return parsed.success ? mapArtifactRow(parsed.data) : null;
+  // Map versions directly (bypass schema for reliability)
+  const state = useGroupStore.getState();
+  const aiName = state.activeGroup?.ai_name || 'Odin';
+  const versions: ArtifactVersion[] = rawVersions.map((v: any) => ({
+    id: v.id,
+    artifact_id: v.artifact_id || artifactId,
+    version_number: v.version_number,
+    content: typeof v.content === 'string' ? v.content : (typeof v.content_ref === 'string' ? v.content_ref : ''),
+    created_by_id: v.created_by_user_id ?? v.created_by_ai_id ?? undefined,
+    created_by_name: v.created_by_ai_id
+      ? aiName
+      : v.created_by_user_id
+        ? (state.memberNicknames[v.created_by_user_id] ?? 'Member')
+        : 'Unknown',
+    change_summary: v.change_summary ?? undefined,
+    created_at: v.created_at,
+  }));
+  // Build artifact with versions
+  const currentFromRows = versions.reduce((max, v) => Math.max(max, v.version_number), 0);
+  const creatorId = art.created_by_user_id ?? art.created_by_ai_id ?? undefined;
+  return {
+    id: art.id,
+    group_id: art.group_id ?? '',
+    project_id: art.project_id ?? undefined,
+    title: art.title ?? art.name ?? 'Untitled artifact',
+    artifact_type: art.artifact_type as Artifact['artifact_type'],
+    current_version: currentFromRows || 1,
+    versions,
+    pinned: art.pinned === true,
+    used_as_context: false,
+    created_by_id: creatorId,
+    created_at: art.created_at,
+    updated_at: art.updated_at,
+  };
 }
 
 /**
