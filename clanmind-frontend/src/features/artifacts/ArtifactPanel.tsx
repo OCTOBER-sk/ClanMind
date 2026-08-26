@@ -60,7 +60,7 @@ export interface ArtifactPanelProps {
   onSendToChat?: (artifact: Artifact) => void;
 }
 
-const DOC_TYPES = new Set<ArtifactType>(['DOCUMENT', 'MARKDOWN', 'RESEARCH']);
+const DOC_TYPES = new Set<ArtifactType>(['DOCUMENT', 'MARKDOWN', 'RESEARCH', 'CODE', 'HTML', 'OTHER']);
 
 function ViewerSkeleton() {
   return (
