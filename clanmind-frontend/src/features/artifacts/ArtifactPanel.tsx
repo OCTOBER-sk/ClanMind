@@ -111,22 +111,24 @@ function ArtifactPanelBody({
   const { togglePin, toggleContext, restoreVersion, exportAs } = useArtifactController();
 
   // §109 — fetch full artifact with versions when panel opens
+  const [fetchedVersions, setFetchedVersions] = useState<ArtifactVersion[]>([]);
   useEffect(() => {
     if (!artifact.id) return;
-    console.log('[ArtifactPanel] fetching full artifact:', artifact.id);
     fetchArtifact(artifact.id).then((full) => {
-      console.log('[ArtifactPanel] fetchArtifact result:', full ? `versions=${full.versions.length}` : 'null');
       if (full && full.versions.length > 0) {
+        setFetchedVersions(full.versions);
         useArtifactStore.getState().mergeArtifactVersion(full);
-        console.log('[ArtifactPanel] merged versions into store');
       }
-    }).catch((err) => console.error('[ArtifactPanel] fetchArtifact error:', err));
+    }).catch(() => {});
   }, [artifact.id]);
 
+  // Use fetched versions if available, otherwise fall back to artifact versions
+  const effectiveVersions = fetchedVersions.length > 0 ? fetchedVersions : artifact.versions;
+
   const currentVersion: ArtifactVersion =
-    artifact.versions.find((v) => v.version_number === activeVersionNumber) ??
-    artifact.versions[artifact.versions.length - 1] ?? // latest version
-    artifact.versions[0] ?? {
+    effectiveVersions.find((v) => v.version_number === activeVersionNumber) ??
+    effectiveVersions[effectiveVersions.length - 1] ??
+    effectiveVersions[0] ?? {
       version_number: artifact.current_version,
       content: '',
       created_by_name: 'Unknown',
@@ -158,7 +160,7 @@ function ArtifactPanelBody({
 
   const isConstructing = construction?.phase === 'constructing';
   const compareVersion = compareVersionNumber
-    ? artifact.versions.find((v) => v.version_number === compareVersionNumber) ?? null
+    ? effectiveVersions.find((v) => v.version_number === compareVersionNumber) ?? null
     : null;
 
   // §254 — exports derive from the PROP artifact (the panel's own truth),
@@ -334,7 +336,7 @@ function ArtifactPanelBody({
                 }
               >
                 <div className="max-h-72 w-72 overflow-y-auto" role="listbox" aria-label="Artifact versions">
-                  {[...artifact.versions].sort((a, b) => b.version_number - a.version_number).map((v) => {
+                  {[...effectiveVersions].sort((a, b) => b.version_number - a.version_number).map((v) => {
                     const isActive = v.version_number === activeVersionNumber;
                     return (
                       <div
