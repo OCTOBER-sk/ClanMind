@@ -235,7 +235,14 @@ export function AppShell() {
   // ─── P8 — project-intelligence controllers: tasks (§111), decisions
   // (§110) and memory (§108) all load through the real endpoint modules;
   // optimistic mutations reconcile on §21.2 conflicts. ─────────────────────
-  const activeProjectId = projectForRoute?.id ?? null;
+  const activeProjectId =
+    projectForRoute?.id ??
+    // No /project/:projectId segment in the URL: fall back to the route
+    // Group's first project so sales surface controllers (tasks §111,
+    // decisions §110) fire and their screens populate instead of staying
+    // empty. Single source of truth (URL) still wins when a project is pinned.
+    projects.find((p) => p.group_id === routeGroupId)?.id ??
+    null;
   const tasksCtl = useTasksController(activeProjectId);
   const decisionsCtl = useDecisionsController(activeProjectId);
   const memoryCtl = useMemoryController(groupForRoute?.id, activeProjectId);
