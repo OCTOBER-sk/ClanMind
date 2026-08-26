@@ -8,6 +8,13 @@
  *   GET /groups                          → { items: Group[] }        (§104)
  *   GET /groups/:id/projects             → { items: Project[] }      (§104)
  *   GET /groups/:id/members              → { items: GroupMember[] }  (§104)
+ *   GET /projects/:id/tasks              → { items: Task[] }         (§111)
+ *   GET /projects/:id/decisions          → { items: Decision[] }     (§110)
+ *   GET /projects/:id/artifacts          → { items: Artifact[] }     (§109)
+ *   GET /groups/:id/memory               → { items: MemoryEntry[] }  (§108)
+ *   GET /groups/:id/memory/candidates    → { items: MemoryCandidate[] }(§108)
+ *   GET /notifications                   → { items: Notification[] } (§95A)
+ *   GET /groups/:id/activity             → { items: ActivityEvent[] }(§98A)
  *   GET /client-versions                 → §165 metadata (309A.1 banner)
  *   WS  /groups/:id/ws?token=…           → per-group room (§16)
  *
@@ -31,6 +38,13 @@ import { initConnectivity, markProtocolUpdateRequired } from '@/sync/connectivit
 import { useGroupStore, DEFAULT_FLAGS } from '@/state/useGroupStore';
 import { useChatStore } from '@/state/useChatStore';
 import { useSyncStore } from '@/state/useSyncStore';
+import { useProjectDataStore } from '@/state/useProjectDataStore';
+import { useArtifactStore } from '@/state/useArtifactStore';
+import { fetchProjectTasks } from '@/api/endpoints/tasks';
+import { fetchProjectDecisions } from '@/api/endpoints/decisions';
+import { fetchGroupMemories, fetchMemoryCandidates } from '@/api/endpoints/memory';
+import { fetchProjectArtifacts } from '@/api/endpoints/artifacts';
+import { fetchNotifications, fetchGroupActivity } from '@/api/endpoints/notifications';
 import type { Group, Project } from '@/types';
 
 type ZodInfer<T extends ZodTypeAny> = zodNamespace.infer<T>;
@@ -87,6 +101,63 @@ async function getItems<TSchema extends ZodTypeAny>(
   });
 }
 
+// ─── Feature store seeding ─────────────────────────────────────────────────
+
+/**
+ * Populate feature stores (Tasks, Decisions, Memory, Artifacts, Notifications,
+ * Activity) from the real backend. Called during bootstrap after the group /
+ * project / member foundation is in place. Each request is independently
+ * catch-guarded so a 404 from a not-yet-implemented endpoint (e.g. D22
+ * /me/memory) leaves the remaining screens functional.
+ */
+export async function loadFeatureStores(
+  groupId: string,
+  projectId?: string,
+): Promise<void> {
+  const featureLoads: Promise<void>[] = [];
+
+  // Project-scoped: Tasks, Decisions, Artifacts
+  if (projectId) {
+    featureLoads.push(
+      fetchProjectTasks(projectId)
+        .then((tasks) => useProjectDataStore.setState({ tasks }))
+        .catch(() => {}),
+      fetchProjectDecisions(projectId)
+        .then((decisions) => useProjectDataStore.setState({ decisions }))
+        .catch(() => {}),
+      fetchProjectArtifacts(projectId)
+        .then((artifacts) => useArtifactStore.setState({ artifacts }))
+        .catch(() => {}),
+    );
+  }
+
+  // Group-scoped: Memory + MemoryCandidates, Activity
+  featureLoads.push(
+    fetchGroupMemories(groupId)
+      .then((memories) => useProjectDataStore.setState({ memories }))
+      .catch(() => {}),
+    fetchMemoryCandidates(groupId)
+      .then((memoryCandidates) =>
+        useProjectDataStore.setState({ memoryCandidates }),
+      )
+      .catch(() => {}),
+    fetchGroupActivity(groupId)
+      .then((activityEvents) =>
+        useProjectDataStore.setState({ activityEvents }),
+      )
+      .catch(() => {}),
+  );
+
+  // User-scoped: Notifications (recipient-filtered server-side, §95A)
+  featureLoads.push(
+    fetchNotifications()
+      .then((notifications) => useProjectDataStore.setState({ notifications }))
+      .catch(() => {}),
+  );
+
+  await Promise.all(featureLoads);
+}
+
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
 let bootstrapped = false;
@@ -135,6 +206,11 @@ export async function bootstrapLiveGroups(): Promise<void> {
     useChatStore.setState({ messages: [], projectFilterId: projects[0]?.id });
   } else {
     useGroupStore.setState({ groups: [], activeGroup: null });
+  }
+
+  // ─── Feature store seeding (§47/§48/§35/§109/§95A/§98A) ────────────────
+  if (activeGroup) {
+    await loadFeatureStores(activeGroup.id, projects[0]?.id);
   }
 
   // §165/§309A.1 — recommended-update metadata for the non-blocking banner.

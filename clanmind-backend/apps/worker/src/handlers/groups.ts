@@ -22,6 +22,8 @@ const patchGroupBody = z.object({
 
 export function groupRoutes(): Hono<{ Bindings: Env; Variables: AuthVariables }> {
   const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+  // §16 WebSocket room entry is handled at the worker entrypoint (index.ts) so
+  // the DO can authenticate via ?token (browsers can't send WS headers).
   app.use("*", requireAuthenticatedUser);
 
   app.get("/api/v1/groups", async (c) => {
