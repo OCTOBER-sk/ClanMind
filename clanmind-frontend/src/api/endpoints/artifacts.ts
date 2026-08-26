@@ -89,10 +89,17 @@ export async function fetchProjectArtifacts(projectId: string): Promise<Artifact
 /** BE §109 — one artifact with its version history. */
 export async function fetchArtifact(artifactId: string): Promise<Artifact | null> {
   const raw = await api.get(`/artifacts/${encodeURIComponent(artifactId)}`);
-  // BE returns { artifact: {...}, versions: [...] } — merge versions into artifact
-  const merged = raw && typeof raw === 'object' && 'artifact' in raw
-    ? { ...(raw as any).artifact, versions: (raw as any).versions ?? [] }
+  // BE returns { artifact: {...} } — extract the artifact
+  const art = raw && typeof raw === 'object' && 'artifact' in raw
+    ? (raw as any).artifact
     : raw;
+  // Fetch versions separately (BE §109)
+  let versions: any[] = [];
+  try {
+    const verResp = await api.get(`/artifacts/${encodeURIComponent(artifactId)}/versions`);
+    versions = (verResp as any)?.items ?? [];
+  } catch { /* versions unavailable */ }
+  const merged = { ...art, versions };
   const parsed = ArtifactRowSchema.safeParse(merged);
   return parsed.success ? mapArtifactRow(parsed.data) : null;
 }

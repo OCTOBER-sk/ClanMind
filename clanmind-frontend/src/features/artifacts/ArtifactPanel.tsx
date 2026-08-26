@@ -113,15 +113,19 @@ function ArtifactPanelBody({
   // §109 — fetch full artifact with versions when panel opens
   useEffect(() => {
     if (!artifact.id) return;
+    console.log('[ArtifactPanel] fetching full artifact:', artifact.id);
     fetchArtifact(artifact.id).then((full) => {
+      console.log('[ArtifactPanel] fetchArtifact result:', full ? `versions=${full.versions.length}` : 'null');
       if (full && full.versions.length > 0) {
         useArtifactStore.getState().mergeArtifactVersion(full);
+        console.log('[ArtifactPanel] merged versions into store');
       }
-    }).catch(() => {});
+    }).catch((err) => console.error('[ArtifactPanel] fetchArtifact error:', err));
   }, [artifact.id]);
 
   const currentVersion: ArtifactVersion =
     artifact.versions.find((v) => v.version_number === activeVersionNumber) ??
+    artifact.versions[artifact.versions.length - 1] ?? // latest version
     artifact.versions[0] ?? {
       version_number: artifact.current_version,
       content: '',
