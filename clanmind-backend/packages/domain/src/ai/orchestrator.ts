@@ -1,4 +1,4 @@
-import type { ModelProviderAdapter, ModelRequest } from "@clanmind/ai-providers";
+import type { ModelProviderAdapter, ModelRequest, ModelRequestMessage } from "@clanmind/ai-providers";
 import { AppError } from "@clanmind/shared";
 import type { EventOutbox } from "../common/ports";
 import type { RealtimePort } from "../realtime/broadcaster";
@@ -272,15 +272,18 @@ export class AiOrchestrator {
     const rankedContext = assembled.competitive
       .map((item) => `[${item.slice}|${item.source_type}:${item.source_id}] ${item.content}`)
       .join("\n");
+    // Build system messages first; the user message is appended LAST (after
+    // any tool-result context) so the array never ends with an orphan tool or
+    // assistant block.  OpenAI/OpenRouter require a trailing user message.
+    const systemMessages: ModelRequestMessage[] = [
+      { role: "system", content: JSON.stringify(assembled.fixed) },
+      ...(rankedContext.length > 0
+        ? [{ role: "system" as const, content: `CONTEXT (ranked):\n${rankedContext}` }]
+        : []),
+    ];
     const request: ModelRequest = {
       model_id: run.model_id,
-      messages: [
-        { role: "system", content: JSON.stringify(assembled.fixed) },
-        ...(rankedContext.length > 0
-          ? [{ role: "system" as const, content: `CONTEXT (ranked):\n${rankedContext}` }]
-          : []),
-        { role: "user", content: input.userRequest },
-      ],
+      messages: [...systemMessages],
       max_tokens: 4096,
     };
 
@@ -347,11 +350,20 @@ export class AiOrchestrator {
       const result = await executor.execute(call.input);
       const safeOutput = sanitizeToolOutput(result.output); // §88
       await this.ledger.complete(ledgerId, "SUCCEEDED", safeOutput);
+      // Provider-agnostic injection: role:'tool' is only valid after an
+      // assistant message that declared matching tool_calls (OpenAI/OpenRouter).
+      // Instead, inject the result as a labelled system context block so it
+      // is visible to every supported provider (OpenAI, Anthropic, Google).
       request.messages.push({
-        role: "tool",
-        content: JSON.stringify(safeOutput), // §88: labeled untrusted by policy
+        role: "system",
+        content: `[tool_result tool="${call.tool_name}"]\n${JSON.stringify(safeOutput)}`,
       });
     }
+
+    // §60 / OpenAI-compatible contract: the user message MUST be the LAST
+    // entry in the messages array.  Tool-result context blocks inserted above
+    // precede it, so the provider never sees a trailing tool/assistant orphan.
+    request.messages.push({ role: "user", content: input.userRequest });
 
     // Steps 14 + 17: provider streaming with §61 fallback chain.
     await this.lifecycle.transition(run.id, "STREAMING");
