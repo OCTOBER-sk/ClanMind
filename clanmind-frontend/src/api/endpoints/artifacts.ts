@@ -73,8 +73,17 @@ function mapList(raw: unknown): Artifact[] {
 
 /** BE §109 — list a project's artifacts (Garage + Overview feed). */
 export async function fetchProjectArtifacts(projectId: string): Promise<Artifact[]> {
-  const raw = await api.get(`/projects/${encodeURIComponent(projectId)}/artifacts`);
-  return mapList(raw);
+  console.log('[artifacts] fetchProjectArtifacts called with projectId:', projectId);
+  try {
+    const raw = await api.get(`/projects/${encodeURIComponent(projectId)}/artifacts`);
+    console.log('[artifacts] raw response:', JSON.stringify(raw).substring(0, 300));
+    const result = mapList(raw);
+    console.log('[artifacts] mapped artifacts:', result.length);
+    return result;
+  } catch (err) {
+    console.error('[artifacts] fetchProjectArtifacts ERROR:', err);
+    throw err;
+  }
 }
 
 /** BE §109 — one artifact with its version history. */

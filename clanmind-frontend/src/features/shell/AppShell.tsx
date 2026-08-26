@@ -76,6 +76,7 @@ import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
 import { useLayoutMode } from '@/hooks/useLayoutMode';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useGroupStore } from '@/state/useGroupStore';
+import { loadFeatureStores } from '@/live/liveRuntime';
 import { useMyProfile } from '@/features/auth/useMyProfile';
 import { signOutSession } from '@/features/auth/session';
 import { useChatStore } from '@/state/useChatStore';
@@ -274,6 +275,8 @@ export function AppShell() {
       useChatStore.getState().resetForGroupSwitch();
       useProjectDataStore.getState().clearGroupScopedData();
       setActiveGroup(groupForRoute);
+      // §47 — re-fetch feature stores for the new group + its first project
+      loadFeatureStores(groupForRoute.id, projectForRoute?.id).catch(() => {});
     }
     if (projectForRoute && activeProject?.id !== projectForRoute.id) {
       setActiveProject(projectForRoute);

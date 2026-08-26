@@ -1,7 +1,6 @@
 /**
  * LIVE-mode runtime — group bootstrap + realtime wiring for the real
- * backend. Loaded ONLY when __DEMO_MODE__ is false; demo mode keeps its
- * deterministic hub (src/mocks) behind the compile gate.
+ * backend.
  *
  * Endpoints consumed (all zod-validated at the boundary, BE §102 errors
  * surface through ApiError):
@@ -45,7 +44,7 @@ import { fetchProjectDecisions } from '@/api/endpoints/decisions';
 import { fetchGroupMemories, fetchMemoryCandidates } from '@/api/endpoints/memory';
 import { fetchProjectArtifacts } from '@/api/endpoints/artifacts';
 import { fetchNotifications, fetchGroupActivity } from '@/api/endpoints/notifications';
-import type { Group, Project } from '@/types';
+import { Group, Project, GroupMember, GroupRole } from '@/types';
 
 type ZodInfer<T extends ZodTypeAny> = zodNamespace.infer<T>;
 type BEGroup = ZodInfer<typeof GroupSchema>;
@@ -114,6 +113,7 @@ export async function loadFeatureStores(
   groupId: string,
   projectId?: string,
 ): Promise<void> {
+  console.log('[liveRuntime] loadFeatureStores called:', { groupId, projectId });
   const featureLoads: Promise<void>[] = [];
 
   // Project-scoped: Tasks, Decisions, Artifacts
@@ -126,8 +126,11 @@ export async function loadFeatureStores(
         .then((decisions) => useProjectDataStore.setState({ decisions }))
         .catch(() => {}),
       fetchProjectArtifacts(projectId)
-        .then((artifacts) => useArtifactStore.setState({ artifacts }))
-        .catch(() => {}),
+        .then((artifacts) => {
+          console.log('[liveRuntime] loaded artifacts:', artifacts.length);
+          useArtifactStore.setState({ artifacts });
+        })
+        .catch((err) => console.error('[liveRuntime] artifacts load error:', err)),
     );
   }
 
@@ -173,7 +176,10 @@ export async function bootstrapLiveGroups(): Promise<void> {
 
   const groups = await getItems('/groups', GroupSchema);
   const mappedGroups = groups.map(mapGroup);
-  const activeGroup = mappedGroups[0] ?? null;
+
+  // §7 — prefer the group from the URL route over the first group
+  const urlGroupId = window.location.pathname.match(/\/group\/([^/]+)/)?.[1] ?? null;
+  const activeGroup = mappedGroups.find((g) => g.id === urlGroupId) ?? mappedGroups[0] ?? null;
 
   let projects: Project[] = [];
   const memberNames = new Map<string, string>();
@@ -182,10 +188,10 @@ export async function bootstrapLiveGroups(): Promise<void> {
     const [projectRows, memberPage] = await Promise.all([
       getItems(`/groups/${activeGroup.id}/projects`, ProjectSchema).catch(() => []),
       api
-        .get<ItemsPage<{ user_id: string; group_display_name?: string | null }>>(
+        .get<ItemsPage<{ user_id: string; group_display_name?: string | null; role?: string; joined_at?: string }>>(
           `/groups/${activeGroup.id}/members`,
         )
-        .catch(() => ({ items: [] as Array<{ user_id: string; group_display_name?: string | null }> })),
+        .catch(() => ({ items: [] as Array<{ user_id: string; group_display_name?: string | null; role?: string; joined_at?: string }> })),
     ]);
 
     projects = projectRows.map(mapProject);
@@ -193,11 +199,22 @@ export async function bootstrapLiveGroups(): Promise<void> {
       if (m.user_id) memberNames.set(m.user_id, m.group_display_name ?? 'Member');
     }
 
+    // §104 — populate the members array with roles so the shell can derive
+    // the current user's role for settings visibility, moderation, etc.
+    const members = (memberPage.items ?? []).map((m) => ({
+      user_id: m.user_id,
+      group_id: activeGroup.id,
+      role: (m.role ?? 'MEMBER') as GroupRole,
+      user: { id: m.user_id, name: m.group_display_name ?? 'Member', email: '', created_at: new Date().toISOString() },
+      joined_at: m.joined_at ?? new Date().toISOString(),
+    } as GroupMember));
+
     useGroupStore.setState({
       groups: mappedGroups,
       activeGroup,
       projects,
       activeProject: projects[0] ?? null,
+      members,
       featureFlags: { ...DEFAULT_FLAGS }, // §165A — server flags endpoint pending; safe defaults
       memberNicknames: Object.fromEntries(memberNames),
     });
