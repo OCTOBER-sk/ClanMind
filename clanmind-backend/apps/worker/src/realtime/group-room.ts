@@ -160,6 +160,11 @@ export class GroupRoom implements DurableObject {
   // --- §16 connection lifecycle ---
 
   private async handleConnect(request: Request, url: URL): Promise<Response> {
+    // The Group id is the DO name in production; local Miniflare dev exposes an
+    // empty state.id.name, so the entrypoint also forwards it as x-room-group.
+    const groupId = this.state.id.name || request.headers.get("x-room-group") || "";
+    if (!groupId) return new Response("bad room", { status: 400 });
+
     // 1. authenticate (token via query; browsers cannot set WS headers)
     const token = url.searchParams.get("token") ?? "";
     let userId: string;
@@ -173,8 +178,6 @@ export class GroupRoom implements DurableObject {
     }
 
     // 2. validate Group membership (removed members never enter §185 #11)
-    const groupId = this.state.id.name;
-    if (!groupId) return new Response("bad room", { status: 400 });
     const db = getServiceClient({
       url: this.env.SUPABASE_URL,
       serviceRoleKey: this.env.SUPABASE_SERVICE_ROLE_KEY,

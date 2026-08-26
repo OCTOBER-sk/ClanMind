@@ -12,6 +12,22 @@ import { getAiRuntime } from "./ai";
  */
 export default {
   fetch: (request: Request, env: Env, ctx: ExecutionContext) => {
+    // §15/§16 WebSocket room entry — handle the upgrade here, before Hono's
+    // Bearer-header auth (browsers can't set headers on an upgrade; the DO
+    // re-verifies the JWT from `?token` + Group membership in handleConnect).
+    const url = new URL(request.url);
+    if (url.pathname.endsWith("/ws") && request.headers.get("upgrade") === "websocket") {
+      // groupId from the /api/v1/groups/<id>/ws path (robust, no .at()).
+      const m = url.pathname.match(/^\/api\/v1\/groups\/([^/]+)\/ws$/);
+      const groupId: string = m ? (m[1] ?? "") : "";
+      const id = env.GROUP_ROOM.idFromName(groupId);
+      const stub = env.GROUP_ROOM.get(id);
+      // Carry the groupId to the DO explicitly (dev Miniflare exposes an empty
+      // state.id.name); the DO falls back to this header in handleConnect.
+      const proxied = new Request(`https://room/ws${url.search}`, request);
+      proxied.headers.set("x-room-group", groupId);
+      return stub.fetch(proxied);
+    }
     const app = createApp(buildServices(env));
     return app.fetch(request, env, ctx);
   },
