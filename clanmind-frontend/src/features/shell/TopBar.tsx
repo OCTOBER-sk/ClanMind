@@ -176,7 +176,7 @@ export function TopBar({
         <img
           src={clanmindMark}
           alt="ClanMind"
-          className="h-5 w-auto dark:invert"
+          className="h-5 w-auto shrink-0 dark:invert"
         />
         <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
 

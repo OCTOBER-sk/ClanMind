@@ -8,7 +8,7 @@ import { AiToolTimeline } from '@/features/ai/AiToolTimeline';
 import { AiQuotaCard } from '@/features/ai/AiQuotaCard';
 import { AiErrorCard, AiStoppedStrip } from '@/features/ai/AiErrorCard';
 import { useAiStreamStore } from '@/features/ai/aiStreamStore';
-import { Pin, Reply, Check, Copy, Sparkles, Clock, RotateCcw, Globe, FileText } from 'lucide-react';
+import { Pin, Reply, Check, Copy, Bot, Clock, RotateCcw, Globe, FileText } from 'lucide-react';
 import { Button } from '@/design-system/components/Button';
 import { copyToClipboard } from '@/tauri/bridge';
 import { SafeMarkdownLink } from '@/tauri/externalLinks';
@@ -127,7 +127,7 @@ function MessageRowInner({
     <div
       className={cn(
         'group relative flex gap-3 px-4 py-1.5 transition-colors duration-100',
-        !isConsecutive ? 'mt-3 pt-2.5' : 'mt-0.5',
+        !isConsecutive ? 'mt-2 pt-2' : 'mt-0.5',
         message.pinned && 'bg-[var(--color-warning-bg)]/40',
         'hover:bg-[var(--color-surface-hover)]/50 focus-visible:bg-[var(--color-surface-hover)]/50'
       )}
@@ -184,7 +184,7 @@ function MessageRowInner({
         {/* Reply Quote Banner (§59) */}
         {message.reply_to_preview && !isConsecutive && (
           <div
-            className="flex items-center gap-1.5 text-[11px] mb-1 pl-2 border-l-2"
+            className="flex items-center gap-1.5 text-[11px] mb-0.5 pl-2 border-l-2"
             style={{ color: 'var(--color-text-secondary)', borderColor: 'var(--color-border-strong)' }}
           >
             <Reply className="w-3 h-3 rotate-180 shrink-0 opacity-60" aria-hidden="true" />
@@ -208,7 +208,7 @@ function MessageRowInner({
                     color: 'var(--color-text-tertiary)',
                   }}
                 >
-                  <Sparkles className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
+                  <Bot className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
                   AI
                 </span>
               )}

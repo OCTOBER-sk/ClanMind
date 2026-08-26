@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Globe, ExternalLink, Sparkles, AlertTriangle, X } from 'lucide-react';
+import { Globe, ExternalLink, Bot, AlertTriangle, X } from 'lucide-react';
 import type { AiSourceCitation } from '@/types';
 import { handleExternalLinkClick } from '@/tauri/externalLinkPolicy';
 
@@ -76,7 +76,7 @@ export function ResearchDrawer({
           style={{ borderColor: 'var(--color-border-strong)', background: 'var(--color-surface)' }}
         >
           <div className="flex items-center gap-1.5 font-bold" style={{ color: 'var(--color-text)' }}>
-            <Sparkles className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
+            <Bot className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />
             <span>Impact on this Project</span>
           </div>
           <p className="leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>

@@ -39,7 +39,7 @@ export function ChatHeader({
       style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
     >
       <div className="flex items-center gap-3 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <Hash className="w-4 h-4 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} aria-hidden="true" />
           <span className="text-[13px] font-bold truncate" style={{ color: 'var(--color-text)' }}>
             {groupName}
@@ -47,11 +47,11 @@ export function ChatHeader({
         </div>
         {/* §267 project context chip */}
         <span
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium truncate max-w-[200px]"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium max-w-[200px]"
           style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
         >
           <FolderKanban className="w-3 h-3 shrink-0" aria-hidden="true" />
-          {activeProjectName ? `Project: ${activeProjectName}` : 'Group chat'}
+          <span className="truncate">{activeProjectName ? `Project: ${activeProjectName}` : 'Group chat'}</span>
         </span>
       </div>
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import * as RadixAvatar from '@radix-ui/react-avatar';
-import { Sparkles } from 'lucide-react';
+import { Bot } from 'lucide-react';
 import { cn } from '../utils';
 import type { PresenceState } from '@/types';
 
@@ -121,7 +121,7 @@ export function Avatar({
               )}
               aria-label={`${name} (AI)`}
             >
-              <Sparkles
+              <Bot
                 className={cn(
                   sz.fallback === 'text-[9px]' ? 'w-3 h-3' : sz.fallback === 'text-[10px]' ? 'w-3.5 h-3.5' : 'w-4 h-4',
                   isAiActive ? 'text-white' : 'text-[var(--color-text-tertiary)]',

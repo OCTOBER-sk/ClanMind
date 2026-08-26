@@ -10,7 +10,7 @@ import {
   Trash2,
   CheckSquare,
   Bookmark,
-  Sparkles,
+  Bot,
 } from 'lucide-react';
 import { IconButton } from '@/design-system/components/IconButton';
 import { Dropdown } from '@/design-system/components/Dropdown';
@@ -105,7 +105,7 @@ export function MessageActions({
     {
       id: 'context',
       label: 'Use as Odin context',
-      icon: <Sparkles className="w-3.5 h-3.5" />,
+      icon: <Bot className="w-3.5 h-3.5" />,
       onClick: () => onUseAsContext(message),
     },
   ];

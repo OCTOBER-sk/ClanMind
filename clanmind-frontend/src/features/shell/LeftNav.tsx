@@ -230,9 +230,9 @@ export const LeftNav = React.memo(function LeftNav({
                           : { color: 'var(--color-text-secondary)' }
                       }
                     >
-                      <span className="truncate flex items-center gap-2">
+                      <span className="flex items-center gap-2 min-w-0">
                         <FolderKanban className="w-3.5 h-3.5 shrink-0 opacity-70" aria-hidden="true" />
-                        {proj.name}
+                        <span className="truncate">{proj.name}</span>
                         {proj.status === 'archived' && (
                           <span className="text-[9px] uppercase tracking-wide opacity-70">archived</span>
                         )}

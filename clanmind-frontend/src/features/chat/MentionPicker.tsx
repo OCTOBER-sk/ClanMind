@@ -1,6 +1,6 @@
 import React, { forwardRef, useImperativeHandle, useState } from 'react';
 import { Avatar } from '@/design-system/components/Avatar';
-import { Sparkles } from 'lucide-react';
+import { Bot } from 'lucide-react';
 import { cn } from '@/design-system/utils';
 import type { GroupMember } from '@/types';
 
@@ -126,7 +126,7 @@ export const MentionPicker = forwardRef<MentionPickerHandle, MentionPickerProps>
                 <p className="truncate font-semibold flex items-center gap-1">
                   {item.name}
                   {item.isAi && (
-                    <Sparkles className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
+                    <Bot className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
                   )}
                 </p>
                 {item.role && (

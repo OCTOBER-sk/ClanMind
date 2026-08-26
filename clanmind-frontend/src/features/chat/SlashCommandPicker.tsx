@@ -1,6 +1,6 @@
 import React, { forwardRef, useImperativeHandle, useMemo, useState } from 'react';
 import {
-  Sparkles,
+  Bot,
   Lock,
   Video,
   Search,
@@ -37,7 +37,7 @@ const BASE_COMMANDS: SlashCommand[] = [
     command: '/odin',
     name: 'Ask Odin',
     description: 'Ask the shared AI teammate a question or request an artifact',
-    icon: <Sparkles className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />,
+    icon: <Bot className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />,
   },
   {
     id: 'cmd_private',

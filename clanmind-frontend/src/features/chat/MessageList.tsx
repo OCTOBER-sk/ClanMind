@@ -3,7 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { MessageRow } from './MessageRow';
 import { ChatHeader } from './ChatHeader';
 import { AiStreamAnnouncer } from '@/features/ai/AiStreamAnnouncer';
-import { ArrowDown, Loader2, Sparkles } from 'lucide-react';
+import { ArrowDown, Loader2, Bot } from 'lucide-react';
 import { cn } from '@/design-system/utils';
 import { Button } from '@/design-system/components/Button';
 import type { Message, TypingIndicator, AiRun, GroupRole } from '@/types';
@@ -413,7 +413,7 @@ export function MessageList({
                   size="sm"
                   variant="spectral"
                   onClick={onAskOdin}
-                  rightIcon={<Sparkles className="w-3.5 h-3.5" />}
+                  rightIcon={<Bot className="w-3.5 h-3.5" />}
                 >
                   Ask {aiName}
                 </Button>

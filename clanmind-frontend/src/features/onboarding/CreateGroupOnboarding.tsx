@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 import {
-  Sparkles,
+  Bot,
   ArrowRight,
   GitPullRequest,
   Bookmark,
@@ -293,7 +293,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   borderColor: 'var(--color-border)',
                 }}
               >
-                <Sparkles className="w-6 h-6" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
+                <Bot className="w-6 h-6" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold">Meet {aiName}.</h1>
@@ -449,7 +449,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               {displayStep >= 2 && (
                 <div className="node-arrive">
                   <Badge variant="spectral" size="sm">
-                    <Sparkles className="w-3 h-3" aria-hidden="true" />
+                    <Bot className="w-3 h-3" aria-hidden="true" />
                     @{aiName} activated
                   </Badge>
                 </div>
@@ -458,7 +458,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               {/* 3 — Odin status starts */}
               {displayStep >= 3 && (
                 <div className="flex items-center gap-2 node-arrive" style={{ color: 'var(--color-warning)' }}>
-                  <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
+                  <Bot className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>{aiName} is researching…</span>
                 </div>
               )}
