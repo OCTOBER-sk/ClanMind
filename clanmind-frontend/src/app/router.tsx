@@ -26,6 +26,10 @@ import { AppShell } from '@/features/shell/AppShell';
 import { AuthScreen } from '@/features/auth/AuthScreen';
 import { OnboardingWizard } from '@/features/onboarding/CreateGroupOnboarding';
 import { NAV_SECTION_PATHS, sectionFromPathname, shellBasePath } from '@/app/nav';
+import { demoMode } from '@/config/env';
+import { createGroup } from '@/api/endpoints/groups';
+import { createProject } from '@/api/endpoints/projects';
+import { useToast } from '@/design-system/components/Toast';
 
 export { NAV_SECTION_PATHS, sectionFromPathname };
 
@@ -61,14 +65,38 @@ function RootRedirect(): ReactElement {
 /** FE §70 — onboarding completion creates the first Group, then enters it. */
 function OnboardingRoute(): ReactElement {
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleComplete = (
+  const handleComplete = async (
     groupName: string,
     projectName: string,
     aiName: string,
-  ): void => {
+  ): Promise<void> => {
     const { addGroup, addProject } = useGroupStore.getState();
     const { setOnboardingComplete } = useUiStore.getState();
+
+    if (!demoMode) {
+      // LIVE mode — persist through the backend, use real server IDs.
+      try {
+        const group = await createGroup({ name: groupName, description: '' });
+        addGroup(group);
+        if (projectName.trim()) {
+          const proj = await createProject(group.id, { name: projectName.trim() });
+          addProject(proj);
+        }
+        setOnboardingComplete(true);
+        navigate(`/group/${group.id}/chat`, { replace: true });
+      } catch (err) {
+        toast({
+          title: 'Failed to create group',
+          description: err instanceof Error ? err.message : 'Please try again.',
+          variant: 'error',
+        });
+      }
+      return;
+    }
+
+    // DEMO mode — fully local, no backend.
     const now = new Date().toISOString();
     const group = {
       id: `grp_${crypto.randomUUID().slice(0, 8)}`,

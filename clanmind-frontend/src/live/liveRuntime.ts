@@ -39,7 +39,7 @@ type BEProject = ZodInfer<typeof ProjectSchema>;
 
 // ─── Row mapping (BE §24/§29/§39 rows → canonical FE types) ─────────────────
 
-function mapGroup(row: BEGroup): Group {
+export function mapGroup(row: BEGroup): Group {
   return {
     id: row.id,
     name: row.name,
@@ -55,7 +55,7 @@ function mapGroup(row: BEGroup): Group {
   };
 }
 
-function mapProject(row: BEProject): Project {
+export function mapProject(row: BEProject): Project {
   return {
     id: row.id,
     group_id: row.group_id,

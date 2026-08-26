@@ -1,8 +1,9 @@
 /**
  * Group endpoints used by Settings (BE §104 Groups + handlers/groups.ts) —
- * the ONLY REST sites for group profile edits and the §228/§9 deletion
+ * REST sites for group creation, profile edits and the §228/§9 deletion
  * lifecycle (FE §9 layer boundary):
  *
+ *   POST   /api/v1/groups { name, description? }          → group row (201)
  *   PATCH  /api/v1/groups/:groupId { name?, description? } → group row
  *   DELETE /api/v1/groups/:groupId → soft delete (Stage 1, recovery window)
  *   POST   /api/v1/groups/:groupId/restore → Owner-only Stage 2
@@ -15,6 +16,22 @@
 
 import { z } from 'zod';
 import { api } from '@/api/client';
+import { GroupSchema } from '@/api/schemas';
+import { mapGroup } from '@/live/liveRuntime';
+import type { Group } from '@/types';
+
+/** POST /groups → 201 group row. Maps the BE row into the canonical FE Group type. */
+export async function createGroup(input: {
+  name: string;
+  description?: string;
+}): Promise<Group> {
+  const raw = await api.post('/groups', input);
+  const parsed = GroupSchema.safeParse(raw);
+  if (!parsed.success) throw new Error('Group create response failed schema validation.')
+  return mapGroup(parsed.data)
+}
+
+// ─── Settings / profile edits ────────────────────────────────────────────────
 
 const UpdatedGroupSchema = z
   .object({ id: z.string().min(1), name: z.string().min(1) })

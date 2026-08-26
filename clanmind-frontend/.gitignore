@@ -26,3 +26,7 @@ dist-ssr
 # Tauri build artifacts
 src-tauri/target
 src-tauri/gen/schemas
+
+# live-mode secrets — never commit
+.env.live
+

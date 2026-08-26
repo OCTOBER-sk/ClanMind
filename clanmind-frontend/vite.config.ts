@@ -34,6 +34,15 @@ export default defineConfig(({ mode }) => {
   server: {
     port: 1420,
     strictPort: true,
+    // Dev-only same-origin proxy to the Worker (live mode). The production
+    // deploy serves the Worker behind the same host, so this mirrors prod.
+    proxy: {
+      '/api/v1': {
+        target: 'http://localhost:8787',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
     watch: {
       ignored: ['**/src-tauri/**'],
     },

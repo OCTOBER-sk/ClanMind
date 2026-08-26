@@ -6,6 +6,8 @@ import { Textarea } from '@/design-system/components/Textarea';
 import { useToast } from '@/design-system/components/Toast';
 import { useGroupStore } from '@/state/useGroupStore';
 import { useAuthStore } from '@/state/useAuthStore';
+import { demoMode } from '@/config/env';
+import { createGroup } from '@/api/endpoints/groups';
 import type { Group } from '@/types';
 
 export interface CreateGroupDialogProps {
@@ -21,13 +23,43 @@ export function CreateGroupDialog({ open, onOpenChange }: CreateGroupDialogProps
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
       setError('Give your group a name.');
       return;
     }
+
+    if (!demoMode) {
+      // LIVE mode — persist through the backend.
+      setLoading(true);
+      try {
+        const group = await createGroup({
+          name: trimmed,
+          description: description.trim() || undefined,
+        });
+        addGroup(group);
+        setActiveGroup(group);
+        toast({ title: 'Group created', variant: 'success' });
+        setName('');
+        setDescription('');
+        setError(null);
+        onOpenChange(false);
+      } catch (err) {
+        toast({
+          title: 'Failed to create group',
+          description: err instanceof Error ? err.message : 'Please try again.',
+          variant: 'error',
+        });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // DEMO mode — fully local.
     const now = new Date().toISOString();
     const group: Group = {
       id: `grp_${Date.now()}`,
@@ -72,8 +104,8 @@ export function CreateGroupDialog({ open, onOpenChange }: CreateGroupDialogProps
           <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button size="sm" variant="primary" onClick={handleCreate}>
-            Create group
+          <Button size="sm" variant="primary" onClick={handleCreate} disabled={loading}>
+            {loading ? 'Creating…' : 'Create group'}
           </Button>
         </>
       }
