@@ -107,6 +107,7 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
             role="listitem"
             data-testid="attachment-chip"
             data-upload-state={isFailed ? 'failed' : isUploading ? 'uploading' : file.upload_state}
+            aria-label={`${file.file_name}, ${statusText}`}
             className={cn(
               'relative flex items-center gap-2 overflow-hidden rounded-lg border px-2 py-1.5 pr-1.5 text-[12px] max-w-[240px] transition-colors',
             )}

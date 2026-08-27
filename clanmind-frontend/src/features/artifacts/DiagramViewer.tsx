@@ -126,23 +126,57 @@ function SpectralEdgeView({
   });
   const drawing = data?.drawing === true;
   const gradientId = `cm-edge-grad-${id}`;
-  return (
-    <>
-      <defs>
-        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-          {/* Spectral restraint — gradient exists ONLY while drawing (§99). */}
-          <stop offset="0%" stopColor="#7e57c2" />
-          <stop offset="50%" stopColor="#7ee8fa" />
-          <stop offset="100%" stopColor="#80ff72" />
-        </linearGradient>
-      </defs>
+  const glowFilterId = `cm-edge-glow-f-${id}`;
+
+  // §41 — Static edges render clean, no gradient overhead.
+  if (!drawing) {
+    return (
       <BaseEdge
         id={id}
         path={path}
-        className={cn(drawing && 'cm-edge-draw')}
+        style={{ stroke: 'var(--color-border-strong)', strokeWidth: 1.5 }}
+      />
+    );
+  }
+
+  return (
+    <>
+      <defs>
+        {/* §41 — Full spectral rainbow: 7 stops, smooth transitions.
+            Colors chosen for vibrancy on both light and dark surfaces. */}
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#ff5f6d" />
+          <stop offset="16%" stopColor="#ffc371" />
+          <stop offset="33%" stopColor="#80ff72" />
+          <stop offset="50%" stopColor="#7ee8fa" />
+          <stop offset="66%" stopColor="#818cf8" />
+          <stop offset="83%" stopColor="#a855f7" />
+          <stop offset="100%" stopColor="#ec4899" />
+        </linearGradient>
+        {/* §41 — Glow filter: soft bloom behind the edge for depth */}
+        <filter id={glowFilterId} x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="5" />
+        </filter>
+      </defs>
+      {/* §41 — Glow layer: wider, blurred, semi-transparent rainbow */}
+      <BaseEdge
+        path={path}
+        className="cm-edge-glow"
         style={{
-          stroke: drawing ? `url(#${gradientId})` : 'var(--color-border-strong)',
-          strokeWidth: drawing ? 2 : 1.5,
+          stroke: `url(#${gradientId})`,
+          strokeWidth: 8,
+          filter: `url(#${glowFilterId})`,
+        }}
+      />
+      {/* §41 — Main edge: crisp rainbow with flowing draw animation */}
+      <BaseEdge
+        id={id}
+        path={path}
+        className="cm-edge-draw"
+        style={{
+          stroke: `url(#${gradientId})`,
+          strokeWidth: 2.5,
+          strokeLinecap: 'round',
         }}
       />
     </>

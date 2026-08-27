@@ -25,8 +25,8 @@ import { copyToClipboard } from '@/tauri/bridge';
  * §70 Create Group Onboarding — 7 steps, everything non-essential skippable:
  *   1. Group name (+ optional description, §71)
  *   2. Invite teammates (skippable, §72)
- *   3. Meet Odin (§73)
- *   4. Optional AI setup — rename Odin / avatar (§73, product rule 12)
+ *   3. Meet AI (§73)
+ *   4. Optional AI setup — rename / avatar (§73, product rule 12)
  *   5. First-run demo animation — all 10 steps (§74, §75)
  *   6. Optional first Project (§77)
  *   7. Enter ClanMind (§70) — never "Workspace" (§2 rule 1)
@@ -36,10 +36,13 @@ export interface OnboardingWizardProps {
   onComplete: (groupName: string, projectName: string, aiName: string) => void;
 }
 
+/** §17.1 — Default AI identity; user can rename during onboarding. */
+const DEFAULT_AI_NAME = 'Odin';
+
 const STEP_LABELS = [
   'Team Setup',
   'Invite',
-  'Meet Odin',
+  `Meet ${DEFAULT_AI_NAME}`,
   'AI Setup',
   'Core Loop Demo',
   'First Project',
@@ -67,7 +70,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [description, setDescription] = useState('');
   const [projectName, setProjectName] = useState('');
   const [projectGoal, setProjectGoal] = useState('');
-  const [aiName, setAiName] = useState('Odin');
+  const [aiName, setAiName] = useState(DEFAULT_AI_NAME);
   const [aiAvatar, setAiAvatar] = useState('odin-default');
   const [inviteEmails, setInviteEmails] = useState<string[]>(['']);
   const [inviteCopied, setInviteCopied] = useState(false);
@@ -164,7 +167,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           <div className="space-y-4">
             <h1 className="text-2xl font-bold">What&rsquo;s your team called?</h1>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
-              Groups are where your team thinks, talks, researches with Odin, and builds together.
+              Groups are where your team thinks, talks, researches with AI, and builds together.
             </p>
             <div className="space-y-3 pt-2">
               <div className="space-y-1">
@@ -359,8 +362,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 <Input
                   id="onb-ai-name"
                   value={aiName}
-                  onChange={(e) => setAiName(e.target.value || 'Odin')}
-                  placeholder="Odin"
+                  onChange={(e) => setAiName(e.target.value || DEFAULT_AI_NAME)}
+                  placeholder={DEFAULT_AI_NAME}
                   maxLength={20}
                 />
               </div>
@@ -445,7 +448,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
               )}
 
-              {/* 2 — @Odin token activates */}
+              {/* 2 — @AI token activates */}
               {displayStep >= 2 && (
                 <div className="node-arrive">
                   <Badge variant="spectral" size="sm">
@@ -455,7 +458,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
               )}
 
-              {/* 3 — Odin status starts */}
+              {/* 3 — AI status starts */}
               {displayStep >= 3 && (
                 <div className="flex items-center gap-2 node-arrive" style={{ color: 'var(--color-warning)' }}>
                   <Bot className="w-3.5 h-3.5" aria-hidden="true" />

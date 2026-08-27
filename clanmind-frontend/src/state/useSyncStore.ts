@@ -70,7 +70,7 @@ export const useSyncStore = create<SyncState>()(
       conflicts: [],
       activeConflict: null,
       // §186A.1 — per-device checkpoint is created on first real sync
-      // (BE §20A); demo hydration seeds one under VITE_DEMO_MODE.
+      // (BE §20A).
       checkpoint: null,
       protocolMismatch: null,
       recommendedUpdate: { available: false, dismissed: false },

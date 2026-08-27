@@ -1,0 +1,26 @@
+Frontend live-integration fix (ClanMind): populate the feature screens from the REAL backend in LIVE mode (VITE_DEMO_MODE=0). Verified gap: the live bootstrap (`src/live/liveRuntime.ts`) only loads groups, projects and members — Tasks, Decisions, Memory, Artifacts (Garage), Activity and Notifications render from local stores that stay empty in live mode, so those screens show "No … yet" even though the data exists in the backend (verified: project 4c10b217 has 2 tasks, 1 decision, 5 artifacts via the Worker API). In demo mode these screens are seeded; in live mode they must load from the backend.
+
+## Goal
+When `bootstrapLiveGroups()` runs (live mode), also load and seed the feature stores so these screens render the real data:
+- Tasks (`useProjectDataStore` tasks) ← GET `/projects/:projectId/tasks`
+- Decisions (`useProjectDataStore` decisions) ← GET `/projects/:projectId/decisions`
+- Memory (`useMemoryStore`? find it) ← GET `/groups/:groupId/memory` (+ `/group/memory` / `/user/private` if present)
+- Artifacts (`useArtifactStore` artifacts) ← GET `/projects/:projectId/artifacts`
+- Activity — find its loader/endpoint
+- Notifications — find its loader/endpoint
+- Search — wire the search index if a live search path exists
+
+Constraints:
+- Use the existing `api` client (`@/api/client`) and any existing `src/api/endpoints/*` read functions + zod schemas (`@/api/schemas`); see how `src/live/liveRuntime.ts` already loads groups/projects/members and mirror that pattern (mapGroup/mapProject style row→store mapping).
+- Preserve DEMO mode exactly (only add a live branch; never break demo).
+- Map backend rows to the store shapes the screens expect (status enums, ids, timestamps) — reuse existing mappers or add minimal ones.
+- Real backend shapes (verified): Task `{id,project_id,title,description,status,priority,owner_user_id,created_at,updated_at,dependencies?}`; Decision `{id,project_id,title,context,status,created_by,created_at}`; Artifact `{id,project_id,name,artifact_type,content_type,content,created_by_user_id,created_at}`; memory rows include scope. Confirm against the actual endpoints while coding.
+- Do NOT touch the backend, routing, auth, or chat logic. Only add live loaders + the bootstrap call + minimal mappers + tests.
+
+## Verification (MANDATORY, report exact)
+1. `pnpm typecheck` clean.
+2. `pnpm test` — ALL existing tests green (report before/after totals). Add minimal tests for the new mappers/loaders if straightforward (mock the api client).
+3. Report files changed + exact test counts + anything NOT VERIFIED.
+4. If any live client request 404s or the backend endpoint name differs, note it explicitly (the bare `/groups/:id/activity`, `/notifications`, `/memory` endpoints exist on the worker — verify).
+
+Style: match existing conventions. No new dependencies.

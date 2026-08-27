@@ -1,0 +1,30 @@
+AGENT E of 8 (A–H) — ClanMind UI/UX deep refinement. You own ONLY artifacts / the right work surface: panel, diagram canvas (alignment is a NON-NEGOTIABLE hard requirement), viewers, compare, versions, export. Agent A refined tokens/theme; reuse them.
+
+## QUALITY FIRST (Sandy's standing priority)
+Artifacts are ClanMind's flagship. Correct GEOMETRY is more important than looks: if nodes misalign, edges drift after zoom/resize, labels overlap, or content clips, FIX THE UNDERLYING layout/coordinate/transform system — never paper over it with arbitrary margins/translate nudges (§38/§86). Render the real app and inspect the diagram at multiple zoom levels and widths before you declare done. Do not claim alignment works because the CSS looks reasonable.
+
+## Source of truth (read before editing)
+build/directives/UIUX_REFINEMENT_DIRECTIVE.md sections 37,38,39,40,41,42,43,69,76,85,86  (<— 38 and 86 are HARD QA: correct the geometry model, never patch with arbitrary CSS nudges)
+ClanMind_Frontend_Master_Implementation_Specification.md sections 94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,204,290,291
+Repo REAL paths: clanmind-frontend/src/features/artifacts/{ArtifactPanel,ArtifactCompare,DiagramViewer,DocumentViewer,ChartViewer,TableArtifactViewer,ContextInspector,UnsupportedArtifactCard}.tsx and diagramUtils.ts, diffUtils.ts, constructionStore.ts, useArtifactController.ts.
+
+## Hard requirement (directive s38/s86 — do not shortcut)
+Fully verify AND correct artifact alignment and geometry in the rendered app. Do not trust CSS looks reasonable. If nodes misalign, edges drift after zoom/resize, labels overlap, content clips, or content floats centered in a huge empty panel — fix the UNDERYLING measurement/layout/coordinate/transform system (deterministic layout, flex/grid, stable node coordinate system, viewport transforms, shared geometry utilities), not arbitrary px nudges.
+
+## Deliverables (refine visuals + geometry; preserve state/events/contracts)
+1. ArtifactPanel.tsx — contextual work surface: opens only for substantial output / primary artifact; open smoothly (panel width expansion, subtle fade/slide), close restores chat width + focus; header aligned (title | TYPE · version | expand/pin/more/close); toolbar consistent; content occupies available space (no centered-tiny-content-in-huge-panel); single primary surface with tabs/stack for competing contexts (thread vs artifact), no pile of overlapping panels (s42); isolate failures so one broken artifact never crashes chat (FE s291, s76).
+2. DiagramViewer.tsx + diagramUtils.ts — canvas: correct centering, viewport calculations, scaling, zoom, pan, scroll, resize, fullscreen, min/max bounds, no clipping. Node geometry: predictable width/height/padding/typography/line-height/connector anchors/internal alignment; nodes in a row/column align EXACTLY. Edge geometry: correct attachment points, no drift after zoom/resize, no label overlap, no avoidable crossing, no stale coords. State transitions loading->building->partial->complete remain stable/readable. Spectral edge animation only while edge being created/updated, then static (FE s99).
+3. DocumentViewer + ChartViewer + TableArtifactViewer — shared ClanMind visual system (header/toolbar/icons/type), no unrelated third-party look; aligned controls; zoom/fit/pan where applicable.
+4. ArtifactCompare.tsx + diffUtils.ts — document diff / structural diff for diagrams / changed rows for tables; never raw JSON by default; clear current-vs-prior state.
+5. Artifact versions/restore/pin/export (in ArtifactPanel) — make version state obvious when active (current/prior/compare/restored/generated) but controls not visually dominant when unused; avoid accidental destructive replacement; versions immutable per backend.
+6. ContextInspector.tsx — human-readable provenance (Used Decision #14, Used requirements.pdf, Used Architecture v3, Used 8 web sources); never hidden chain-of-thought.
+7. UnsupportedArtifactCard.tsx — "created by a newer ClanMind version / Update to view", no crash.
+8. Verify at narrow-right-panel / normal / wide / ultrawide / panel-resize / zoom / pan / fullscreen / close-reopen (s69). No content too small, no toolbar overlapping content, no canvas clipping important content.
+
+## Constraints (hard)
+- ZERO new deps (uses @xyflow/react already present). Preserve artifact event pipeline (constructionStore, artifactEvents), ArtifactPanel tests, artifactsRoutes tests, memo test, exporters test. Keep all green.
+- True-black/white discipline; spectral only for construction/milestone/selected-AI.
+- Do NOT touch chat/ai/shell screens. Work only inside clanmind-frontend/.
+
+## Verify (inside clanmind-frontend) then self-review
+pnpm exec tsc -b ; pnpm run lint ; pnpm test. Then INSPECT the rendered artifact in the running app (vite dev at http://localhost:1420, demo mode) — open a diagram, verify nodes/edges/labels align at multiple zoom levels and widths, screenshot it. Do not declare success from CSS alone. git status must show ONLY artifacts/* files. Report files changed, geometry fixes (with what was wrong and the healthy fix), test counts, NOT VERIFIED items. Artifacts are first-class project work — make them precise, spacious, legible, unmistakably ClanMind.

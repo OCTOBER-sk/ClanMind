@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Send,
   Paperclip,
@@ -106,6 +106,11 @@ export function Composer({
 }: ComposerProps) {
   const [showMentions, setShowMentions] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
+  /** §31 — draft persistence key scoped to conversation context */
+  const draftKey = useMemo(
+    () => `clanmind:draft:${visibility}:${privateRecipientId ?? 'group'}`,
+    [visibility, privateRecipientId],
+  );
   /** §60 — viewport placement of the mention picker, tracking the caret. */
   const [mentionPlacement, setMentionPlacement] = useState<{ left: number; top: number } | null>(null);
   const [showCommands, setShowCommands] = useState(false);
@@ -123,6 +128,26 @@ export function Composer({
   const privateChooserRef = useRef<PrivateRecipientChooserHandle | null>(null);
   /** Last known caret offset in the textarea — anchor for §60 tracking. */
   const caretPosRef = useRef(0);
+
+  // §31 — draft persistence: load on mount, save on change
+  useEffect(() => {
+    if (text) return; // don't overwrite existing text
+    try {
+      const saved = localStorage.getItem(draftKey);
+      if (saved) onChangeText(saved);
+    } catch { /* localStorage unavailable */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+
+  useEffect(() => {
+    try {
+      if (text.trim()) {
+        localStorage.setItem(draftKey, text);
+      } else {
+        localStorage.removeItem(draftKey);
+      }
+    } catch { /* localStorage unavailable */ }
+  }, [text, draftKey]);
 
   const isOffline = syncStatus === 'offline' || syncStatus === 'reconnecting';
 
@@ -266,6 +291,8 @@ export function Composer({
       e.preventDefault();
       if (canSend) {
         onSend();
+        // §31 — clear draft after successful send
+        try { localStorage.removeItem(draftKey); } catch { /* */ }
         setShowMentions(false);
         setShowCommands(false);
       }
@@ -506,7 +533,7 @@ export function Composer({
           }}
         >
           <div className="flex items-center gap-1.5">
-            <Lock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            <span aria-hidden="true" className="text-sm">🔒</span>
             <span>
               Private with{' '}
               <span data-testid="privacy-recipient" className="underline decoration-dotted underline-offset-2">

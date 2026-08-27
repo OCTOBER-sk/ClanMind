@@ -14,6 +14,7 @@ export interface DecisionCardProps {
   /** 1-based position in the Project's chronological log. */
   ordinal: number;
   members: GroupMember[];
+  aiName?: string;
   onApprove?: (decision: Decision) => void;
   onReject?: (decision: Decision) => void;
   disabled?: boolean;
@@ -35,9 +36,9 @@ function decisionStatusVariant(
   }
 }
 
-function memberName(userId: string | null | undefined, members: GroupMember[]): string | null {
+function memberName(userId: string | null | undefined, members: GroupMember[], aiName: string): string | null {
   if (!userId) return null;
-  if (userId === 'odin_ai') return 'Odin';
+  if (userId === 'odin_ai') return aiName;
   const member = members.find((m) => m.user_id === userId);
   return member?.nickname ?? member?.user.name ?? null;
 }
@@ -46,12 +47,13 @@ export function DecisionCard({
   decision,
   ordinal,
   members,
+  aiName = 'AI',
   onApprove,
   onReject,
   disabled,
 }: DecisionCardProps) {
-  const approvedByName = memberName(decision.approved_by, members);
-  const proposedByName = memberName(decision.proposed_by, members);
+  const approvedByName = memberName(decision.approved_by, members, aiName);
+  const proposedByName = memberName(decision.proposed_by, members, aiName);
 
   return (
     <div

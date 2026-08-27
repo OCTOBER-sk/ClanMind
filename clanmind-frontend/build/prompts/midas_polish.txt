@@ -1,0 +1,21 @@
+Frontend polish fix (ClanMind, LIVE mode). Fix concrete flagship-polish nits a user auditor flagged; bounded scope. All work in clanmind-frontend.
+
+## Task 1 — Remove "silly" AI-start emojis / charm
+- `src/features/chat/MessageActions.tsx` uses decorative emoji/sparkles. Audit EVERY emoji/sparkle/gif decoration in the CHAT + ONBOARDING demo surfaces. Replace or remove the silly ones with clean, monochrome, spec-compliant icons (lucide-react icons are already used app-wide). The rule: professional technical tool, no cartoon emoji in the AI message chrome/status.
+- Also audit `src/features/onboarding/CreateGroupOnboarding.tsx` (Core Loop Demo §74/§75) and `src/features/ai/*` for any cartoon emoji — replace with lucide icons or remove.
+
+## Task 2 — Clean logo + profile alignment
+- `src/features/shell/TopBar.tsx` (and any global header): ensure the brand mark / wordmark and the user profile avatar/initials are on a consistent baseline, vertically aligned, correct spacing (no jitter), and that the logo uses the monochrome `clanmind-mark` at a consistent height. Also verify the nav + header padding is uniform.
+- `src/features/shell/AppShell.tsx`: verify nav grouping + the selected-state alignment; nothing looks off-centre.
+
+## Task 3 — Chat/flagship surface polish (light touch, DO NOT over-refactor)
+- Chat message column: ensure text alignment, avatars, timestamps and the AI response bubble are cleanly aligned; the "reply" indicator shouldn't create a huge dead gap — tighten spacing so a user message flows into the AI reply.
+- Project-name truncation: add a proper ellipsis/`text-overflow` treatment where the project name is cut off in the sidebar and header (`…`). Do not change behaviour.
+
+## Verification (MANDATORY, report exact results)
+- `pnpm typecheck` clean.
+- `pnpm test` — ALL existing tests green (report totals before/after). Fix any test that asserts on the old emoji if presence was asserted (update the assertion, not weaken coverage).
+- Report files changed + exact test counts + anything NOT VERIFIED.
+- Do NOT touch backend, routing logic, auth, or the store shapes. Visual/presentation only.
+
+Style: match existing conventions (single quotes, trailing commas, lucide icons). No new dependencies. This is presentation polish — behaviour must be preserved exactly.

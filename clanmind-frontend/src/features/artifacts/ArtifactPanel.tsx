@@ -115,18 +115,19 @@ function ArtifactPanelBody({
   useEffect(() => {
     if (!artifact.id) return;
     fetchArtifact(artifact.id).then((full) => {
+      console.log('[ArtifactPanel] fetchArtifact result:', full ? `versions=${full.versions.length}, content_len=${full.versions[full.versions.length-1]?.content?.length}` : 'null');
       if (full && full.versions.length > 0) {
         setFetchedVersions(full.versions);
         useArtifactStore.getState().mergeArtifactVersion(full);
       }
-    }).catch(() => {});
+    }).catch((err) => console.error('[ArtifactPanel] fetchArtifact error:', err));
   }, [artifact.id]);
 
   // Use fetched versions if available, otherwise fall back to artifact versions
   const effectiveVersions = fetchedVersions.length > 0 ? fetchedVersions : artifact.versions;
 
   const currentVersion: ArtifactVersion =
-    (activeVersionNumber && activeVersionNumber > 0
+    (fetchedVersions.length === 0 && activeVersionNumber && activeVersionNumber > 0
       ? effectiveVersions.find((v) => v.version_number === activeVersionNumber)
       : null) ??
     effectiveVersions[effectiveVersions.length - 1] ??

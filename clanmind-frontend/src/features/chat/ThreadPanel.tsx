@@ -74,6 +74,8 @@ export function ThreadPanel({
   return (
     <div
       data-testid="thread-panel"
+      role="complementary"
+      aria-label="Thread panel"
       className="flex flex-col h-full border-l text-[13px]"
       style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
     >
@@ -121,7 +123,7 @@ export function ThreadPanel({
       </div>
 
       {/* Replies List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3" role="log" aria-label="Thread replies">
         {replies.length === 0 && (
           <div className="text-[12px] text-center py-6" style={{ color: 'var(--color-text-tertiary)' }}>
             No replies yet — start the thread.

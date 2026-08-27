@@ -19,7 +19,6 @@ import {
   Circle,
 } from 'lucide-react';
 import { cn } from '@/design-system/utils';
-import odinAvatar from '@/assets/brand/odin-avatar.png';
 import type { AiRunStatus } from '@/types';
 
 // ─── Public types ───────────────────────────────────────────────────────────
@@ -38,7 +37,7 @@ export interface AiStatusIndicatorProps {
   status: AiStatusKind;
   /** Human-readable activity label shown next to the indicator (§132) */
   activityLabel?: string;
-  /** The AI name shown as prefix (default "Odin") */
+  /** The AI name shown as prefix (default "AI") */
   aiName?: string;
   /** Compact variant — just the pulsing dot, no text */
   compact?: boolean;
@@ -146,7 +145,7 @@ const STATUS_CONFIG: Record<AiStatusKind, StatusConfig> = {
 export const AiStatusIndicator = memo(function AiStatusIndicator({
   status,
   activityLabel,
-  aiName = 'Odin',
+  aiName = 'AI',
   compact = false,
   className,
 }: AiStatusIndicatorProps) {
@@ -188,12 +187,14 @@ export const AiStatusIndicator = memo(function AiStatusIndicator({
       aria-label={`${aiName} \u00b7 ${displayLabel}`}
       className={cn('inline-flex items-center gap-1.5 select-none', className)}
     >
-      {/* Odin avatar — compact, rounded, monochrome */}
-      <img
-        src={odinAvatar}
-        alt={aiName}
-        className="w-4 h-4 rounded-full object-cover shrink-0 dark:invert"
-      />
+      {/* AI avatar — initial-based, rounded */} 
+      <span
+        className="w-4 h-4 rounded-full shrink-0 flex items-center justify-center text-[9px] font-bold"
+        style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
+        aria-hidden="true"
+      >
+        {aiName.charAt(0).toUpperCase()}
+      </span>
 
       {/* Status icon — spectral for active states */}
       <span className="inline-flex shrink-0" style={{ color: spectral ? undefined : colorVar }}>

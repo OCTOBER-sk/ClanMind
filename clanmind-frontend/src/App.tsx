@@ -52,19 +52,13 @@ export function App() {
   }, []);
 
   // Real connectivity → SyncBanner truth (FE §185). Realtime is initialised
-  // at boot: demo installs its hub + socket (src/mocks); LIVE mode bootstraps
-  // group data from the real backend and connects the group room.
+  // at boot: LIVE mode bootstraps group data from the real backend and
+  // connects the group room.
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
     void (async () => {
       try {
-        const { demoMode } = await import('@/config/env');
-        if (demoMode) {
-          const { getRealtime } = await import('@/realtime/connection');
-          if (!cancelled) initConnectivity(getRealtime());
-          return;
-        }
         const live = await import('@/live/liveRuntime');
         if (cancelled) return;
         await live.bootstrapLiveGroups();

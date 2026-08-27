@@ -130,15 +130,18 @@ export function TeamView({
         ) : (
           /* §21 — compact row layout, not oversized cards */
           <div className="px-6 py-3">
+            {/* Team members table */}
+            <div role="table" aria-label="Team members">
             {/* Column headers */}
             <div
               className="grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] gap-3 px-3 py-2 text-[10px] font-bold uppercase tracking-wide"
               style={{ color: 'var(--color-text-tertiary)' }}
+              role="row"
             >
-              <span>Member</span>
-              <span>Role</span>
-              <span>Status</span>
-              <span className="text-right">Actions</span>
+              <span role="columnheader">Member</span>
+              <span role="columnheader">Role</span>
+              <span role="columnheader">Status</span>
+              <span role="columnheader" className="text-right">Actions</span>
             </div>
 
             {/* Rows */}
@@ -147,6 +150,7 @@ export function TeamView({
               <div
                 className="grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] items-center gap-3 px-3 py-2.5 rounded-md"
                 style={{ background: 'var(--color-surface)' }}
+                role="row"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Avatar name="Odin" src={odinAvatar} size="sm" isAi />
@@ -178,6 +182,8 @@ export function TeamView({
                   <div
                     key={member.user_id}
                     className="grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] items-center gap-3 px-3 py-2.5 rounded-md transition-colors hover:bg-[var(--color-surface-hover)]"
+                    role="row"
+                    aria-label={`${nickname}, ${member.role}`}
                   >
                     {/* Avatar + Name */}
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -238,6 +244,7 @@ export function TeamView({
                         variant="ghost"
                         leftIcon={<MessageSquare className="w-3 h-3" />}
                         onClick={() => onStartPrivateChat(member)}
+                        aria-label={`Start private chat with ${nickname}`}
                       >
                         Private
                       </Button>
@@ -245,6 +252,7 @@ export function TeamView({
                   </div>
                 );
               })}
+            </div>
             </div>
           </div>
         )}

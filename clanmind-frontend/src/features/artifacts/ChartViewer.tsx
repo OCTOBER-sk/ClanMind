@@ -91,7 +91,7 @@ export default function ChartViewer({ content }: { content: string }) {
   );
 
   return (
-    <div className="flex h-full flex-1 flex-col overflow-y-auto bg-[var(--color-surface-raised)] p-4">
+    <div className="flex h-full flex-1 flex-col overflow-y-auto bg-[var(--color-surface-raised)] p-4" role="img" aria-label={chart.title ? `Chart: ${chart.title}` : 'Data chart'}>
       {chart.title && (
         <h3 className="mb-3 text-xs font-bold text-[var(--color-text)]">{chart.title}</h3>
       )}

@@ -138,8 +138,8 @@ export function MessageActions({
                 onReact(emoji);
                 setIsEmojiPickerOpen(false);
               }}
-              className="text-base p-1.5 hover:bg-[var(--color-surface-hover)] rounded-md transition-all duration-100 hover:scale-110 cursor-pointer"
-              aria-label={`React ${emoji}`}
+              className="text-base p-1.5 hover:bg-[var(--color-surface-hover)] rounded-md transition-all duration-100 hover:scale-105 active:scale-95 cursor-pointer"
+              aria-label={`React with ${emoji}`}
             >
               {emoji}
             </button>

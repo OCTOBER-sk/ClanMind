@@ -21,3 +21,7 @@ Thumbs.db
 # Parked inner repo metadata (backend was vendored into this monorepo for push;
 # restore with: Rename-Item clanmind-backend\.git_disabled_for_monorepo_push .git)
 **/.git_disabled_for_monorepo_push/
+
+# local secrets & scratch probes (never commit)
+clanmind-frontend/.env
+clanmind-backend/scripts/probe*.py

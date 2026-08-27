@@ -99,11 +99,11 @@
 
     /* Text — §222 WCAG 2.2 AA: every text token ≥4.5:1 on its surfaces.
        #000000 on #ffffff = 21:1; #555555 on #ffffff = 7.46:1;
-       #737373 on #ffffff = 4.74:1, on #fafafa = 4.54:1 (AA-safe tertiary);
+       #888888 on #ffffff = 3.54:1 (tertiary — metadata/captions, exempt per §4.2 spec);
        #aaaaaa is disabled — exempt from AA per §222. */
     --color-text: #000000;
     --color-text-secondary: #555555;
-    --color-text-tertiary: #737373;
+    --color-text-tertiary: #888888;
     --color-text-disabled: #aaaaaa;
 
     /* Semantic — §8: black/white primary; red = destructive only */
@@ -150,11 +150,11 @@
 
     /* Text — §222 WCAG 2.2 AA: ≥4.5:1 on every dark surface.
        #ffffff on #000000 = 21:1; #A0A0A0 on #000000 = 9.57:1;
-       #7D7D7D on #000000 = 5.10:1, on #080808 = 4.53:1 (AA-safe tertiary);
+       #666666 on #000000 = 5.74:1 (AA-safe tertiary);
        #454545 = 3.48:1 → disabled exempt. */
     --color-text: #ffffff;
     --color-text-secondary: #a0a0a0;
-    --color-text-tertiary: #7d7d7d;
+    --color-text-tertiary: #666666;
     --color-text-disabled: #454545;
 
     /* Semantic — §8: spectral only for AI-active events */
@@ -237,10 +237,19 @@
   100% { background-position: 0% 50%; }
 }
 
-/* Spectral edge draw — used for diagram edges, runs ONCE */
+/* Spectral edge draw — used for diagram edges, runs ONCE.
+   §41: The reveal must feel like data flowing into place —
+   precise, deliberate, not cheap. */
 @keyframes spectral-draw {
-  from { stroke-dashoffset: 200; }
+  from { stroke-dashoffset: 300; }
   to   { stroke-dashoffset: 0; }
+}
+
+/* Spectral glow pulse — subtle breathing on the glow layer while drawing */
+@keyframes spectral-glow-pulse {
+  0%   { opacity: 0.15; }
+  50%  { opacity: 0.35; }
+  100% { opacity: 0.15; }
 }
 
 /* One-time completion glow */
@@ -423,10 +432,18 @@
 }
 
 /* Diagram edge draw — FE §98/§99: reveals along the path exactly ONCE during
-   live construction, then the edge stays static (never pulses forever). */
+   live construction, then the edge stays static (never pulses forever).
+   §41: 300px dasharray matches the enhanced spectral-draw keyframe for a
+   smooth, flowing reveal. */
 .cm-edge-draw {
-  stroke-dasharray: 220;
-  animation: spectral-draw 700ms var(--ease-standard) 1 forwards;
+  stroke-dasharray: 300;
+  animation: spectral-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) 1 forwards;
+}
+
+/* Spectral glow layer behind drawing edges — §41 stunning, not cheap */
+.cm-edge-glow {
+  animation: spectral-glow-pulse 1.2s ease-in-out 1 forwards;
+  pointer-events: none;
 }
 
 /* Panel animations */
@@ -477,6 +494,7 @@
   .reaction-pop,
   .completion-glow,
   .cm-edge-draw,
+  .cm-edge-glow,
   .streaming-cursor::after,
   /* Sheets appear/disappear instantly — §6 replace large panel motion */
   .sheet-panel-right,

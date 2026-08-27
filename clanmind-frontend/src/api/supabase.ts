@@ -3,8 +3,7 @@
  *
  * Supabase owns credentials, session lifecycle, token refresh, and password
  * recovery. ALL domain data flows through `/api/v1` — no table access from
- * the client. In demo mode (VITE_DEMO_MODE=1) this module is never called;
- * the session gateway routes to the demo transport instead.
+ * the client.
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';

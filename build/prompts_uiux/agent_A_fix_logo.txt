@@ -1,0 +1,16 @@
+Tiny AGENT A follow-up (ClanMind UI/UX). One precise fix, nothing else.
+
+## Problem (out of scope in the A run)
+clanmind-frontend/src/design-system/components/ClanMindLogo.tsx still renders a PERSISTENT BLUE accent: lines ~99 `fill-blue-400 dark:fill-blue-500` and ~107 `text-blue-600 dark:text-blue-400` on the wordmark. The directive (build/directives/UIUX_REFINEMENT_DIRECTIVE.md s6, s19, s88) explicitly forbids persistent blue primary accents and wants the ClanMind mark monochrome so it reads in both themes. Kill the blue.
+
+## Deliverable (this ONE file)
+clanmind-frontend/src/design-system/components/ClanMindLogo.tsx
+- Wordmark text and fill must be MONOCHROME: inherit currentColor (e.g. `fill-current` / `text-current`), so the logo adopts the surrounding text color in light and dark and stays neutral at rest.
+- Do NOT redraw the logo or change its geometry/aspect. Preserve the shape, sizes, and the component's exported props/API exactly.
+- If a color prop/default currently forces blue, change only the fill/text classes to current/inherit; keep every exported prop.
+
+## Constraints
+- No new deps. Keep pnpm test green (author any callers that assert a specific class if one exists; value-only change preferred). pnpm exec tsc -b must pass. Do not touch any other file.
+
+## Self-review
+Re-read the diff; grep confirms no `blue-` or `fill-blue|text-blue` remains in the logo file; run tsc + tests; report files changed and test count.

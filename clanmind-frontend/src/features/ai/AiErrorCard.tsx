@@ -55,7 +55,7 @@ export interface AiErrorCardProps {
 }
 
 export function AiErrorCard({
-  aiName = 'Odin',
+  aiName = 'AI',
   errorCode,
   errorMessage,
   onRetry,
@@ -85,12 +85,13 @@ export function AiErrorCard({
               variant="outline"
               leftIcon={<RotateCcw className="w-3 h-3" />}
               onClick={onRetry}
+              aria-label="Retry AI response"
             >
               Retry
             </Button>
           )}
           {onTryFallback && (
-            <Button size="sm" variant="ghost" leftIcon={<Zap className="w-3 h-3" />} onClick={onTryFallback}>
+            <Button size="sm" variant="ghost" leftIcon={<Zap className="w-3 h-3" />} onClick={onTryFallback} aria-label="Try fallback AI provider">
               Try fallback
             </Button>
           )}
@@ -102,7 +103,7 @@ export function AiErrorCard({
 
 /** §137/§134A CANCELLED — quiet strip; partial output stays visible above it. */
 export function AiStoppedStrip({
-  aiName = 'Odin',
+  aiName = 'AI',
   hasPartial,
   onRetry,
 }: {

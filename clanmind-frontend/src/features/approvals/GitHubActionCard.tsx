@@ -141,6 +141,7 @@ export function GitHubActionCard({
                     setConfirmOpen(false);
                   });
               }}
+              aria-label="Confirm approval of this GitHub action"
             >
               Approve
             </Button>

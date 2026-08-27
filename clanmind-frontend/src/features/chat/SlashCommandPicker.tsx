@@ -141,6 +141,7 @@ export const SlashCommandPickerWithKeyboard = forwardRef<
             key={cmd.id}
             role="option"
             aria-selected={i === clampedIndex}
+            aria-label={`${cmd.name}: ${cmd.description}`}
             onMouseEnter={() => setSelectedIndex(i)}
             onClick={() => {
               onSelect(cmd);

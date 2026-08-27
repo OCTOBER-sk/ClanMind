@@ -1,0 +1,29 @@
+AGENT F of 8 (A–H) — ClanMind UI/UX deep refinement. You own ONLY: Garage, Team, Tasks, Decisions, Memory, Project Overview/Pulse. Agent A refined tokens/theme; reuse them.
+
+## QUALITY FIRST (Sandy's standing priority)
+Correct behaviour and density over restyle: every surface needs intentional empty/loading/error states, real data logic preserved (controllers/selectors untouched), and compact, readable layouts that never waste viewport with oversized empty cards. The Team screen must NOT be a sea of giant empty member cards. Represent all NINE file sync states in Garage with tooltips — never collapse to five.
+
+## Source of truth (read before editing)
+build/directives/UIUX_REFINEMENT_DIRECTIVE.md sections 21,35,36,50,51
+ClanMind_Frontend_Master_Implementation_Specification.md sections 77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,116,117,118,119,120,121,122
+Repo REAL paths: clanmind-frontend/src/features/{garage,team,tasks,decisions,memory,projects,chat(only the Chat->Task/Decision prefill forms if they exist elsewhere)}. Relevant: garage/{GarageView,FileSyncIcon,LocalFileTreeView,localFiles}.tsx ; team/TeamView.tsx ; tasks/{TaskCard,TasksView,taskDisplay,useTasksController}.tsx ; decisions/{DecisionCard,DecisionsView,decisionOrdinal,useDecisionsController}.tsx ; memory/{MemoryView,useMemoryController}.tsx ; projects/{ProjectOverview,ProjectPulse}.tsx.
+
+## North star (directive s21, s35, s36)
+Garage = premium engineering archive, NOT a generic dashboard: Albums/Artifacts/Files/Research/Pinned/filters/metadata/versions; grid + list view (remember locally); not every item a giant bordered card; title/type/version/author/date/pin/AI-relationship legible at a glance. Team = disciplined, not oversized empty cards (the current Team screenshot wastes vertical space on big member cards — fix): avatar/name/role/presence/project/actions in a compact row or tight grid; no overuse of colored presence dots. Project Overview answers what-is-this/where-is-it/what-next; Project Pulse = compact goal/progress/blockers/next milestone/relevant AI insight — NOT a cluttered widget dashboard. Tasks/Decisions = first-class objects that feel part of the same work environment, restrained semantic statuses, preserve ownership/state/dates/references/project-context/chat-linkage/decision-task relationships. Memory = communicate scope clearly (Group/Project/private/candidate/explicit), privacy indicator icon+text not color-only (s50).
+
+## Deliverables (refine visuals + density + empty/loading/error states; preserve data logic + controllers)
+1. garage/GarageView.tsx + FileSyncIcon.tsx + LocalFileTreeView.tsx — archive feel; grid/list with remembered view; represent ALL NINE file sync states (LOCAL_ONLY/QUEUED/UPLOADING/SYNCED/REMOTE_CHANGED/LOCAL_CHANGED/CONFLICT/DELETED/RESTORABLE) with plain-language tooltips (s58, FE s189 — do not collapse to five states); compact cards/rows.
+2. team/TeamView.tsx — compact disciplined rows or tight grid; avatar/display name/Group role/presence/project where useful/Private chat/Mention/nickname/invite per role; no huge empty card interiors; no overuse of colored dots.
+3. tasks/TaskCard.tsx + TasksView.tsx — compact cards; title/owner/status/priority/due/related decision; restrained semantic statuses; states complete.
+4. decisions/DecisionCard.tsx + DecisionsView.tsx — Decision #N / title / Status Approved/Proposed / Reason / Sources / Approved by.
+5. memory/MemoryView.tsx — clear scope columns/sections (Group/Project/Your private) + candidate cards + explicit memory; scope icon+text; card types Decision/Constraint/Convention/Preference/Finding/Lesson with source/created/updated/scope.
+6. projects/ProjectOverview.tsx + ProjectPulse.tsx — concise operating view; Pulse communicates goal/progress/blockers/next/AI insight; pulse progress marker moves with a single spectral travel then settles (s85, FE s85) — no continuous animation; not a cluttered dashboard.
+7. Every surface: intentional empty states (s63) inviting action without marketing; loading skeletons not universal spinner; error states with what-happened/what-is-safe/next-action.
+
+## Constraints (hard)
+- ZERO new deps. Preserve controllers/selectors/data logic; you refine presentation + density + states. Keep all green: garage/GarageView.test.tsx, team tests if any, tasks/decisions/memory/projects tests.
+- True-black/white discipline; spectral only for AI-related states; restrained semantic status colors.
+- Do NOT touch shell/chat/artifacts/ai. Work only inside clanmind-frontend/.
+
+## Verify (inside clanmind-frontend) then self-review
+pnpm exec tsc -b ; pnpm run lint ; pnpm test. Hostile-review density (no giant empty cards), all nine sync states present, empty/loading/error states complete, Pulse not cluttered. git status must show ONLY garage/team/tasks/decisions/memory/projects files. Report files changed, test counts, and NOT VERIFIED items.

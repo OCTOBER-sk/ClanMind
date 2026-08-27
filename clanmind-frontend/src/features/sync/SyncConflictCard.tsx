@@ -102,6 +102,7 @@ export function SyncConflictCard({ conflict, onResolve }: SyncConflictCardProps)
               variant="ghost"
               leftIcon={<Trash2 className="w-3.5 h-3.5" />}
               onClick={() => onResolve(conflict.id, 'server_wins')}
+              aria-label="Discard local changes"
             >
               Discard mine
             </Button>
@@ -110,6 +111,7 @@ export function SyncConflictCard({ conflict, onResolve }: SyncConflictCardProps)
               variant="primary"
               leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
               onClick={() => onResolve(conflict.id, 'manual')}
+              aria-label="Restore as new item"
             >
               Restore mine as new
             </Button>
@@ -121,6 +123,7 @@ export function SyncConflictCard({ conflict, onResolve }: SyncConflictCardProps)
               variant="outline"
               leftIcon={<GitCompare className="w-3.5 h-3.5" />}
               onClick={() => setShowDiff(!showDiff)}
+              aria-label={showDiff ? 'Hide version comparison' : 'Compare versions'}
             >
               {showDiff ? 'Hide Compare' : 'Compare'}
             </Button>
@@ -131,6 +134,7 @@ export function SyncConflictCard({ conflict, onResolve }: SyncConflictCardProps)
                 variant="outline"
                 leftIcon={<GitMerge className="w-3.5 h-3.5" />}
                 onClick={() => onResolve(conflict.id, 'merged')}
+                aria-label="Merge changes manually"
               >
                 Merge manually
               </Button>
@@ -139,6 +143,7 @@ export function SyncConflictCard({ conflict, onResolve }: SyncConflictCardProps)
               size="sm"
               variant="ghost"
               onClick={() => onResolve(conflict.id, 'client_wins')}
+              aria-label="Keep local version"
             >
               Keep mine
             </Button>
@@ -146,6 +151,7 @@ export function SyncConflictCard({ conflict, onResolve }: SyncConflictCardProps)
               size="sm"
               variant="primary"
               onClick={() => onResolve(conflict.id, 'server_wins')}
+              aria-label="Use server version"
             >
               Use remote
             </Button>

@@ -1,0 +1,29 @@
+AGENT D of 8 (A–H) — ClanMind UI/UX deep refinement. You own ONLY Odin / AI: AI states, streaming UI, error/quota cards, tool timeline, research drawer, status indicator. Agent A refined tokens/theme; do not redo them.
+
+## QUALITY FIRST (Sandy's standing priority)
+Correctness of AI-state mapping and streaming behaviour is the priority, not just looks. The UI MUST reflect the canonical backend AI run/tool states exactly (no invented states), preserve the streaming lifecycle and reduced-motion path, and NEVER leak chain-of-thought. Preserve every existing AI state contract and test; fix any real mapping defect you find. Only restyle where it costs no correctness.
+
+## Source of truth (read before editing)
+build/directives/UIUX_REFINEMENT_DIRECTIVE.md sections 44,45,46,47,48,49,72,73
+ClanMind_Frontend_Master_Implementation_Specification.md sections 129,130,131,132,133,134,134A,135,136,137,138,139,140,141,142,143,144,145,146,147,148 (AI states MUST map to canonical backend enums)
+Repo REAL paths: clanmind-frontend/src/features/ai/{AiStatusIndicator,AiErrorCard,AiQuotaCard,AiStreamAnnouncer,AiToolTimeline,ResearchDrawer}.tsx and src/features/chat/aiStreamStore.ts + the AI-message rendering in chat/MessageRow / any AIMessage component.
+
+## North star (directive s45, s48, s72)
+Map UI to canonical backend run states exactly: QUEUED "Odin is starting", RUNNING "Odin is working", WAITING_TOOL show actual active tool/provenance, STREAMING incremental response, COMPLETED final+sources/artifacts/actions, FAILED AI error card + recovery, CANCELLED Stopped + preserve available partial content. Do NOT invent frontend states that contradict backend truth. Do NOT expose hidden chain-of-thought — expose high-level status, active tool, tool provenance, sources, outputs, artifacts, actions, progress (mandatory s72). Spectral color = AI activity only: researching subtle spectral indicator + source activity; building = spectral edge/controlled pulse + build motion; waiting for approval = semantic approval state (no endless rainbow); completed = settles to monochrome. Rhythm: monochrome calm -> AI activity -> spectral emergence -> completion -> calm.
+
+## Deliverables (refine visuals/interaction; preserve state contracts)
+1. AiStatusIndicator.tsx — available/working/researching/building/waiting-for-approval/limited/offline; no "thinking" label; maps to canonical states via aiStreamStore.
+2. AI streaming message (chat MessageRow AI path + aiStreamStore) — shell created immediately on start; incremental Markdown with stable height where possible; preserve scroll; composer stays usable; collapse tool timeline after completion (auto). Respect prefers-reduced-motion: replace animated construction with immediate state + textual status, never lose info.
+3. AiToolTimeline.tsx — provenance view: "6 sources found / 3 relevant / Synthesizing…" high-level activity (not hidden reasoning); each tool card reflects real ai_tool_calls state; collapsed after completion.
+4. AiErrorCard.tsx — recovery-oriented: "Odin couldn't complete this response. Provider temporarily unavailable." Retry + Try fallback; transparent about what is safe.
+5. AiQuotaCard.tsx — exact backend contract (FE s141): branch on can_continue_with_byok. true -> near-invisible, subtle "Odin · BYOK" indicator, not blocking; false -> "Application AI quota reached. An administrator can configure BYOK to continue." + Open AI settings for admins only. Never generic "AI unavailable".
+6. ResearchDrawer.tsx — clean source cards/rows (title, domain, retrieved, Open); summary/findings/sources/project impact/uncertainty; citations expose provenance clearly, no chain-of-thought; "Research · N sources" indicator (s49, FE s143-147).
+7. Odin visual identity (where the AI message renders) — avatar, AI name, subtle accent, content, provenance/tool metadata, action row; not a giant colored card; distinct but settles to monochrome at rest.
+
+## Constraints (hard)
+- ZERO new deps. Preserve every state contract in aiStreamStore and the exact backend enum mapping (do not invent states). Keep all AI tests green: chat/aiStreaming.test.ts, chat/aiStreamingUi.test.tsx, chat/aiRunPrivacy.test.ts, chat/aiStreamStore, aiQuota behaviour (quota/byok keyword handling), reducedMotion test.
+- True-black/white discipline; spectral ONLY for AI/artifact activity, never behind body text or as default fills.
+- Do NOT touch other feature screens. Work only inside clanmind-frontend/.
+
+## Verify (inside clanmind-frontend) then self-review
+pnpm exec tsc -b ; pnpm run lint ; pnpm test. Hostile-review: streaming stability, reduced-motion path, quota branching, no chain-of-thought leak, spectral restraint. git status must show ONLY ai/* + the chat AI-message file(s) you touched. Report files changed, test counts, and NOT VERIFIED items. Odin should feel like a useful shared teammate — visibly alive only during real AI work.

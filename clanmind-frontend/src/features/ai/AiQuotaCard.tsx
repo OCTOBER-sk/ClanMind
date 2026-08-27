@@ -4,6 +4,7 @@ import { Button } from '@/design-system/components/Button';
 import type { GroupRole } from '@/types';
 
 export interface AiQuotaCardProps {
+  aiName?: string;
   canContinueWithByok: boolean;
   userRole: GroupRole;
   onOpenSettings: () => void;
@@ -11,6 +12,7 @@ export interface AiQuotaCardProps {
 
 /** §141 — branches on can_continue_with_byok; near-invisible when BYOK takes over */
 export function AiQuotaCard({
+  aiName = 'AI',
   canContinueWithByok,
   userRole,
   onOpenSettings,
@@ -31,7 +33,7 @@ export function AiQuotaCard({
           style={{ color: 'var(--color-text-tertiary)' }}
           title="Running via configured BYOK provider"
         >
-          Odin · BYOK
+          {aiName} · BYOK
         </span>
       </div>
     );
@@ -40,6 +42,7 @@ export function AiQuotaCard({
   return (
     <div
       className="my-2 p-4 rounded-lg border text-xs space-y-3"
+      role="alert"
       style={{
         borderColor: 'var(--color-warning)',
         background: 'var(--color-warning-bg)',
@@ -62,6 +65,7 @@ export function AiQuotaCard({
           variant="outline"
           leftIcon={<Settings className="w-3.5 h-3.5" />}
           onClick={onOpenSettings}
+          aria-label="Open AI Settings to configure BYOK"
         >
           Open AI Settings
         </Button>

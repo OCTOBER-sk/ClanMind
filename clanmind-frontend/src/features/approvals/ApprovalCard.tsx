@@ -399,12 +399,12 @@ export function ApprovalCard({
       {isActive && (
         <div className="flex items-center gap-2 pt-1">
           {isGithubAction(action) && onViewDiff && (
-            <Button size="sm" variant="outline" onClick={onViewDiff}>
+            <Button size="sm" variant="outline" onClick={onViewDiff} aria-label="Review GitHub changes">
               Review Changes
             </Button>
           )}
           <div className="flex-1" />
-          <Button size="sm" variant="ghost" disabled={isRejecting} onClick={handleReject}>
+          <Button size="sm" variant="ghost" disabled={isRejecting} onClick={handleReject} aria-label={`Reject ${actionLabel(action.action_kind)}`}>
             Reject
           </Button>
           <Button
@@ -412,6 +412,7 @@ export function ApprovalCard({
             variant={action.risk_level === 'CRITICAL' ? 'danger' : 'primary'}
             isLoading={isApproving}
             onClick={handleApprove}
+            aria-label={`Approve ${actionLabel(action.action_kind)}`}
           >
             Approve
           </Button>

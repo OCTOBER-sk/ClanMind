@@ -62,7 +62,7 @@ export function MeetingStartDialog({ projectId }: { projectId?: string }) {
           <Button size="sm" variant="ghost" onClick={() => setStartDialogOpen(false)}>
             Cancel
           </Button>
-          <Button size="sm" variant="primary" loading={starting} onClick={() => void handleStart()}>
+          <Button size="sm" variant="primary" loading={starting} onClick={() => void handleStart()} aria-label="Start a new meeting">
             Start meeting
           </Button>
         </>
@@ -187,6 +187,7 @@ export function MeetingEndSummaryDialog({ onAcceptCandidate, onEndMeeting }: Mee
             variant="primary"
             loading={ending}
             onClick={() => void handleReviewAndSave()}
+            aria-label="Review and save meeting summary"
           >
             Review &amp; Save
           </Button>
@@ -228,7 +229,7 @@ export function MeetingEndSummaryDialog({ onAcceptCandidate, onEndMeeting }: Mee
                   {candidateTitle(cand.content)}
                 </span>
                 <div className="flex gap-1.5 shrink-0">
-                  <Button size="sm" variant="ghost" onClick={() => handleSkip(cand.id)}>
+                  <Button size="sm" variant="ghost" onClick={() => handleSkip(cand.id)} aria-label={`Skip ${candidateTitle(cand.content)}`}>
                     Skip
                   </Button>
                   {(cand.candidate_type === 'DECISION' || cand.candidate_type === 'TASK') && (
@@ -237,6 +238,7 @@ export function MeetingEndSummaryDialog({ onAcceptCandidate, onEndMeeting }: Mee
                       variant="primary"
                       loading={savingId === cand.id}
                       onClick={() => void handleSaveCandidate(cand)}
+                      aria-label={`Save ${candidateTitle(cand.content)}`}
                     >
                       Save
                     </Button>

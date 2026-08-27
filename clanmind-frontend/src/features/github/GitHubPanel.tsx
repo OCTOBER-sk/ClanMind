@@ -216,7 +216,7 @@ export function GitHubPanel({
 
       {/* ─── Pending actions (§159) — gated by github_write per §165A.2 ─── */}
       {projectId && (
-        <div className="space-y-3">
+        <div className="space-y-3" role="region" aria-label="Pending GitHub actions">
           <div className="flex items-center justify-between">
             <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
               Pending actions
@@ -225,7 +225,7 @@ export function GitHubPanel({
               <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
                 {pendingGithubRows.length} pending
               </span>
-              <Button size="sm" variant="ghost" leftIcon={<RefreshCw className="w-3 h-3" />} onClick={() => void refresh()}>
+              <Button size="sm" variant="ghost" leftIcon={<RefreshCw className="w-3 h-3" />} onClick={() => void refresh()} aria-label="Refresh pending actions">
                 Refresh
               </Button>
             </span>
@@ -266,7 +266,7 @@ export function GitHubPanel({
       )}
 
       {/* ─── Pull requests (§159) — backend-reported rows only ─── */}
-      <div className="space-y-2">
+      <div className="space-y-2" role="region" aria-label="Pull requests">
         <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
           Pull requests
         </h3>
@@ -379,13 +379,13 @@ function ConnectForm({
           <span className="block text-[10px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
             Owner
           </span>
-          <Input value={ownerLogin} onChange={(e) => onOwnerLogin(e.target.value)} placeholder="robotics-core" />
+          <Input value={ownerLogin} onChange={(e) => onOwnerLogin(e.target.value)} placeholder="robotics-core" aria-label="Repository owner" />
         </label>
         <label className="space-y-1">
           <span className="block text-[10px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
             Repository
           </span>
-          <Input value={repoName} onChange={(e) => onRepoName(e.target.value)} placeholder="flight-controller" />
+          <Input value={repoName} onChange={(e) => onRepoName(e.target.value)} placeholder="flight-controller" aria-label="Repository name" />
         </label>
         <label className="space-y-1">
           <span className="block text-[10px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>

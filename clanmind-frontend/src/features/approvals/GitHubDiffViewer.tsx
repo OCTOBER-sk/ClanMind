@@ -512,7 +512,7 @@ export function GitHubDiffViewer({
 
         {/* §164 Merge — high impact, explicit confirmation dialog */}
         {mergeEnabled && onApproveAndMerge && (
-          <Button size="sm" variant="primary" className="w-full" onClick={() => setMergeDialogOpen(true)}>
+          <Button size="sm" variant="primary" className="w-full" onClick={() => setMergeDialogOpen(true)} aria-label="Approve and merge this pull request">
             Approve &amp; Merge
           </Button>
         )}
@@ -536,6 +536,7 @@ export function GitHubDiffViewer({
                 setMergeDialogOpen(false);
                 onApproveAndMerge?.();
               }}
+              aria-label="Confirm merge of this pull request"
             >
               Merge
             </Button>

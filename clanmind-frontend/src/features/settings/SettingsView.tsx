@@ -252,6 +252,8 @@ export function SettingsView({
       <div
         className="w-56 p-4 border-r space-y-1"
         style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
+        role="navigation"
+        aria-label="Settings navigation"
       >
         <h2
           className="text-xs font-bold uppercase tracking-wider px-3 mb-3"
@@ -278,7 +280,7 @@ export function SettingsView({
       </div>
 
       {/* Right Settings Content */}
-      <div className="flex-1 overflow-y-auto p-8 max-w-3xl space-y-8">
+      <div className="flex-1 overflow-y-auto p-8 max-w-3xl space-y-8" role="main" aria-label="Settings content">
         {/* ── ACCOUNT (§272 User Profile; GET/PATCH /me) ── */}
         {activeSection === 'account' && (
           <div className="space-y-6">

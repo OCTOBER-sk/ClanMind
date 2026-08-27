@@ -26,7 +26,6 @@ import { AppShell } from '@/features/shell/AppShell';
 import { AuthScreen } from '@/features/auth/AuthScreen';
 import { OnboardingWizard } from '@/features/onboarding/CreateGroupOnboarding';
 import { NAV_SECTION_PATHS, sectionFromPathname, shellBasePath } from '@/app/nav';
-import { demoMode } from '@/config/env';
 import { createGroup } from '@/api/endpoints/groups';
 import { createProject } from '@/api/endpoints/projects';
 import { useToast } from '@/design-system/components/Toast';
@@ -75,56 +74,22 @@ function OnboardingRoute(): ReactElement {
     const { addGroup, addProject } = useGroupStore.getState();
     const { setOnboardingComplete } = useUiStore.getState();
 
-    if (!demoMode) {
-      // LIVE mode — persist through the backend, use real server IDs.
-      try {
-        const group = await createGroup({ name: groupName, description: '' });
-        addGroup(group);
-        if (projectName.trim()) {
-          const proj = await createProject(group.id, { name: projectName.trim() });
-          addProject(proj);
-        }
-        setOnboardingComplete(true);
-        navigate(`/group/${group.id}/chat`, { replace: true });
-      } catch (err) {
-        toast({
-          title: 'Failed to create group',
-          description: err instanceof Error ? err.message : 'Please try again.',
-          variant: 'error',
-        });
+    try {
+      const group = await createGroup({ name: groupName, description: '' });
+      addGroup(group);
+      if (projectName.trim()) {
+        const proj = await createProject(group.id, { name: projectName.trim() });
+        addProject(proj);
       }
-      return;
-    }
-
-    // DEMO mode — fully local, no backend.
-    const now = new Date().toISOString();
-    const group = {
-      id: `grp_${crypto.randomUUID().slice(0, 8)}`,
-      name: groupName,
-      description: '',
-      status: 'ACTIVE' as const,
-      ai_name: aiName || 'Odin',
-      ai_proactivity: 'balanced' as const,
-      created_at: now,
-      updated_at: now,
-    };
-    addGroup(group);
-    if (projectName.trim()) {
-      addProject({
-        id: `proj_${crypto.randomUUID().slice(0, 8)}`,
-        group_id: group.id,
-        name: projectName.trim(),
-        goal: '',
-        description: '',
-        project_type: 'software' as const,
-        status: 'active' as const,
-        pulse_progress: 0,
-        created_at: now,
-        updated_at: now,
+      setOnboardingComplete(true);
+      navigate(`/group/${group.id}/chat`, { replace: true });
+    } catch (err) {
+      toast({
+        title: 'Failed to create group',
+        description: err instanceof Error ? err.message : 'Please try again.',
+        variant: 'error',
       });
     }
-    setOnboardingComplete(true);
-    navigate(`/group/${group.id}/chat`, { replace: true });
   };
 
   return <OnboardingWizard onComplete={handleComplete} />;

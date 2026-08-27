@@ -497,6 +497,7 @@ export function MessageList({
       {!isNearBottom && (
         <button
           onClick={() => scrollToBottom(true)}
+          aria-label={unreadNewCount > 0 ? `Jump to latest, ${unreadNewCount} new messages` : 'Jump to latest'}
           className={cn(
             'absolute bottom-3 right-8 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shadow-[var(--shadow-lg)] transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer z-30 border',
             unreadNewCount > 0

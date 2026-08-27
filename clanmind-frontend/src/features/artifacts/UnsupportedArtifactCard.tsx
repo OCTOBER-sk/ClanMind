@@ -15,7 +15,7 @@ export interface UnsupportedArtifactCardProps {
  */
 export function UnsupportedArtifactCard({ onViewRaw, onExportRaw, onUpdate }: UnsupportedArtifactCardProps) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-xs space-y-4 bg-[var(--color-surface-raised)]">
+    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-xs space-y-4 bg-[var(--color-surface-raised)]" role="status" aria-label="Unsupported artifact">
       <div className="p-3 rounded-full bg-[var(--color-warning-bg)] border border-[var(--color-warning)]/20">
         <AlertCircle className="w-8 h-8 text-[var(--color-warning)]" aria-hidden="true" />
       </div>
@@ -32,17 +32,17 @@ export function UnsupportedArtifactCard({ onViewRaw, onExportRaw, onUpdate }: Un
 
       <div className="flex flex-wrap items-center justify-center gap-2">
         {onViewRaw && (
-          <Button size="sm" variant="ghost" leftIcon={<FileJson className="w-3.5 h-3.5" />} onClick={onViewRaw}>
+          <Button size="sm" variant="ghost" leftIcon={<FileJson className="w-3.5 h-3.5" />} onClick={onViewRaw} aria-label="View raw artifact content">
             View raw
           </Button>
         )}
         {onExportRaw && (
-          <Button size="sm" variant="outline" leftIcon={<Download className="w-3.5 h-3.5" />} onClick={onExportRaw}>
+          <Button size="sm" variant="outline" leftIcon={<Download className="w-3.5 h-3.5" />} onClick={onExportRaw} aria-label="Export artifact as JSON">
             Export JSON
           </Button>
         )}
         {onUpdate && (
-          <Button size="sm" variant="primary" leftIcon={<RefreshCw className="w-3.5 h-3.5" />} onClick={onUpdate}>
+          <Button size="sm" variant="primary" leftIcon={<RefreshCw className="w-3.5 h-3.5" />} onClick={onUpdate} aria-label="Check for ClanMind update">
             Check for update
           </Button>
         )}

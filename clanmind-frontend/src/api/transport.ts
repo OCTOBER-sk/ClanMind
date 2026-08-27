@@ -2,10 +2,8 @@
  * Transport layer — the ONLY place raw network I/O happens for REST.
  *
  * The default transport is `fetch` (JSON) + XHR (multipart uploads, the only
- * browser API with upload progress). In demo mode (VITE_DEMO_MODE=1) a
- * deterministic in-process transport override is installed (src/mocks) that
- * implements the same backend contracts, so the entire app runs end-to-end
- * without a live deployment and production bundles contain zero mock code.
+ * browser API with upload progress). Tests can install a transport override
+ * via `setTransportOverride()` (used by src/mocks and test files).
  */
 
 import { AbortedError, NetworkError } from './errors';
@@ -64,7 +62,7 @@ export class TimeoutError extends Error {
 
 let transportOverride: Transport | null = null;
 
-/** Installed by src/mocks when VITE_DEMO_MODE=1. Never set in production. */
+/** Installed by tests and src/mocks. Never set in production. */
 export function setTransportOverride(transport: Transport | null): void {
   transportOverride = transport;
 }

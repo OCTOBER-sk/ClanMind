@@ -12,12 +12,14 @@ import { Badge } from '@/design-system/components/Badge';
 import type { AiToolCall, AiToolCallStatus } from '@/types';
 
 export interface AiToolTimelineProps {
+  aiName?: string;
   toolCalls: AiToolCall[];
   onApproveTool?: (toolCallId: string) => void;
   onDenyTool?: (toolCallId: string) => void;
 }
 
 export function AiToolTimeline({
+  aiName = 'AI',
   toolCalls,
   onApproveTool,
   onDenyTool,
@@ -65,11 +67,13 @@ export function AiToolTimeline({
           userToggledRef.current = true;
           setIsExpanded(!isExpanded);
         }}
+        aria-expanded={isExpanded}
+        aria-label={`${aiName} tool activity — ${completedCount} of ${toolCalls.length} complete`}
         className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer select-none"
       >
         <div className="flex items-center gap-2 font-semibold text-[var(--color-text-secondary)] text-[11px]">
           {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" /> : <ChevronRight className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" />}
-          <span>Odin Tool Activity</span>
+          <span>{aiName} Tool Activity</span>
           <Badge variant={isAllDone ? 'neutral' : 'warning'} size="sm">
             {completedCount}/{toolCalls.length} Complete
           </Badge>
@@ -109,6 +113,7 @@ export function AiToolTimeline({
                     onClick={() => onDenyTool?.(call.id)}
                     className="px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer"
                     style={{ color: 'var(--color-text-secondary)' }}
+                    aria-label={`Deny ${call.tool_name}`}
                   >
                     Deny
                   </button>
@@ -116,6 +121,7 @@ export function AiToolTimeline({
                     onClick={() => onApproveTool?.(call.id)}
                     className="px-2 py-0.5 rounded text-[10px] font-semibold cursor-pointer"
                     style={{ background: 'var(--color-primary)', color: 'var(--color-primary-foreground)' }}
+                    aria-label={`Approve ${call.tool_name}`}
                   >
                     Approve Tool
                   </button>

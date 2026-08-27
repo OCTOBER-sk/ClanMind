@@ -5,10 +5,7 @@ import { Input } from '@/design-system/components/Input';
 import { Textarea } from '@/design-system/components/Textarea';
 import { useToast } from '@/design-system/components/Toast';
 import { useGroupStore } from '@/state/useGroupStore';
-import { useAuthStore } from '@/state/useAuthStore';
-import { demoMode } from '@/config/env';
 import { createGroup } from '@/api/endpoints/groups';
-import type { Group } from '@/types';
 
 export interface CreateGroupDialogProps {
   open: boolean;
@@ -18,7 +15,6 @@ export interface CreateGroupDialogProps {
 /** §15 Group switcher → Create Group. §70 group name + optional description. */
 export function CreateGroupDialog({ open, onOpenChange }: CreateGroupDialogProps) {
   const { addGroup, setActiveGroup } = useGroupStore();
-  const { user } = useAuthStore();
   const { toast } = useToast();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -32,64 +28,28 @@ export function CreateGroupDialog({ open, onOpenChange }: CreateGroupDialogProps
       return;
     }
 
-    if (!demoMode) {
-      // LIVE mode — persist through the backend.
-      setLoading(true);
-      try {
-        const group = await createGroup({
-          name: trimmed,
-          description: description.trim() || undefined,
-        });
-        addGroup(group);
-        setActiveGroup(group);
-        toast({ title: 'Group created', variant: 'success' });
-        setName('');
-        setDescription('');
-        setError(null);
-        onOpenChange(false);
-      } catch (err) {
-        toast({
-          title: 'Failed to create group',
-          description: err instanceof Error ? err.message : 'Please try again.',
-          variant: 'error',
-        });
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    // DEMO mode — fully local.
-    const now = new Date().toISOString();
-    const group: Group = {
-      id: `grp_${Date.now()}`,
-      name: trimmed,
-      description: description.trim() || undefined,
-      status: 'ACTIVE',
-      ai_name: 'Odin',
-      ai_proactivity: 'balanced',
-      created_at: now,
-      updated_at: now,
-    };
-    addGroup(group);
-    setActiveGroup(group);
-    // First member is the creator as Owner
-    if (user) {
-      useGroupStore.getState().addMember({
-        user_id: user.id,
-        group_id: group.id,
-        role: 'OWNER',
-        user,
-        joined_at: now,
-        created_at: now,
-        updated_at: now,
+    setLoading(true);
+    try {
+      const group = await createGroup({
+        name: trimmed,
+        description: description.trim() || undefined,
       });
+      addGroup(group);
+      setActiveGroup(group);
+      toast({ title: 'Group created', variant: 'success' });
+      setName('');
+      setDescription('');
+      setError(null);
+      onOpenChange(false);
+    } catch (err) {
+      toast({
+        title: 'Failed to create group',
+        description: err instanceof Error ? err.message : 'Please try again.',
+        variant: 'error',
+      });
+    } finally {
+      setLoading(false);
     }
-    toast({ title: 'Group created', variant: 'success' });
-    setName('');
-    setDescription('');
-    setError(null);
-    onOpenChange(false);
   };
 
   return (

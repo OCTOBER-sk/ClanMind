@@ -19,6 +19,7 @@ import type { Decision, GroupMember } from '@/types';
 export interface DecisionsViewProps {
   decisions: Decision[];
   members: GroupMember[];
+  aiName?: string;
   isLoading?: boolean;
   error?: string | null;
   onPropose: () => void;
@@ -29,6 +30,7 @@ export interface DecisionsViewProps {
 export function DecisionsView({
   decisions,
   members,
+  aiName = 'AI',
   isLoading,
   error,
   onPropose,
@@ -71,6 +73,7 @@ export function DecisionsView({
           variant="primary"
           leftIcon={<Plus className="w-3.5 h-3.5" />}
           onClick={onPropose}
+          aria-label="Propose a new decision"
         >
           Propose
         </Button>
@@ -112,7 +115,7 @@ export function DecisionsView({
             <EmptyState
               icon={<Bookmark className="w-8 h-8" />}
               title="No decisions recorded yet."
-              description="Recording what the team chose — and why — keeps future work honest. Propose one or ask Odin to."
+              description={`Recording what the team chose — and why — keeps future work honest. Propose one or ask ${aiName} to.`}
               actions={
                 <Button size="sm" variant="ghost" onClick={onPropose}>
                   Propose Decision
@@ -127,6 +130,7 @@ export function DecisionsView({
               decision={dec}
               ordinal={ordinals.get(dec.id) ?? 0}
               members={members}
+              aiName={aiName}
               onApprove={onApprove}
               onReject={onReject}
             />

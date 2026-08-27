@@ -112,16 +112,23 @@ function LoginView({
     error: null,
     loading: false,
   });
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+
+  const validate = (): boolean => {
+    const errors: typeof fieldErrors = {};
+    if (!form.email.trim()) errors.email = 'Email is required.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Enter a valid email address.';
+    if (!form.password) errors.password = 'Password is required.';
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.email || !form.password) {
-      setForm((f) => ({ ...f, error: 'Please enter your email and password.' }));
-      return;
-    }
+    if (!validate()) return;
     setForm((f) => ({ ...f, loading: true, error: null }));
     try {
-      const identity = await getSessionGateway().signIn(form.email, form.password);
+      const identity = await getSessionGateway().signIn(form.email.trim(), form.password);
       await establishSession(identity);
     } catch (err) {
       setForm((f) => ({
@@ -137,9 +144,11 @@ function LoginView({
     setForm((f) => ({ ...f, loading: false }));
   };
 
+  const canSubmit = form.email.trim().length > 0 && form.password.length > 0 && !form.loading;
+
   return (
     <div className="space-y-6 animate-[fade-in_200ms_ease-out]">
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col items-center gap-4">
         <img
           src={clanmindMark}
           alt="ClanMind"
@@ -165,8 +174,18 @@ function LoginView({
             autoComplete="email"
             placeholder="you@team.com"
             value={form.email}
-            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            onChange={(e) => {
+              setForm((f) => ({ ...f, email: e.target.value }));
+              if (fieldErrors.email) setFieldErrors((fe) => ({ ...fe, email: undefined }));
+            }}
+            onBlur={() => {
+              if (!form.email.trim()) setFieldErrors((fe) => ({ ...fe, email: 'Email is required.' }));
+              else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) setFieldErrors((fe) => ({ ...fe, email: 'Enter a valid email address.' }));
+              else setFieldErrors((fe) => ({ ...fe, email: undefined }));
+            }}
             disabled={form.loading}
+            error={fieldErrors.email}
+            aria-describedby={fieldErrors.email ? 'login-email-error' : undefined}
             required
           />
         </div>
@@ -184,8 +203,17 @@ function LoginView({
             autoComplete="current-password"
             placeholder="••••••••"
             value={form.password}
-            onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+            onChange={(e) => {
+              setForm((f) => ({ ...f, password: e.target.value }));
+              if (fieldErrors.password) setFieldErrors((fe) => ({ ...fe, password: undefined }));
+            }}
+            onBlur={() => {
+              if (!form.password) setFieldErrors((fe) => ({ ...fe, password: 'Password is required.' }));
+              else setFieldErrors((fe) => ({ ...fe, password: undefined }));
+            }}
             disabled={form.loading}
+            error={fieldErrors.password}
+            aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
             required
           />
         </div>
@@ -193,6 +221,7 @@ function LoginView({
         {form.error && (
           <p
             role="alert"
+            aria-live="polite"
             className="text-xs text-[var(--color-danger)] bg-[var(--color-danger-bg)] px-3 py-2 rounded-lg"
           >
             {form.error}
@@ -205,7 +234,7 @@ function LoginView({
           size="md"
           className="w-full"
           loading={form.loading}
-          disabled={form.loading}
+          disabled={!canSubmit}
         >
           {form.loading ? 'Signing in…' : 'Sign in'}
         </Button>
@@ -215,14 +244,14 @@ function LoginView({
         <button
           type="button"
           onClick={onForgotPassword}
-          className="hover:text-[var(--color-text)] transition-colors cursor-pointer focus-ring rounded"
+          className="hover:text-[var(--color-text)] transition-colors cursor-pointer focus-visible:shadow-[var(--focus-ring)] rounded px-1 py-0.5"
         >
           Forgot password?
         </button>
         <button
           type="button"
           onClick={onSignup}
-          className="hover:text-[var(--color-text)] transition-colors cursor-pointer focus-ring rounded"
+          className="hover:text-[var(--color-text)] transition-colors cursor-pointer focus-visible:shadow-[var(--focus-ring)] rounded px-1 py-0.5"
         >
           Create account →
         </button>
@@ -242,26 +271,33 @@ function SignupView({ onLogin }: { onLogin: () => void }) {
     error: null as string | null,
     loading: false,
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
+
+  const validate = (): boolean => {
+    const errors: Record<string, string | undefined> = {};
+    if (!form.name.trim()) errors.name = 'Name is required.';
+    if (!form.email.trim()) errors.email = 'Email is required.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Enter a valid email address.';
+    if (!form.password) errors.password = 'Password is required.';
+    else if (form.password.length < 8) errors.password = 'Password must be at least 8 characters.';
+    if (!form.confirm) errors.confirm = 'Please confirm your password.';
+    else if (form.password !== form.confirm) errors.confirm = "Passwords don't match.";
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const clearFieldError = (field: string) => {
+    if (fieldErrors[field]) setFieldErrors((fe) => ({ ...fe, [field]: undefined }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.password) {
-      setForm((f) => ({ ...f, error: 'All fields are required.' }));
-      return;
-    }
-    if (form.password !== form.confirm) {
-      setForm((f) => ({ ...f, error: "Passwords don't match." }));
-      return;
-    }
-    if (form.password.length < 8) {
-      setForm((f) => ({ ...f, error: 'Password must be at least 8 characters.' }));
-      return;
-    }
+    if (!validate()) return;
     setForm((f) => ({ ...f, loading: true, error: null }));
     try {
       const identity = await getSessionGateway().signUp({
-        name: form.name,
-        email: form.email,
+        name: form.name.trim(),
+        email: form.email.trim(),
         password: form.password,
       });
       await establishSession(identity);
@@ -276,9 +312,64 @@ function SignupView({ onLogin }: { onLogin: () => void }) {
     setForm((f) => ({ ...f, loading: false }));
   };
 
+  const canSubmit =
+    form.name.trim().length > 0 &&
+    form.email.trim().length > 0 &&
+    form.password.length >= 8 &&
+    form.confirm.length > 0 &&
+    !form.loading;
+
+  const fields = [
+    {
+      id: 'signup-name',
+      label: 'Name',
+      type: 'text',
+      field: 'name' as const,
+      autoComplete: 'name',
+      placeholder: 'Your name',
+      onBlur: () => { if (!form.name.trim()) setFieldErrors((fe) => ({ ...fe, name: 'Name is required.' })); },
+    },
+    {
+      id: 'signup-email',
+      label: 'Email',
+      type: 'email',
+      field: 'email' as const,
+      autoComplete: 'email',
+      placeholder: 'you@team.com',
+      onBlur: () => {
+        if (!form.email.trim()) setFieldErrors((fe) => ({ ...fe, email: 'Email is required.' }));
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) setFieldErrors((fe) => ({ ...fe, email: 'Enter a valid email address.' }));
+      },
+    },
+    {
+      id: 'signup-password',
+      label: 'Password',
+      type: 'password',
+      field: 'password' as const,
+      autoComplete: 'new-password',
+      placeholder: '8+ characters',
+      onBlur: () => {
+        if (!form.password) setFieldErrors((fe) => ({ ...fe, password: 'Password is required.' }));
+        else if (form.password.length < 8) setFieldErrors((fe) => ({ ...fe, password: 'Password must be at least 8 characters.' }));
+      },
+    },
+    {
+      id: 'signup-confirm',
+      label: 'Confirm password',
+      type: 'password',
+      field: 'confirm' as const,
+      autoComplete: 'new-password',
+      placeholder: '••••••••',
+      onBlur: () => {
+        if (!form.confirm) setFieldErrors((fe) => ({ ...fe, confirm: 'Please confirm your password.' }));
+        else if (form.password !== form.confirm) setFieldErrors((fe) => ({ ...fe, confirm: "Passwords don't match." }));
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6 animate-[fade-in_200ms_ease-out]">
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col items-center gap-4">
         <img
           src={clanmindMark}
           alt="ClanMind"
@@ -288,14 +379,7 @@ function SignupView({ onLogin }: { onLogin: () => void }) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3" noValidate>
-        {(
-          [
-            { id: 'signup-name', label: 'Name', type: 'text', field: 'name', autoComplete: 'name', placeholder: 'Your name' },
-            { id: 'signup-email', label: 'Email', type: 'email', field: 'email', autoComplete: 'email', placeholder: 'you@team.com' },
-            { id: 'signup-password', label: 'Password', type: 'password', field: 'password', autoComplete: 'new-password', placeholder: '8+ characters' },
-            { id: 'signup-confirm', label: 'Confirm password', type: 'password', field: 'confirm', autoComplete: 'new-password', placeholder: '••••••••' },
-          ] as const
-        ).map(({ id, label, type, field, autoComplete, placeholder }) => (
+        {fields.map(({ id, label, type, field, autoComplete, placeholder, onBlur }) => (
           <div key={id} className="space-y-1">
             <label
               htmlFor={id}
@@ -308,15 +392,20 @@ function SignupView({ onLogin }: { onLogin: () => void }) {
               type={type}
               autoComplete={autoComplete}
               placeholder={placeholder}
-              value={form[field as keyof typeof form] as string}
-              onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
+              value={form[field]}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, [field]: e.target.value }));
+                clearFieldError(field);
+              }}
+              onBlur={onBlur}
               disabled={form.loading}
+              error={fieldErrors[field]}
             />
           </div>
         ))}
 
         {form.error && (
-          <p role="alert" className="text-xs text-[var(--color-danger)] bg-[var(--color-danger-bg)] px-3 py-2 rounded-lg">
+          <p role="alert" aria-live="polite" className="text-xs text-[var(--color-danger)] bg-[var(--color-danger-bg)] px-3 py-2 rounded-lg">
             {form.error}
           </p>
         )}
@@ -327,7 +416,7 @@ function SignupView({ onLogin }: { onLogin: () => void }) {
           size="md"
           className="w-full"
           loading={form.loading}
-          disabled={form.loading}
+          disabled={!canSubmit}
         >
           {form.loading ? 'Creating account…' : 'Create account'}
         </Button>
@@ -338,7 +427,7 @@ function SignupView({ onLogin }: { onLogin: () => void }) {
         <button
           type="button"
           onClick={onLogin}
-          className="hover:text-[var(--color-text)] transition-colors cursor-pointer font-medium focus-ring rounded"
+          className="hover:text-[var(--color-text)] transition-colors cursor-pointer font-medium focus-visible:shadow-[var(--focus-ring)] rounded px-1 py-0.5"
         >
           Sign in
         </button>
@@ -422,6 +511,7 @@ function ForgotPasswordView({ onBack }: { onBack: () => void }) {
           {sendFailed && (
             <p
               role="alert"
+              aria-live="polite"
               className="text-xs text-[var(--color-danger)] bg-[var(--color-danger-bg)] px-3 py-2 rounded-lg"
             >
               Couldn't send the reset link right now. Try again.

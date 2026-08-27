@@ -146,10 +146,11 @@ export function MeetingPanel({
           setEditingId(cand.id);
           setEditDraft(candidateTitle(cand.content));
         }}
+        aria-label={`Edit ${candidateTitle(cand.content)}`}
       >
         Edit
       </Button>
-      <Button size="sm" variant="ghost" onClick={() => onDismissCandidate(cand.id)}>
+      <Button size="sm" variant="ghost" onClick={() => onDismissCandidate(cand.id)} aria-label={`Dismiss ${candidateTitle(cand.content)}`}>
         Dismiss
       </Button>
       <Button
@@ -158,6 +159,7 @@ export function MeetingPanel({
         loading={acceptingId === cand.id}
         leftIcon={acceptingId !== cand.id ? <Check className="w-3.5 h-3.5" /> : undefined}
         onClick={() => handleAccept(cand)}
+        aria-label={`${acceptLabel}: ${candidateTitle(cand.content)}`}
       >
         {acceptLabel}
       </Button>
@@ -299,7 +301,7 @@ export function MeetingPanel({
                 color: 'var(--color-text)',
               }}
             />
-            <Button size="sm" variant="secondary" onClick={handleAddNote}>
+            <Button size="sm" variant="secondary" onClick={handleAddNote} aria-label="Add meeting note">
               Add
             </Button>
           </div>
@@ -422,6 +424,7 @@ export function MeetingPanel({
                     variant="outline"
                     leftIcon={<ArrowRight className="w-3.5 h-3.5" />}
                     onClick={() => onResearchShortcut(candidateTitle(cand.content))}
+                    aria-label={`Research: ${candidateTitle(cand.content)}`}
                   >
                     /research
                   </Button>
@@ -499,6 +502,7 @@ export function MeetingPanel({
                     variant="ghost"
                     leftIcon={<Undo2 className="w-3 h-3" />}
                     onClick={() => onRestoreCandidate(cand.id)}
+                    aria-label={`Restore ${candidateTitle(cand.content)}`}
                   >
                     Restore
                   </Button>

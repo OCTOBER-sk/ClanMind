@@ -85,6 +85,7 @@ export function NotificationCenterPanel({
             variant="ghost"
             onClick={onMarkAllRead}
             disabled={unreadCount === 0 || isMutating}
+            aria-label="Mark all notifications as read"
           >
             {isMutating ? (
               <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
@@ -202,6 +203,7 @@ export function NotificationCenterPanel({
           onClick={onViewAllActivity}
           className="text-xs font-semibold cursor-pointer hover:underline focus-visible:shadow-[var(--focus-ring)] outline-none rounded"
           style={{ color: 'var(--color-info)' }}
+          aria-label="View all activity"
         >
           View all activity
         </button>

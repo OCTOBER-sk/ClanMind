@@ -1,0 +1,30 @@
+AGENT G of 8 (A–H) — ClanMind UI/UX deep refinement. You own ONLY: Meetings, GitHub, Approvals, Notifications, Activity, Settings, Auth/Onboarding, Group/Project dialogs and switchers. Agent A refined tokens/theme; reuse them.
+
+## QUALITY FIRST (Sandy's standing priority)
+Approvals MUST use the generalized ApprovalCard driven by ai_actions (GitHub = one specialization) and MUST submit the exact payload_hash + payload_version it displays — never a bare approved:true. No giant red approve buttons for every action; risk-tiered emphasis. Meetings = first-class state, not a separate app; candidate cards map the real lifecycle; unresolved candidates stay visible at end. Privileged controls role-scoped; never expose raw BYOK secrets. Preserve every contract/controller, keep tests green.
+
+## Source of truth (read before editing)
+build/directives/UIUX_REFINEMENT_DIRECTIVE.md sections 32,33,34,52,53,54,55,56
+ClanMind_Frontend_Master_Implementation_Specification.md sections 66,67,68,69,70,71,72,73,74,75,76,123,124,124A,125,126,127,128,156,157,158,159,160,161,162,163,164,164A,165,166,167,168,169,170,171,171A,172,173,174,232
+Repo REAL paths: clanmind-frontend/src/features/{meetings,github,approvals,notifications,settings,groups,auth,onboarding}. approvals/{ApprovalCard,GitHubActionCard,GitHubDiffViewer}.tsx ; github/GitHubPanel.tsx ; meetings/{MeetingPanel,MeetingActiveHeader,MeetingDialogs}.tsx ; notifications/{ActivityView,NotificationCenterPanel,notificationDisplay,notificationPrefs}.tsx ; settings/SettingsView.tsx ; groups/{CreateGroupDialog,JoinGroupDialog}.tsx ; auth/AuthScreen.tsx ; onboarding/CreateGroupOnboarding.tsx.
+
+## North star (directive s53)
+Approvals must feel deliberate and use the GENERALIZED approval card (FE s164A) driven by ai_actions, with GitHub as one specialization — do NOT implement a separate approval UI. Show action_kind, risk_level (READ_ONLY/LOW/MEDIUM/HIGH/CRITICAL), payload summary, requested_by, created/expires, Reject/Approve. The client NEVER sends a bare approved:true — it submits the exact payload_hash + payload_version it is showing (s164A.2). Status map PROPOSED/WAITING_APPROVAL/APPROVED/EXECUTING/SUCCEEDED/FAILED/REJECTED/EXPIRED. Critical actions get stronger confirmation than low-risk; do not make every approve button giant red. Meetings = first-class state, NOT a separate app: active header (● Meeting, timer, Pause/End), panel sections (live notes/potential decisions/action items/open questions/Odin suggestions), candidate cards map to backend lifecycle (PENDING active / ACCEPTED collapsed confirming promoted_to / REJECTED recoverable in Dismissed / MERGED note / EXPIRED removed), unresolved candidates stay visible at end (FE s124A). Auth/Onboarding: clean, branded (ClanMind mark anchor login, FE s67-76), short onboarding sequence, first-run AI demo communicates the loop visually not in paragraphs. Settings: two-column, clear sections (AI/Members/Notifications/GitHub/Usage/Security/Danger Zone), privileged controls role-scoped, no raw BYOK secrets. Notifications: exact backend category model (Mention/Private/AI/Approvals/Tasks/Decisions/Artifacts/GitHub/Meeting/Odin suggestions/System), preference matrix, no notifications for ordinary chat by default.
+
+## Deliverables (refine visuals + states; preserve contracts/controllers)
+1. approvals/ApprovalCard.tsx (+ GitHubActionCard + GitHubDiffViewer) — generalized approval surface per s164A; deliberate approve/reject; expiry flow ("This action changed since you last saw it. Review the latest version.") never silently retries old hash; risk-tiered emphasis.
+2. github/GitHubPanel.tsx — connected owner/repo/main/last-synced/pending-actions/PRs; clear read-only vs read-write vs needs-reauth states (FE s165); do not imply public-URL grants write.
+3. meetings/* — first-class meeting mode; active header + panel sections + candidate lifecycle mapping; end summary (Decisions/Tasks/Questions/Research/Review & Save) becomes a Garage artifact option.
+4. notifications/ActivityView + NotificationCenterPanel + notificationPrefs — exact categories; preference matrix (in-app/desktop/email) where desktop derived client-side from in_app + OS permission; no generic chat spam.
+5. settings/SettingsView.tsx — two-column, clean sections, role-scoped privileged controls, dirty-state, section-level save for AI/GitHub/permissions.
+6. groups/CreateGroupDialog + JoinGroupDialog — clean, short onboarding, no Workspace terminology (Account->Group->Projects only).
+7. auth/AuthScreen.tsx + onboarding/CreateGroupOnboarding.tsx — branded clean entry; short 7-step onboarding sequence with skip paths; first-run demo communicates loop visually.
+8. Proper confirmation dialogs (FE s227): destructive / external-impact / security-sensitive / ownership changes confirm; copy/panels do not.
+
+## Constraints (hard)
+- ZERO new deps. Preserve controllers/contracts: useNotificationsController, useSettingsController, useGithubConnection, approval payload_hash/version handling (NEVER approved:true). Keep all green tests (existing settings/github/meeting/notification/auth tests; TopBar.meeting.test.tsx must stay green).
+- True-black/white discipline; approvals not giant red by default; meetings not a separate app look.
+- Do NOT touch chat/artifacts/shell/ai. Work only inside clanmind-frontend/.
+
+## Verify (inside clanmind-frontend) then self-review
+pnpm exec tsc -b ; pnpm run lint ; pnpm test. Hostile-review: approval carries payload hash/version not boolean; expiry flow correct; meeting candidates map lifecycle; no raw secrets; onboarding short with skip paths. git status must show ONLY the listed feature files. Report files changed, test counts, and NOT VERIFIED items.

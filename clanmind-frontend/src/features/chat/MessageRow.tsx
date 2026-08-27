@@ -545,7 +545,7 @@ function MessageRowInner({
                   onClick={() => onReact(message.id, reaction.emoji)}
                   aria-pressed={hasReacted}
                   className={cn(
-                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] border transition-all duration-100 cursor-pointer select-none',
+                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] border transition-all duration-100 cursor-pointer select-none hover:scale-105 active:scale-95',
                     hasReacted
                       ? 'border-[var(--color-info)]/40 font-medium'
                       : 'hover:bg-[var(--color-surface-hover)]'
@@ -568,6 +568,7 @@ function MessageRowInner({
         {message.thread_count && message.thread_count > 0 ? (
           <button
             onClick={() => onOpenThread?.(message)}
+            aria-label={`Open thread with ${message.thread_count} ${message.thread_count === 1 ? 'reply' : 'replies'}`}
             className="flex items-center gap-1.5 mt-1.5 text-[12px] font-medium cursor-pointer hover:underline transition-colors"
             style={{ color: 'var(--color-info)' }}
           >

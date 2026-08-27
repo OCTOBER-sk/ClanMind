@@ -1,12 +1,9 @@
 /**
  * ClanMind environment configuration — validated once at boot (fail-fast).
  *
- * Live mode requires VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY;
+ * Requires VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY;
  * the realtime socket derives from the API origin (`/api/v1/groups/:id/ws`,
- * BE §16/§104) unless VITE_WS_URL overrides it explicitly. Demo mode
- * (VITE_DEMO_MODE=1) runs the full app against the in-repo deterministic
- * demo runtime (src/mocks) which implements the exact backend contracts —
- * it must never be bundled into production builds.
+ * BE §16/§104) unless VITE_WS_URL overrides it explicitly.
  */
 
 import { z } from 'zod';
@@ -19,8 +16,6 @@ const RawEnvSchema = z.object({
 });
 
 declare const __APP_VERSION__: string;
-/** Compile-time gate (vite define) — enables dead-code elimination of src/mocks. */
-declare const __DEMO_MODE__: boolean;
 
 function parseRawEnv(): z.infer<typeof RawEnvSchema> {
   const result = RawEnvSchema.safeParse(import.meta.env);
@@ -33,8 +28,8 @@ function parseRawEnv(): z.infer<typeof RawEnvSchema> {
 
 const raw = parseRawEnv();
 
-/** Compile-time gate mirrored for readability; hot paths use __DEMO_MODE__ directly. */
-export const demoMode: boolean = __DEMO_MODE__;
+/** @deprecated Always false — demo mode has been removed from runtime. */
+export const demoMode: boolean = false;
 
 export const env = {
   apiBaseUrl: raw.VITE_API_BASE_URL.replace(/\/+$/, ''),
@@ -49,13 +44,12 @@ export const env = {
 
 /** Throws when live mode is selected but required endpoints are missing. */
 export function assertLiveConfig(): void {
-  if (demoMode) return;
   const missing: string[] = [];
   if (!env.supabaseUrl) missing.push('VITE_SUPABASE_URL');
   if (!env.supabasePublishableKey) missing.push('VITE_SUPABASE_PUBLISHABLE_KEY');
   if (missing.length > 0) {
     throw new Error(
-      `[config] Live mode requires ${missing.join(', ')} — set them or enable VITE_DEMO_MODE for local development.`,
+      `[config] Live mode requires ${missing.join(', ')}.`,
     );
   }
 }

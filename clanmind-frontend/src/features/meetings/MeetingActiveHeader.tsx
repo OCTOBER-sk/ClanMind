@@ -39,8 +39,8 @@ export function MeetingActiveHeader({
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 font-bold text-xs tracking-wider">
           {/* §52 — active meeting indicator: spectral pulse for a first-class live state */}
-          <span className="w-2.5 h-2.5 rounded-full spectral-active animate-pulse" />
-          <span style={{ color: 'var(--color-text)' }}>MEETING IN PROGRESS</span>
+          <span className="w-2.5 h-2.5 rounded-full spectral-active animate-pulse" aria-hidden="true" />
+          <span style={{ color: 'var(--color-text)' }} aria-label="Meeting in progress">MEETING IN PROGRESS</span>
         </div>
         <span
           className="text-xs font-mono font-medium px-2 py-0.5 rounded"
@@ -48,6 +48,8 @@ export function MeetingActiveHeader({
             color: 'var(--color-text-secondary)',
             background: 'var(--color-surface-hover)',
           }}
+          aria-label={`Elapsed time: ${formatTime(elapsedSeconds)}`}
+          role="timer"
         >
           {formatTime(elapsedSeconds)}
         </span>
@@ -71,6 +73,7 @@ export function MeetingActiveHeader({
             variant="outline"
             leftIcon={<Play className="w-3.5 h-3.5 fill-current" />}
             onClick={onResume}
+            aria-label="Resume meeting timer"
           >
             Resume
           </Button>
@@ -80,6 +83,7 @@ export function MeetingActiveHeader({
             variant="outline"
             leftIcon={<Pause className="w-3.5 h-3.5" />}
             onClick={onPause}
+            aria-label="Pause meeting timer"
           >
             Pause
           </Button>
@@ -90,6 +94,7 @@ export function MeetingActiveHeader({
           variant="danger"
           leftIcon={<Square className="w-3.5 h-3.5 fill-current" />}
           onClick={onEnd}
+          aria-label="End the current meeting"
         >
           End Meeting
         </Button>

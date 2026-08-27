@@ -88,6 +88,7 @@ export function ChatHeader({
         {meetingEnabled && !isMeetingActive && onStartMeeting && (
           <button
             onClick={onStartMeeting}
+            aria-label="Start meeting"
             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-semibold cursor-pointer transition-colors"
             style={{
               color: 'var(--color-danger)',

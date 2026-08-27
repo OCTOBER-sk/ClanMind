@@ -51,7 +51,7 @@ function textFor(phase: Lifecycle, aiName: string): string {
   }
 }
 
-export function AiStreamAnnouncer({ aiName = 'Odin', runsByMessage }: AiStreamAnnouncerProps) {
+export function AiStreamAnnouncer({ aiName = 'AI', runsByMessage }: AiStreamAnnouncerProps) {
   const [announcement, setAnnouncement] = useState('');
   /** One announcement per run+status pair — transitions never re-fire. */
   const seenRef = useRef(new Set<string>());

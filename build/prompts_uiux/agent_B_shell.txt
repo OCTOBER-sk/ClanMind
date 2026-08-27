@@ -1,0 +1,27 @@
+AGENT B of 8 (A–H) — ClanMind UI/UX deep refinement. You own ONLY the desktop shell: three-region layout, top bar, left nav, responsive behavior, shortcuts. Agent A already refined the design-system foundation (tokens/theme/primitives) — REUSE it, do not redo it.
+
+## Source of truth (read before editing)
+build/directives/UIUX_REFINEMENT_DIRECTIVE.md sections 16,17,18,19,20
+ClanMind_Frontend_Master_Implementation_Specification.md sections 12,13,14,15,16,17,63 (authorities)
+Repo REAL paths: clanmind-frontend/src/features/shell/{AppShell,TopBar,LeftNav,PanelResizer,KeyboardShortcutsDialog}.tsx and app/router.tsx, app/nav.ts.
+
+## North star (directive s5.2)
+Monochrome calm at rest; spectral only for AI activity. Preserve the three-region model (top bar / left rail / main / contextual right work surface). Right panel must NOT occupy half the screen when empty. Selected state monochrome-first (strong contrast, subtle surface, no persistent bright blue block <-- directive s19). Top bar answers "Where am I?" as ClanMind / Group / Project. Left nav communicates Chat / Projects (active + others) / Overview / Tasks / Decisions / Memory / Team / Garage / Activity / Settings — no giant hierarchical tree, no "Workspace" terminology (product model stays Account->Group->Projects).
+
+## Deliverables (refine these, preserve public API)
+1. features/shell/AppShell.tsx — three-region grid polish; contextual right surface (collapses/closes when no meaningful content, becomes sheet/fullscreen at narrow widths); clean alignment with top bar; panel resize via PanelResizer with sane min/max (no unusably narrow or overly wide); focus-return after panel actions.
+2. features/shell/TopBar.tsx — "Where am I?" hierarchy: [ClanMind mark] / [Group] / [Project]  + search + sync + notifications + profile; not overloaded with context-specific controls; Start Meeting stays available per current screen/permission. Align cleanly with shell grid.
+3. features/shell/LeftNav.tsx — monochrome-first selected state (no persistent blue block); clear icon/text weight; project context obvious (active project unmistakable); archive state only when relevant; collapse behavior at narrow widths.
+4. features/shell/PanelResizer.tsx — non-drag alternative / keyboard-accessible resize; smooth; store preference locally (FE spec s249, s220/221 accessible target sizing).
+5. features/shell/KeyboardShortcutsDialog.tsx — Ctrl/Cmd+K search/commands, Ctrl/Cmd+/ help, Ctrl/Cmd+Shift+P project switcher, Enter send, Shift+Enter newline, Esc close overlays. Clean, discoverable.
+6. Verify responsive at 1280/1440/1600/1920/2560+ and narrow: three panes wide, compress medium, left rail collapses + right surface becomes sheet narrow. No clipped labels, no overlapping toolbars, no content unusably narrow.
+
+## Constraints (hard)
+- ZERO new runtime deps. Reuse design-system components and tokens only.
+- Preserve all existing tests green (shell has AppShell.a11y.test.tsx, LeftNav.test.tsx, TopBar.meeting.test.tsx). No API renames.
+- True-black/white discipline. No persistent blue selection, no glassmorphism, no heavy glow.
+- Do NOT touch other feature screens (chat/artifacts/etc. are later agents).
+- Work only inside clanmind-frontend/.
+
+## Verify (inside clanmind-frontend) then self-review
+pnpm exec tsc -b ; pnpm run lint ; pnpm test. Re-read your diff hostile-reviewing layout/overflow/z-index/clipping across widths. git status must show ONLY shell files + app/nav.ts + app/router.tsx. Report files changed, test counts, AA/layout compromises with exact values, and NOT VERIFIED items (e.g. "2560px unchecked"). Be disciplined — a calm, exact, premium shell that is unmistakably ClanMind.

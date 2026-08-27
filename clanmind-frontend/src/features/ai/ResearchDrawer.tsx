@@ -4,6 +4,7 @@ import type { AiSourceCitation } from '@/types';
 import { handleExternalLinkClick } from '@/tauri/externalLinkPolicy';
 
 export interface ResearchDrawerProps {
+  aiName?: string;
   topic: string;
   summary: string;
   findings: string[];
@@ -14,6 +15,7 @@ export interface ResearchDrawerProps {
 }
 
 export function ResearchDrawer({
+  aiName = 'AI',
   topic,
   summary,
   findings,

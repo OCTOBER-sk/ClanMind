@@ -4,10 +4,12 @@
  * updated and scope (§116). Odin's uncertain candidates render the §117
  * Save/Dismiss banner; "Add memory" opens the §118 scope chooser that
  * defaults to Project inside a Project context.
+ *
+ * §55: AI memory management — view, edit, delete memories.
  */
 
 import React, { useMemo, useState } from 'react';
-import { Check, Plus, Sparkles, Lock, Users, Folder } from 'lucide-react';
+import { Check, Plus, Sparkles, Lock, Users, Folder, Pencil, Trash2, X } from 'lucide-react';
 import { Button } from '@/design-system/components/Button';
 import { Badge } from '@/design-system/components/Badge';
 import { Dialog } from '@/design-system/components/Dialog';
@@ -26,6 +28,10 @@ export interface MemoryViewProps {
   onSaveCandidate: (candidateId: string) => void;
   onDismissCandidate: (candidateId: string) => void;
   onAddMemory: (scope: MemoryScope, memoryType: MemoryCardType, content: string) => void;
+  /** §55 edit memory content. */
+  onEditMemory?: (memoryId: string, content: string) => void;
+  /** §55 delete/archive memory. */
+  onDeleteMemory?: (memoryId: string) => void;
 }
 
 type Section = Extract<'project' | 'group' | 'private', string>;
@@ -56,6 +62,8 @@ export function MemoryView({
   onSaveCandidate,
   onDismissCandidate,
   onAddMemory,
+  onEditMemory,
+  onDeleteMemory,
 }: MemoryViewProps) {
   const [activeSection, setActiveSection] = useState<Section>(inProject ? 'project' : 'group');
   const [isRememberOpen, setRememberOpen] = useState(false);
@@ -92,6 +100,7 @@ export function MemoryView({
           variant="primary"
           leftIcon={<Plus className="w-3.5 h-3.5" />}
           onClick={() => setRememberOpen(true)}
+          aria-label="Add new memory"
         >
           Add Memory
         </Button>
@@ -126,7 +135,7 @@ export function MemoryView({
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <Button size="sm" variant="ghost" onClick={() => onDismissCandidate(cand.id)}>
+                  <Button size="sm" variant="ghost" onClick={() => onDismissCandidate(cand.id)} aria-label="Dismiss candidate">
                     Dismiss
                   </Button>
                   <Button
@@ -134,6 +143,7 @@ export function MemoryView({
                     variant="primary"
                     leftIcon={<Check className="w-3.5 h-3.5" />}
                     onClick={() => onSaveCandidate(cand.id)}
+                    aria-label="Save candidate as memory"
                   >
                     Save
                   </Button>
@@ -149,12 +159,14 @@ export function MemoryView({
         className="px-6 pt-2 border-b"
         style={{ borderColor: 'var(--color-border)' }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" role="tablist" aria-label="Memory scope">
           {SECTIONS.map((s) => (
             <button
               key={s.key}
               onClick={() => setActiveSection(s.key)}
-              aria-current={activeSection === s.key}
+              role="tab"
+              aria-selected={activeSection === s.key}
+              aria-controls={`memory-panel-${s.key}`}
               data-testid={`memory-section-${s.key}`}
               className="flex items-center gap-1.5 pb-2.5 text-[11px] font-semibold border-b-2 transition-colors cursor-pointer"
               style={{
@@ -181,7 +193,12 @@ export function MemoryView({
       )}
 
       {/* Memories list */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-2" aria-busy={isLoading}>
+      <div
+        className="flex-1 overflow-y-auto p-6 space-y-2"
+        aria-busy={isLoading}
+        role="tabpanel"
+        id={`memory-panel-${activeSection}`}
+      >
         {/* §64 — skeleton loading */}
         {isLoading && sectionRows.length === 0 ? (
           <div className="space-y-2">
@@ -201,17 +218,26 @@ export function MemoryView({
             ))}
           </div>
         ) : sectionRows.length === 0 ? (
-          <div data-testid="memory-empty" className="text-center py-12 space-y-1">
-            <p className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-              No {SECTIONS.find((s) => s.key === activeSection)?.label.toLowerCase()} yet.
-            </p>
-            <p className="text-xs max-w-sm mx-auto leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
-              Memories keep decisions, constraints and conventions alive across sessions. Save one
-              yourself or let {aiName} propose candidates from chat.
-            </p>
-          </div>
+          <EmptyState
+            icon={<Folder className="w-8 h-8" />}
+            title={`No ${SECTIONS.find((s) => s.key === activeSection)?.label.toLowerCase()} yet.`}
+            description={`Memories keep decisions, constraints and conventions alive across sessions. Save one yourself or let ${aiName} propose candidates from chat.`}
+            actions={
+              <Button size="sm" variant="ghost" onClick={() => setRememberOpen(true)} aria-label="Add a memory">
+                Add a memory
+              </Button>
+            }
+          />
         ) : (
-          sectionRows.map((mem) => <MemoryCardRow key={mem.id} memory={mem} />)
+          sectionRows.map((mem) => (
+            <MemoryCardRow
+              key={mem.id}
+              memory={mem}
+              aiName={aiName}
+              onEdit={onEditMemory}
+              onDelete={onDeleteMemory}
+            />
+          ))
         )}
       </div>
 
@@ -338,16 +364,50 @@ function RememberForm({
 /**
  * One §116 card — typed badge + content + provenance line
  * (source · scope · created · updated).
+ * §55 — edit and delete actions.
  */
-function MemoryCardRow({ memory }: { memory: MemoryEntry }) {
+function MemoryCardRow({
+  memory,
+  aiName,
+  onEdit,
+  onDelete,
+}: {
+  memory: MemoryEntry;
+  aiName: string;
+  onEdit?: (memoryId: string, content: string) => void;
+  onDelete?: (memoryId: string) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(memory.content);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const isTypedVocabulary = CARD_TYPES.includes(memory.memory_type as MemoryCardType);
   const scopeLabel = memory.scope_type === 'USER_PRIVATE' ? 'Private' : memory.scope_type;
   const provenance = [
-    `Source: ${sourceLabel(memory)}`,
+    `Source: ${sourceLabel(memory, aiName)}`,
     `Scope: ${scopeLabel}`,
     `Created ${new Date(memory.created_at).toLocaleDateString()}`,
     `Updated ${new Date(memory.updated_at).toLocaleDateString()}`,
   ];
+
+  const handleSaveEdit = () => {
+    if (editContent.trim() && onEdit) {
+      onEdit(memory.id, editContent.trim());
+      setIsEditing(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditContent(memory.content);
+    setIsEditing(false);
+  };
+
+  const handleDelete = () => {
+    if (onDelete) {
+      onDelete(memory.id);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   return (
     <div
@@ -368,21 +428,90 @@ function MemoryCardRow({ memory }: { memory: MemoryEntry }) {
             {memory.scope_type === 'USER_PRIVATE' ? 'Private' : memory.scope_type}
           </span>
         </div>
+        {/* §55 edit/delete actions */}
+        <div className="flex items-center gap-1 shrink-0">
+          {onEdit && !isEditing && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="p-1 rounded transition-colors cursor-pointer hover:bg-[var(--color-surface-hover)]"
+              style={{ color: 'var(--color-text-tertiary)' }}
+              aria-label={`Edit memory: ${memory.content.slice(0, 40)}`}
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+          )}
+          {onDelete && !isEditing && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="p-1 rounded transition-colors cursor-pointer hover:bg-[var(--color-surface-hover)]"
+              style={{ color: 'var(--color-text-tertiary)' }}
+              aria-label={`Delete memory: ${memory.content.slice(0, 40)}`}
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          )}
+        </div>
       </div>
-      <p style={{ color: 'var(--color-text)' }}>{memory.content}</p>
+
+      {/* §55 inline edit mode */}
+      {isEditing ? (
+        <div className="space-y-2">
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            rows={3}
+            maxLength={2000}
+            className="w-full px-3 py-1.5 rounded-md border text-xs outline-none resize-none"
+            style={{ borderColor: 'var(--color-border-strong)', background: 'var(--color-surface)', color: 'var(--color-text)' }}
+            aria-label="Edit memory content"
+          />
+          <div className="flex justify-end gap-1.5">
+            <Button size="sm" variant="ghost" onClick={handleCancelEdit} aria-label="Cancel editing">
+              <X className="w-3 h-3 mr-1" /> Cancel
+            </Button>
+            <Button size="sm" variant="primary" onClick={handleSaveEdit} disabled={!editContent.trim()} aria-label="Save edit">
+              <Check className="w-3 h-3 mr-1" /> Save
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p style={{ color: 'var(--color-text)' }}>{memory.content}</p>
+      )}
+
       <ul className="pt-1 border-t text-[10px] flex flex-wrap gap-x-3 gap-y-0.5" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-tertiary)' }}>
         {provenance.map((line) => (
           <li key={line}>{line}</li>
         ))}
       </ul>
+
+      {/* §55 delete confirmation */}
+      {showDeleteConfirm && (
+        <div
+          className="flex items-center justify-between p-2 rounded-md border text-xs"
+          style={{ borderColor: 'var(--color-danger)', background: 'var(--color-surface)' }}
+          role="alert"
+        >
+          <span style={{ color: 'var(--color-text-secondary)' }}>Delete this memory?</span>
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" variant="ghost" onClick={() => setShowDeleteConfirm(false)} aria-label="Cancel delete">
+              Cancel
+            </Button>
+            <Button size="sm" variant="danger" onClick={handleDelete} aria-label="Confirm delete">
+              Delete
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function sourceLabel(memory: MemoryEntry): string {
+function sourceLabel(memory: MemoryEntry, aiName: string): string {
   switch (memory.source_type) {
     case 'ai_research':
-      return 'Odin research';
+      return `${aiName} research`;
     case 'explicit':
       return 'You';
     case 'candidate_accepted':

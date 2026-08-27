@@ -7,8 +7,8 @@
  * Raw JSON is never exposed by default.
  */
 
-import { useMemo } from 'react';
-import { ArrowLeftRight, GitCompare } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowLeftRight, Columns2, GitCompare, Rows3 } from 'lucide-react';
 import { Button } from '@/design-system/components/Button';
 import {
   diffDiagram,
@@ -36,6 +36,8 @@ function svgDataUrl(svg: string): string {
 }
 
 export function ArtifactCompare({ artifactType, versionA, versionB, onClose }: ArtifactCompareProps) {
+  // §47 — split/unified toggle for line diffs.
+  const [diffView, setDiffView] = useState<'unified' | 'split'>('unified');
   // All hooks run unconditionally — branching happens only at render time.
   const header = (
     <div className="flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
@@ -179,32 +181,116 @@ export function ArtifactCompare({ artifactType, versionA, versionB, onClose }: A
     return (
       <div className="flex h-full flex-col overflow-hidden bg-[var(--color-surface-raised)]">
         {header}
+        {/* §47 — view mode toggle */}
+        <div className="flex items-center gap-1 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5">
+          <span className="mr-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)]">View</span>
+          <button
+            onClick={() => setDiffView('unified')}
+            aria-pressed={diffView === 'unified'}
+            aria-label="Unified diff view"
+            className={cn(
+              'flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors',
+              diffView === 'unified'
+                ? 'bg-[var(--color-surface-hover)] text-[var(--color-text)]'
+                : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]',
+            )}
+          >
+            <Rows3 className="h-3 w-3" aria-hidden="true" />
+            Unified
+          </button>
+          <button
+            onClick={() => setDiffView('split')}
+            aria-pressed={diffView === 'split'}
+            aria-label="Split diff view"
+            className={cn(
+              'flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors',
+              diffView === 'split'
+                ? 'bg-[var(--color-surface-hover)] text-[var(--color-text)]'
+                : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]',
+            )}
+          >
+            <Columns2 className="h-3 w-3" aria-hidden="true" />
+            Split
+          </button>
+        </div>
+
         <div className="min-h-0 flex-1 overflow-y-auto font-mono text-[11px] leading-relaxed select-text">
-          {rows.map((row, i) => (
-            <div
-              key={i}
-              className={cn(
-                'flex gap-2 px-4 py-px',
-                row.type === 'added' && 'bg-[var(--color-success-bg)]',
-                row.type === 'removed' && 'bg-[var(--color-danger-bg)]',
-              )}
-            >
-              <span className="w-8 shrink-0 text-right text-[var(--color-text-tertiary)]" aria-hidden="true">
-                {row.lineA ?? row.lineB ?? ''}
-              </span>
-              <span
+          {diffView === 'unified' ? (
+            // §47 — Unified view: all lines in one column with +/- markers.
+            rows.map((row, i) => (
+              <div
+                key={i}
                 className={cn(
-                  'w-3 shrink-0',
-                  row.type === 'added' && 'text-[var(--color-success)]',
-                  row.type === 'removed' && 'text-[var(--color-danger)]',
+                  'flex gap-2 px-4 py-px',
+                  row.type === 'added' && 'bg-[var(--color-success-bg)]',
+                  row.type === 'removed' && 'bg-[var(--color-danger-bg)]',
                 )}
-                aria-label={row.type === 'added' ? 'added line' : row.type === 'removed' ? 'removed line' : undefined}
               >
-                {row.type === 'added' ? '+' : row.type === 'removed' ? '−' : ''}
-              </span>
-              <span className="whitespace-pre-wrap text-[var(--color-text)]">{row.text || ' '}</span>
+                <span className="w-8 shrink-0 text-right text-[var(--color-text-tertiary)]" aria-hidden="true">
+                  {row.lineA ?? row.lineB ?? ''}
+                </span>
+                <span
+                  className={cn(
+                    'w-3 shrink-0',
+                    row.type === 'added' && 'text-[var(--color-success)]',
+                    row.type === 'removed' && 'text-[var(--color-danger)]',
+                  )}
+                  aria-label={row.type === 'added' ? 'added line' : row.type === 'removed' ? 'removed line' : undefined}
+                >
+                  {row.type === 'added' ? '+' : row.type === 'removed' ? '−' : ''}
+                </span>
+                <span className="whitespace-pre-wrap text-[var(--color-text)]">{row.text || ' '}</span>
+              </div>
+            ))
+          ) : (
+            // §47 — Split view: removed on left, added on right.
+            <div className="grid grid-cols-2 divide-x divide-[var(--color-border)]">
+              <div className="overflow-x-auto" role="region" aria-label="Before version">
+                <div className="px-1.5 py-1 text-center text-[9px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+                  v{versionB.version_number} — Before
+                </div>
+                {rows.map((row, i) => (
+                  <div
+                    key={`l-${i}`}
+                    className={cn(
+                      'flex gap-1 px-2 py-px',
+                      row.type === 'removed' && 'bg-[var(--color-danger-bg)]',
+                      row.type === 'added' && 'opacity-30',
+                    )}
+                  >
+                    <span className="w-6 shrink-0 text-right text-[var(--color-text-tertiary)]" aria-hidden="true">
+                      {row.lineA ?? ''}
+                    </span>
+                    <span className="whitespace-pre-wrap text-[var(--color-text)]">
+                      {row.type !== 'added' ? (row.text || ' ') : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="overflow-x-auto" role="region" aria-label="After version">
+                <div className="px-1.5 py-1 text-center text-[9px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+                  v{versionA.version_number} — After
+                </div>
+                {rows.map((row, i) => (
+                  <div
+                    key={`r-${i}`}
+                    className={cn(
+                      'flex gap-1 px-2 py-px',
+                      row.type === 'added' && 'bg-[var(--color-success-bg)]',
+                      row.type === 'removed' && 'opacity-30',
+                    )}
+                  >
+                    <span className="w-6 shrink-0 text-right text-[var(--color-text-tertiary)]" aria-hidden="true">
+                      {row.lineB ?? ''}
+                    </span>
+                    <span className="whitespace-pre-wrap text-[var(--color-text)]">
+                      {row.type !== 'removed' ? (row.text || ' ') : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
+          )}
         </div>
       </div>
     );

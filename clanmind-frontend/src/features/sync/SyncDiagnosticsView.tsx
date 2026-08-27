@@ -114,6 +114,8 @@ export function SyncDiagnosticsView({
       <div
         className="p-4 rounded-xl border space-y-3"
         style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+        role="region"
+        aria-label="Pending local operations"
       >
         <h3 className="font-bold flex items-center justify-between">
           <span>Pending Local Operations Queue</span>
@@ -179,7 +181,7 @@ export function SyncDiagnosticsView({
       </div>
 
       {/* §285 conflicts */}
-      <div className="space-y-3">
+      <div className="space-y-3" role="region" aria-label="Sync conflicts">
         <h3 className="font-bold">Conflicts</h3>
         {conflicts.length === 0 ? (
           <p className="italic" style={{ color: 'var(--color-text-tertiary)' }}>
@@ -199,6 +201,8 @@ export function SyncDiagnosticsView({
         <div
           className="p-4 rounded-xl border space-y-3"
           style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+          role="region"
+          aria-label="Notification delivery states"
         >
           <h3 className="font-bold flex items-center justify-between">
             <span>Notification Delivery States</span>

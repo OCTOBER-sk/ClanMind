@@ -1,0 +1,33 @@
+AGENT C of 8 (A–H) — ClanMind UI/UX deep refinement. You own ONLY chat: main conversation, messages, composer, reactions, threads, mentions, private mode, attachments. Agent A already refined tokens/theme/primitives — REUSE, do not redo.
+
+## QUALITY FIRST (Sandy's explicit priority for this agent)
+Chat/composer is the CORE of ClanMind. Get the INTERACTIONS RIGHT — do not just restyle. Preserve and exercise every behaviour exactly: composer auto-grow and keyboard behaviour (Enter send / Shift+Enter newline, native undo), optimistic insert + duplicate-guard, offline queue with identical client_operation_id reuse, intelligent scroll-follow during streaming, private-mode leak protection, drafts persistence, retry-never-discard on failure. If a behaviour is wrong or missing, FIX IT. Only restyle where it does not cost correctness. Verify each interaction as you go, not by eyeballing classes.
+
+## Source of truth (read before editing)
+build/directives/UIUX_REFINEMENT_DIRECTIVE.md sections 22,23,24,25,26,27,28,29,30,48
+ClanMind_Frontend_Master_Implementation_Specification.md sections 21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60
+Repo REAL paths: clanmind-frontend/src/features/chat/{MessageList,MessageRow,Composer,ChatHeader,MentionPicker,SlashCommandPicker,ThreadPanel,AttachmentTray,MessageActions,PrivateRecipientChooser}.tsx
+
+## North star (directive s5.2 + s22)
+Chat must become one of the most refined screens. Distinct ClanMind identity — NOT a Slack clone. Normal message: readable body first, metadata secondary, small avatar+name+time header, then body, then attachments/reactions/reply/actions. No giant colored chat bubbles. AI message separate (agent D owns Odin visuals; do not overhaul AI message cards here). Composer must feel like a professional writing surface, not a generic input. Private mode unmistakable (s29): show text "Private with Arun" / "Private with Odin", not color alone; prevent stale public/private accidental send.
+
+## Deliverables (refine visuals/interactions, preserve behaviour + controller logic)
+1. MessageList.tsx — grouping, unread divider, intelligent scroll-follow during streaming (auto-follow only near bottom; Jump to latest; stop-follow on scroll up), virtualization stable (no scroll jumps, correct anchor), new-message button. Readable max-width for normal messages; wider for AI/research/tables/code.
+2. MessageRow.tsx — message anatomy (avatar/author/time/body/attachments/reactions/reply/action row); hover/focus actions only for permitted ones (Reply/React/Copy/More primary; Edit/Delete/Pin/Quote/Create task/Save decision/Use as context/Mark unread in More); do not hide critical actions behind hover alone; states normal/hovered/focused/pending/failed/edited/deleted/mentioned/reply-target/search-highlighted/selected (FE s209).
+3. Composer.tsx — professional writing surface; auto-grow (min ~44-52px, max ~220-280px); Enter send / Shift+Enter newline; attachment + /command + @mention + project-context chip + send; empty=subdued/disabled, focused=stronger ring (no glow/scale), sending=duplicate-submit guard + brief state; offline/queued/failed states (keep text, Retry, never discard); draft persists; stays usable while Odin processes (do not lock composer).
+4. ChatHeader.tsx — Group chat / Project: X context chip clearly distinguishing Group chat vs Project context (s20); project-context chip; search; meeting entry; presence. NOT overloaded.
+5. MentionPicker.tsx — tracks caret, stays in viewport, avoids covering composer, repositions on resize; shows avatar+name (+Odin distinct); arrow/enter/esc keyboard.
+6. SlashCommandPicker.tsx — /ask /private /meeting /research /memory /project; icon+short description; keyboard filtering.
+7. ThreadPanel.tsx — original+replies+reactions+attachments+composer in the contextual work surface; not a stack of floating panels; Escape closes and restores focus (s30, FE s220).
+8. AttachmentTray.tsx — compact chips (icon/name/size/remove); states selected/uploading/uploaded/failed/cancelled; upload progress "name.pdf · 64%"; upload+indexing "Uploaded · Preparing for Odin"; failure "Couldn't upload this file." Retry/Remove; never silently drop.
+9. MessageActions.tsx + ReactionPicker + MessageRow copy: copy icon->check + tooltip "Copied" (~1.5-2s), no big toast for copy; reactions tiny scale/fade (0.85->1 no bounce); code copy preserves exactly + language label + Copy.
+10. PrivateRecipientChooser.tsx — recipient pick (Arun/Priya/Odin); header changes to the unmistakable private indicator (s29).
+
+## Constraints (hard)
+- ZERO new runtime deps. Reuse design-system components/tokens. Keep every behaviour: controller (useChatController.ts), selectors (chatSelectors.ts), streaming store (aiStreamStore.ts), accessibility and markdown-security behaviour. You refine presentation + interaction polish only.
+- Keep ALL existing chat tests green (chat/*.test.tsx, *.a11y.test.tsx, markdownSecurity, aiStreaming, privateLeakage, aiRunPrivacy, useChatController). Do not weaken security/a11y tests.
+- True-black/white discipline, restrained spectral (s48: spectral around AI activity, not every message). No Slack clone look.
+- Do NOT touch ai/* or artifacts/* (agents D/E own them). Work only inside clanmind-frontend/.
+
+## Verify (inside clanmind-frontend) then self-review
+pnpm exec tsc -b ; pnpm run lint ; pnpm test. Hostile-review overflow/z-index/composer layout/clipping; confirm offline/failed/pending states intact; confirm private indicator is text+icon not color-only. git status must show ONLY chat files (+ shared design-system reuse is fine, no edits there). Report files changed, test counts, any behaviour you preserved that now needs visual check, and NOT VERIFIED items. Make chat feel calm, precise, premium, unmistakably ClanMind.

@@ -1,0 +1,26 @@
+AGENT H of 8 (A–H) — ClanMind UI/UX deep refinement. You own ONLY: offline/sync/conflict experience, global accessibility & keyboard QA pass, error boundaries, reduced-motion, privacy-in-state. Agents A–G refined the screens; you are the QA + resilience owner closing the program.
+
+## QUALITY FIRST (Sandy's standing priority)
+You are the resilience + quality gate. Every conflict type gets its OWN copy (never one generic message); Sync banner reflects real pending ops; error boundaries isolate surface failures so one broken feature never crashes the app; focus/announce/contrast/reduced-motion pass across the shipped screens; Group switching must never leak private state. Verify on the running vite app when you can (http://localhost:1420 demo mode); if a flow cannot be exercised headlessly, mark it NOT VERIFIED honestly — never fake it.
+
+## Source of truth (read before editing)
+build/directives/UIUX_REFINEMENT_DIRECTIVE.md sections 57,58,59,60,63,64,65,66,67,68,77,82,83,84,93,94,95,96,98,99
+ClanMind_Frontend_Master_Implementation_Specification.md sections 179,180,181,182,183,184,185,186,186A,187,188,189,190,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,286,287,312,313,314,315
+Repo REAL paths: clanmind-frontend/src/features/sync/{SyncBanner,SyncConflictCard,SyncDiagnosticsView}.tsx ; app/ErrorBoundary.tsx ; auth/SessionExpiredGate.tsx ; src/sync/* ; design-system primitives (for a11y greps only).
+
+## Deliverables (refine + verify; preserve sync logic/contracts)
+1. features/sync/SyncBanner.tsx — connected=invisible; reconnecting "Reconnecting"; offline "Offline"; syncing "Syncing N changes"; done "Synced". Reflect real local sync_operations pending count, not a guess (FE s186A.1).
+2. features/sync/SyncConflictCard.tsx — conflict_type drives distinct copy, NOT one generic message (FE s186A.3): version_mismatch "updated by someone else while offline"; concurrent_edit "you and someone else both changed this"; deleted_upstream "deleted by someone else while offline" with only Restore-mine-as-new / Discard-mine. Never silently overwrite (s59, FE s186). Resolution writes back same-channel.
+3. features/sync/SyncDiagnosticsView.tsx — connection/protocol/version/last-sequence/last-sync/pending-ops/conflicts; never includes keys/secrets/private content (FE s287).
+4. app/ErrorBoundary.tsx + SessionExpiredGate.tsx — feature-level boundaries (chat/garage/artifact/github/settings recover independently, one broken surface never crashes the app FE s199/s291); global catastrophic screen "ClanMind encountered an unexpected problem. Local drafts are preserved." Restart + Copy diagnostics; session-expiry screen keeps local work safe, never discards queued local work (FE s197).
+5. Accessibility + keyboard QA pass across the shipped screens (s65, FE s207-223, s312-315): visible focus everywhere (strong neutral focus ring, not accent-only), hierarchical headings in AI/prose, accessible names on all icon-only buttons + tooltips, dialog/popover focus trap + restore, status announcements (3 new messages / Odin started/completed/failed — not every token), minimum pointer target 24x24 floor (core 32-40), contrast AA. prefers-reduced-motion: remove moving spectral lines / large panel motion / artifact construction animation -> immediate state + textual status, never drop critical info. Non-drag alternatives for panel resize. No relying on color alone for private/conflict/approval/error/AI-activity/sync state (also icon+text).
+6. Privacy in UI state (s60, s99, s79, FE s176): switching Group resets/scopes caches, no cross-Group private previews/memory/notifications leak; search results inherit source authorization; don't trust frontend permission as security (backend authoritative).
+7. Run the feedback/edge QA (FE s207-216 state matrices where feasible): empty/loading/error/offline permission-denied states exist on surfaces you can touch without changing screen visuals (report gaps you cannot fix without a screen owner).
+
+## Constraints (hard)
+- ZERO new deps. Keep ALL sync tests green (sync/conflict logic, SyncBanner truth, diagnostics). Do NOT change sync engine logic/contracts (idempotency, client_operation_id reuse, checkpoint). You fix presentation + resilience + a11y + privacy-in-state.
+- True-black/white discipline.
+- You may touch design-system primitives ONLY to fix an accessibility defect (focus/announce/labels); do not restyle them (Agent A owns styling).
+
+## Verify (inside clanmind-frontend) then self-review
+pnpm exec tsc -b ; pnpm run lint ; pnpm test. Then MANUALLY exercise in the vite dev app (http://localhost:1420 demo mode): offline banner, a conflict card for each of the 3 types, session/error boundaries, keyboard nav (something that depends on the fixed port is fine — most flows are demo-usable), reduced-motion via emulated prefers-reduced-motion, and a Group switch checking no cross-Group leak. Report file-by-file changes, the a11y fixes you made and how you verified each, test counts, and NOT VERIFIED items (state plainly). You are the resilience + quality gate closing the program.

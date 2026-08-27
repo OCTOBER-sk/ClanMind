@@ -1,0 +1,16 @@
+Small AGENT B2 (brand asset wiring) — ClanMind UI, midas. Two uploaded brand assets must be wired into the rendered UI per build/directives/UIUX_REFINEMENT_DIRECTIVE.md section 6. They already exist in the repo: src/assets/brand/clanmind-mark.png (a monochrome C/M monogram, black on white) and src/assets/brand/odin-avatar.png (a monochrome Viking warrior avatar, black on white). Wire them in.
+
+## 6.1 ClanMind mark
+Render `clanmind-mark.png` as the primary ClanMind identity mark. Use a proper import (e.g. `import clanmindMark from '@/assets/brand/clanmind-mark.png'`) and an <img> with the accessible name "ClanMind". Apply it at: the login/first-launch brand block (src/features/auth/AuthScreen.tsx), onboarding brand (src/features/onboarding/CreateGroupOnboarding.tsx), and the compact shell top-left identity if the shell shows a logo (src/features/shell/TopBar.tsx / AppShell.tsx). Keep the monochrome theme: the PNG is black-on-white, so in DARK theme apply an invert/contrast filter so it reads white-on-black (e.g. className 'dark:invert' or, if the shell has no dark class, a small CSS rule that inverts under `.dark`). Do NOT distort aspect; keep it compact and crisp; do not add decorative backgrounds. The existing inline-SVG ClanMindLogo component may stay for tiny 16-20px spots, but the uploaded mark becomes the brand image of record at login/onboarding/shell identity.
+
+## 6.2 Odin avatar (temporary reference)
+Render `odin-avatar.png` as the DEFAULT Odin avatar wherever the AI identity appears: the AI message author avatar in chat (src/features/chat/MessageRow.tsx AI path), the AI status/presence identity (src/features/ai/AiStatusIndicator.tsx if it shows an avatar), the Team view Odin row (src/features/team/TeamView.tsx), the AI identity in settings if one exists (src/features/settings), and the onboarding AI_AVATARS default `'odin-default'` (src/features/onboarding/CreateGroupOnboarding.tsx → import and use the png as the 'odin-default' option). Keep it compact, rounded where the surrounding UI already rounds avatars, with an accessible name "Odin". Apply the same monochrome inversion treatment for the true-black dark theme. Do NOT make it a giant decoration.
+
+## Constraints
+- NO new dependencies. Import the pngs as static assets only (already local assets).
+- Preserve every component's exported props/API; keep all 471 FE tests green (there ARE avatar/a11y tests — read them; value-only changes preferred). pnpm exec tsc -b, pnpm run lint, pnpm test must pass.
+- True-black/white discipline; the images must read correctly in BOTH light and dark. No giant logo/avatar.
+- Work only inside clanmind-frontend/src. Touch only the files listed above (+ the asset imports).
+
+## Self-review
+Re-read your diff; confirm both assets are imported and rendered at the named sites; confirm the dark invert works (grep the filter/invert class); confirm tests+tsc+lint pass with exact counts; git status shows only the listed files. Report files changed, test counts, and NOT VERIFIED items (e.g. any site you could not wire).

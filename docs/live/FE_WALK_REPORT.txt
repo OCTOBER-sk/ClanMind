@@ -1,0 +1,42 @@
+URL=http://localhost:1420/group/85b2dcff-1d25-4b02-9066-ea5d10dac06c/chat
+TITLE=ClanMind · Shared Project Room for People + AI
+NAV_LINKS=["#cm-main-content", "https://www.st.com/resource/en/reference_manual/dm00320582-stm32f405415-advanced-armbased-32bit-microcontrollers-stmicroelectronics.pdf", "https://www.st.com/en/embedded-software/stm32f4-standard-peripheral-libraries.html"]
+[chat] url=http://localhost:1420/group/85b2dcff-1d25-4b02-9066-ea5d10dac06c/chat title=ClanMind · Shared Project Room for People + AI bodylen=2600
+[chat] body=Skip to main content | Connected — all changes synced | STM32 telemetry at scale | STM32 telemetry at scale | Search or jump to… | Ctrl+K | FR | Chat | PROJECTS | STM32 telemetry at scale | 0% | Overview | Tasks | Decisions | Team Memory | Team | Garage | Activity | Settings | Odin AI Active | STM32 telemetry at scale | Project: STM32 telemetry at scale | ME | Member | 03:20 AM |  | Hello Odin — realtime live test. What is the SPI1 TX DMA request on the F446? |  | 03:24 A
+[chat] console_errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[chat] pageerrors=[]
+[chat] composer textareas=1
+[chat] after-send=Skip to main content | Connected — all changes synced | STM32 telemetry at scale | STM32 telemetry at scale | Search or jump to… | Ctrl+K | FR | Chat | PROJECTS | STM32 telemetry at scale | 0% | Overview | Tasks | Decisions | Team Memory | Team | Garage | Activity | Settings | Odin AI Active | STM32 telemetry at scale | Project: STM32 telem
+[chat] console_errors=[]
+[overview] url=http://localhost:1420/group/85b2dcff-1d25-4b02-9066-ea5d10dac06c/overview title=ClanMind · Shared Project Room for People + AI bodylen=764
+[overview] body=Skip to main content | Connected — all changes synced | STM32 telemetry at scale | STM32 telemetry at scale | Search or jump to… | Ctrl+K | FR | Chat | PROJECTS | STM32 telemetry at scale | 0% | Overview | Tasks | Decisions | Team Memory | Team | Garage | Activity | Settings | Odin AI Active | STM32 telemetry at scale | other |  | PROJECT PULSE | 0% | FOCUS |  | Not set yet |  | BLOCKED |  | Nothing blocked |  | NEXT |  | No next step captured |  | Odin: 1 unresolved decision needs attenti
+[overview] console_errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[overview] pageerrors=[]
+[tasks] url=http://localhost:1420/group/85b2dcff-1d25-4b02-9066-ea5d10dac06c/tasks title=ClanMind · Shared Project Room for People + AI bodylen=682
+[tasks] body=Skip to main content | Connected — all changes synced | STM32 telemetry at scale | STM32 telemetry at scale | Search or jump to… | Ctrl+K | FR | Chat | PROJECTS | STM32 telemetry at scale | 0% | Overview | Tasks | Decisions | Team Memory | Team | Garage | Activity | Settings | Odin AI Active | Tasks |  | 2 open · actionable work linked to team decisions. |  | New Task | All (2) | To Do (2) | In Progress (0) | Done (0) | Cancelled (0) | Document IRQ priority + gotcha for F446 | 
+[tasks] console_errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[tasks] pageerrors=[]
+[decisions] url=http://localhost:1420/group/85b2dcff-1d25-4b02-9066-ea5d10dac06c/decisions title=ClanMind · Shared Project Room for People + AI bodylen=549
+[decisions] body=Skip to main content | Connected — all changes synced | STM32 telemetry at scale | STM32 telemetry at scale | Search or jump to… | Ctrl+K | FR | Chat | PROJECTS | STM32 telemetry at scale | 0% | Overview | Tasks | Decisions | Team Memory | Team | Garage | Activity | Settings | Odin AI Active | Decisions |  | The project's decision log — approved choices and open proposals. |  | Propose | Decision #1: Adopt SPI+DMA-1 channel 3 over interrupt-driven TX | PROPOSED | CONTEX
+[decisions] console_errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[decisions] pageerrors=[]
+[memory] url=http://localhost:1420/group/85b2dcff-1d25-4b02-9066-ea5d10dac06c/memory title=ClanMind · Shared Project Room for People + AI bodylen=528
+[memory] body=Skip to main content | Connected — all changes synced | STM32 telemetry at scale | STM32 telemetry at scale | Search or jump to… | Ctrl+K | FR | Chat | PROJECTS | STM32 telemetry at scale | 0% | Overview | Tasks | Decisions | Team Memory | Team | Garage | Activity | Settings | Odin AI Active | Memory |  | Scoped context Odin retains across sessions. |  | Add Memory | Project Memory | Group Memory | Your Private Memory |  | No project memory yet. |  | Memories keep decisions, co
+[memory] console_errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[memory] pageerrors=[]
+[team] url=http://localhost:1420/group/85b2dcff-1d25-4b02-9066-ea5d10dac06c/team title=ClanMind · Shared Project Room for People + AI bodylen=409
+[team] body=Skip to main content | Connected — all changes synced | STM32 telemetry at scale | STM32 telemetry at scale | Search or jump to… | Ctrl+K | FR | Chat | PROJECTS | STM32 telemetry at scale | 0% | Overview | Tasks | Decisions | Team Memory | Team | Garage | Activity | Settings | Odin AI Active | Team |  | 0 members · Group members and roles. |  | Invite | No team members yet |  | Invite teammates to collaborate on projects and share AI context. |  | Invite Teammate
+[team] console_errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[team] pageerrors=[]
+[garage] url=http://localhost:1420/group/85b2dcff-1d25-4b02-9066-ea5d10dac06c/garage title=ClanMind · Shared Project Room for People + AI bodylen=732
+[garage] body=Skip to main content | Connected — all changes synced | STM32 telemetry at scale | STM32 telemetry at scale | Search or jump to… | Ctrl+K | FR | Chat | PROJECTS | STM32 telemetry at scale | 0% | Overview | Tasks | Decisions | Team Memory | Team | Garage | Activity | Settings | Odin AI Active | Project Garage |  | Artifacts, research findings, and technical references. |  | Connect folder | All | Artifacts | Files | Research | Pinned | Recent |  | SPI1_TX_DATAFLOW |  | DIAGRAM | SPI1_TX
+[garage] console_errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[garage] pageerrors=[]
+[activity] url=http://localhost:1420/group/85b2dcff-1d25-4b02-9066-ea5d10dac06c/activity title=ClanMind · Shared Project Room for People + AI bodylen=358
+[activity] body=Skip to main content | Connected — all changes synced | STM32 telemetry at scale | STM32 telemetry at scale | Search or jump to… | Ctrl+K | FR | Chat | PROJECTS | STM32 telemetry at scale | 0% | Overview | Tasks | Decisions | Team Memory | Team | Garage | Activity | Settings | Odin AI Active | Activity |  | You are all caught up. |  | No activity yet. |  | Mentions, approvals and AI events will appear here.
+[activity] console_errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[activity] pageerrors=[]
+[settings] url=http://localhost:1420/group/85b2dcff-1d25-4b02-9066-ea5d10dac06c/settings title=ClanMind · Shared Project Room for People + AI bodylen=394
+[settings] body=Skip to main content | Connected — all changes synced | STM32 telemetry at scale | STM32 telemetry at scale | Search or jump to… | Ctrl+K | FR | Chat | PROJECTS | STM32 telemetry at scale | 0% | Overview | Tasks | Decisions | Team Memory | Team | Garage | Activity | Settings | Odin AI Active | GROUP SETTINGS | Account | Appearance | Account |  | Your global profile (§272). |  | F | frontendqa | Display name | Email | frontendqa@clanmind.io | Save profile
+[settings] console_errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[settings] pageerrors=[]

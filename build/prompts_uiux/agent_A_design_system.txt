@@ -1,0 +1,38 @@
+AGENT A of 8 (A–H) — ClanMind UI/UX deep refinement. You own ONLY the design-system foundation. Atom integrates. Do not touch shell/chat/artifacts/screens — later agents own those.
+
+## Source of truth (read before editing)
+build/directives/UIUX_REFINEMENT_DIRECTIVE.md sections 5,6,7,8,9,10,11,12,13,14,15,88,90
+ClanMind_Frontend_Master_Implementation_Specification.md sections 3,4,5,6,8 (your authorities; never contradict)
+Repo: clanmind-frontend/. Code is NOT truth when it conflicts with directive/spec.
+
+## North star (directive s5.2)
+Black and white are the language; spectral color is the event. Calm monochrome at rest. True-black dark theme, white/off-white light. Red = semantic only. NO persistent blue primary. Spectral only for Odin-active / AI generation / artifact construction / progress / selected-AI state. Never rainbow behind text or as button fills.
+
+## Deliverables (exact files, nothing else)
+1. clanmind-frontend/src/index.css — repoint dark surfaces to APPROX: bg #000000, surface #080808, surface-raised #101010, surface-elevated #181818; dark borders #1A1A1A/#2A2A2A; text #FFFFFF/#A0A0A0/#666666/#454545. Light: bg #FFFFFF, surface #FAFAFA, raised #F5F5F5, elevated #FFFFFF; text #000000/#555555/#888888/#AAAAAA; borders #E5E5E5/#D4D4D4. No warm beige. Verify primary token is near-black (light ~#111827) / white (dark ~#FFFFFF); NO blue primary anywhere (a semantic `info` state may stay but never dominant). Add --color-surface-elevated and wire to @theme as cm-surface-elevated. Keep every text token >=4.5:1 on its surface (WCAG AA); if a directive hex fails AA use nearest AA-safe value in the same family and note it. Refine radius/border/shadow per directive s11/s12/s13: shell 0–6px, inputs/buttons 4–8px, cards 6–10px; reduce border noise (surface contrast+spacing over competing borders; strong borders only focus/selection/dialog/conflict); restrained shadows (popover/dialog/dropdown/palette only, no heavy card glow).
+2. clanmind-frontend/src/design-system/tokens/index.ts — align exported tokens with new CSS vars; add surfaceElevated; all values stay semantic; no magic numbers.
+3. Typography (s9): ONE UI family (Inter if already available; else keep current family, just normalize token usage — report which), ONE mono for code. Semantic font tokens: weights regular/medium/semibold/bold, lineHeights, font.xs..display. No ultra-light for critical text.
+4. Icons (s14): lucide-react IS installed — standardize on it. Consistent stroke ~1.5–2px; sizes 16/18/20/24. Create a shared icon-size token/constant. No emoji as core UI icons. Do not retrofit every screen now (later agents do).
+5. Primitives (s15): Button, IconButton, Input, Textarea, Select, Checkbox, Switch, Badge, Avatar, Tooltip, Popover, Dropdown, Dialog, Sheet, Tabs, Toast, Progress, Skeleton, EmptyState, ErrorState, CommandPalette in clanmind-frontend/src/design-system/components/. Refine their VISUAL styling to monochrome-first + new radius/border/shadow. Do NOT change exported props/API or behaviour. Keep every a11y contract and test.
+
+## Constraints (hard)
+- ZERO new runtime dependencies (lucide + radix + cmdk already present).
+- Do NOT rename/remove exported components, props, or files that break imports. Preserve public API.
+- Keep green: pnpm test, pnpm exec tsc -b, pnpm run lint (run inside clanmind-frontend/). Token/theme changes may legitimately require updating token-contract tests that assert old CSS values — update those assertions to the NEW directive values; never edit test logic to dodge a real failure.
+- No glassmorphism, no heavy blur/glow, no giant gradients, no permanent rainbow, no ultra-thin text, no emoji icons.
+- Work only inside clanmind-frontend/.
+
+## Real-interfaces check (grep before coding)
+- package.json (icon lib confirmed: lucide-react; note Inter availability — check index.html/@fontsource; do NOT add a dep)
+- src/index.css (read full @theme + light/dark + spectral gradient first)
+- src/design-system/tokens/index.ts (exact shape)
+- 3-4 files in src/design-system/components/ for styling conventions
+- tests: src/design-system/tokens.a11y.test.ts and *.a11y.test.tsx (update value-assertions only)
+
+## Self-review (before you finish)
+1. git diff — every color nests under a semantic token; spectral only on AI-state usages.
+2. grep :root and .dark — dark true black, light white.
+3. Run + pass: pnpm exec tsc -b, pnpm run lint, pnpm test. Report exact counts.
+4. git status — ONLY your 5 deliverables + updated tests. Nothing else; revert stray edits.
+5. Report: files changed (one line each), AA-compromise notes (hex you adjusted + value used), test counts, NOT VERIFIED items.
+Be precise and disciplined — foundation for a clean, calm, premium, unmistakably-ClanMind product.

@@ -85,7 +85,7 @@ const SETTINGS_ITEM: NavItem = { id: 'settings', label: 'Settings', icon: <Setti
 /* §19 monochrome-first selected state: strong contrast + subtle surface,
    never a persistent colored block. Idle: quiet surface on hover only. */
 const activeNavClass =
-  'bg-[var(--color-surface-hover)] text-[var(--color-text)] font-bold';
+  'bg-[var(--color-surface-hover)] text-[var(--color-text)] font-semibold';
 const idleNavClass = 'hover:bg-[var(--color-surface-hover)]';
 const RAIL_WIDTH_COLLAPSED_PX = 56;
 
@@ -189,7 +189,7 @@ export const LeftNav = React.memo(function LeftNav({
               <div className="flex items-center justify-between px-2.5 mb-1.5">
                 <span
                   id="nav-projects-label"
-                  className="text-[10px] font-bold uppercase tracking-wider"
+                  className="text-[10px] font-semibold uppercase tracking-wider"
                   style={{ color: 'var(--color-text-tertiary)' }}
                 >
                   Projects
@@ -213,32 +213,32 @@ export const LeftNav = React.memo(function LeftNav({
                 {sortedProjects.map((proj) => {
                   const isActive = activeProject?.id === proj.id;
                   return (
-                    <button
-                      key={proj.id}
-                      onClick={() => onSelectProject(proj)}
-                      aria-current={isActive ? 'page' : undefined}
-                      title={proj.name}
-                      className={cn(
-                        'w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer text-left',
-                        isActive
-                          ? 'bg-[var(--color-surface-hover)] border-l-2 border-[var(--color-text)]'
-                          : cn(idleNavClass, 'border-l-2 border-transparent')
-                      )}
-                      style={
-                        isActive
-                          ? { color: 'var(--color-text)' }
-                          : { color: 'var(--color-text-secondary)' }
-                      }
-                    >
-                      <span className="flex items-center gap-2 min-w-0">
-                        <FolderKanban className="w-3.5 h-3.5 shrink-0 opacity-70" aria-hidden="true" />
-                        <span className="truncate">{proj.name}</span>
-                        {proj.status === 'archived' && (
-                          <span className="text-[9px] uppercase tracking-wide opacity-70">archived</span>
+                    <Tooltip key={proj.id} content={proj.name} side="right">
+                      <button
+                        onClick={() => onSelectProject(proj)}
+                        aria-current={isActive ? 'page' : undefined}
+                        className={cn(
+                          'w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer text-left',
+                          isActive
+                            ? 'bg-[var(--color-surface-hover)] border-l-2 border-[var(--color-text)]'
+                            : cn(idleNavClass, 'border-l-2 border-transparent')
                         )}
-                      </span>
-                      <span className="text-[10px] font-mono opacity-60">{proj.pulse_progress}%</span>
-                    </button>
+                        style={
+                          isActive
+                            ? { color: 'var(--color-text)' }
+                            : { color: 'var(--color-text-secondary)' }
+                        }
+                      >
+                        <span className="flex items-center gap-2 min-w-0">
+                          <FolderKanban className="w-3.5 h-3.5 shrink-0 opacity-70" aria-hidden="true" />
+                          <span className="truncate">{proj.name}</span>
+                          {proj.status === 'archived' && (
+                            <span className="text-[9px] uppercase tracking-wide opacity-70">archived</span>
+                          )}
+                        </span>
+                        <span className="text-[10px] font-mono opacity-60">{proj.pulse_progress}%</span>
+                      </button>
+                    </Tooltip>
                   );
                 })}
               </div>

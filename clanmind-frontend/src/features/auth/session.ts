@@ -2,11 +2,7 @@
  * Session gateway + account-session controllers (P1, BE §6 / FE §67/§68/§197).
  *
  * Layer discipline: components call the controllers here; the gateway is the
- * only place that speaks Supabase Auth or the auth transport routes.
- *
- * Two implementations behind one interface:
- *  - demo  — `/auth/*` demo transport routes (deterministic, testable expiry)
- *  - live  — @supabase/supabase-js (credentials/refresh/recovery; BE §6.1)
+ * only place that speaks Supabase Auth (credentials/refresh/recovery; BE §6.1).
  *
  * FE §68: password reset NEVER reveals whether an account exists.
  * FE §197: session expiry preserves all local work; "Sign in again" re-enters
@@ -15,9 +11,7 @@
  * state first (R4).
  */
 
-import { api } from '@/api/client';
 import { ApiError } from '@/api/errors';
-import { env } from '@/config/env';
 import { useAuthStore } from '@/state/useAuthStore';
 import { setOutboxAccount, hydrateOutbox } from '@/sync/outbox';
 import { clearAccountLocalState } from './accountState';
@@ -37,38 +31,7 @@ export interface SessionGateway {
   signOut(): Promise<void>;
 }
 
-// ─── Demo gateway (VITE_DEMO_MODE=1) ─────────────────────────────────────────
-
-interface AuthSessionResponse {
-  access_token: string;
-  user: { id: string; email: string; name: string };
-}
-
-function createDemoGateway(): SessionGateway {
-  return {
-    async signIn(email, password) {
-      const res = await api.post<AuthSessionResponse>('/auth/login', { email, password });
-      return res.user;
-    },
-    async signUp({ name, email, password }) {
-      const res = await api.post<AuthSessionResponse>('/auth/signup', {
-        name,
-        email,
-        password,
-      });
-      return res.user;
-    },
-    // The demo route always 200s; the no-disclosure contract is enforced there.
-    async requestPasswordReset(email) {
-      await api.post('/auth/request-password-reset', { email });
-    },
-    async signOut() {
-      await api.post('/auth/logout').catch(() => undefined);
-    },
-  };
-}
-
-// ─── Live gateway (Supabase Auth) ────────────────────────────────────────────
+// ─── Supabase Auth gateway ───────────────────────────────────────────────────
 
 function supabaseErrorToApiError(err: { message: string; status?: number }): ApiError {
   const status = err.status ?? 400;
@@ -81,7 +44,7 @@ function supabaseErrorToApiError(err: { message: string; status?: number }): Api
   });
 }
 
-async function createLiveGateway(): Promise<SessionGateway> {
+async function createGateway(): Promise<SessionGateway> {
   const { getSupabase } = await import('@/api/supabase');
   const auth = () => getSupabase().auth;
   const identityFrom = (user: {
@@ -136,12 +99,11 @@ export function getSessionGateway(): SessionGateway {
 
 /**
  * Called once from the boot sequence (main.tsx prepare()) BEFORE first render.
- * Live mode loads the Supabase SDK via dynamic import so the demo bundle
- * contains none of it (bible rule 12).
+ * Loads the Supabase SDK via dynamic import.
  */
 export async function initSessionGateway(): Promise<void> {
   if (!gateway) {
-    gateway = env.demoMode ? createDemoGateway() : await createLiveGateway();
+    gateway = await createGateway();
   }
 }
 

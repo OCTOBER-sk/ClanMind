@@ -1,0 +1,28 @@
+Frontend live-integration fix: wire REAL backend group + project creation. The frontend currently runs `VITE_DEMO_MODE=0` (LIVE mode) against the ClerkWorker at localhost:8787 via the vite proxy + real Supabase auth (verified working: GET /api/v1/me 200, bootstrapLiveGroups loads groups). BUT creating a group/project is LOCAL-ONLY — no POST to the backend — so freshly created groups never persist and every live screen request 404s. Fix the live write-path for groups and projects.
+
+## Bugs to fix (root cause already confirmed)
+1. `clanmind-frontend/src/app/router.tsx` → `OnboardingRoute.handleComplete(groupName, projectName, aiName)` (lines ~65-100) builds `{ id: 'grp_${...}' }` and calls `addGroup(group)` + `addProject(...)` LOCALLY, then navigates. It never POSTs to the backend.
+2. `clanmind-frontend/src/features/groups/CreateGroupDialog.tsx` → `handleCreate` (lines ~25-61) likewise builds `{ id: 'grp_${Date.now()}' }` and calls `addGroup` locally, never POSTing.
+
+## Required behaviour (LIVE mode only; DEMO mode keeps current local behaviour)
+### A. Add `createGroup` + `createProject` live endpoints
+- In `src/api/endpoints/groups.ts` add:
+  `export async function createGroup(input: { name: string; description?: string }): Promise<Group>` → `api.post('/groups', input)`; validate the response with `GroupSchema` (from '@/api/schemas', line ~58) via safeParse; on failure throw `new Error('Group create response failed schema validation.')`.
+- Create `src/api/endpoints/projects.ts` (does not exist yet) with `createProject(groupId: string, input: { name: string; description?: string; goal?: string; project_type?: string }): Promise<Project>` → `api.post(`/groups/${encodeURIComponent(groupId)}/projects`, input)`; validate with `ProjectSchema` from '@/api/schemas'.
+- Use the existing `api` client from '@/api/client' (it already attaches bearer token + idempotency key + retries). DO NOT call fetch directly.
+- Real backend (verified) response shapes:
+  - POST /groups → 201 `{ id: <uuid>, name, description, owner_user_id, status:'ACTIVE', created_at, updated_at, avatar_object_id, deleted_at }`
+  - POST /groups/:id/projects → 201 `{ id:<uuid>, group_id, name, description, goal, project_type, status, progress, created_by, created_at, updated_at, archived_at }`
+
+### B. Persist through the backend in the UI flows
+- `router.tsx` `OnboardingRoute`: in `handleComplete`, when NOT demo mode: `const group = await createGroup({ name: groupName, description: '' })`; then `addGroup(group)`, `setActiveGroup(group)`; if `projectName.trim()`: `const proj = await createProject(group.id, { name: projectName.trim() })` then `addProject(proj)`. Use the REAL ids from the responses (never fake `grp_`/`proj_`). Handle errors with a toast (useToast from '@/design-system/components/Toast') and do NOT navigate on failure. When demo mode is true keep the current fully-local path. Make the handler async.
+- `CreateGroupDialog.tsx`: in `handleCreate`, when NOT demo mode: `const g = await createGroup({ name: trimmed, description: ... }); addGroup(g); setActiveGroup(g);` use the real id. Demo mode keeps local. Guard demo mode via `env.demoMode` from '@/config/env' (import it — check how CreateGroupDialog/router currently import; add a clean import).
+- Map the typed `Group`/`Project` from '@/types' — the API schemas' zod-inferred row should align with what addGroup/addProject expect; if fields differ (e.g. `pulse_progress` vs `progress`, `status` casing), use the `.map` style already in `src/live/liveRuntime.ts` (`mapGroup`, `mapProject`) — export those functions from liveRuntime if convenient and reuse them so the response row → store row mapping is identical to bootstrap. Prefer consistency with liveRuntime mapping.
+
+## Verification (MANDATORY — report exact results, not claims)
+1. `pnpm --filter <fe> typecheck` — clean.
+2. `pnpm test` in clanmind-frontend — ALL existing tests stay green (run the full vitest suite). If you add tests, add minimal ones: e.g. `groups` endpoint createGroup POSTs to `/groups` with the api client (mock via vi.mock('@/api/client')), and router handleComplete calls createGroup (not bare addGroup) in live mode — mock the api client + stores. Do not over-engineer; existing suite must be green, new tests must pass.
+3. Report: files changed, test totals (x passed / y failed before vs after), typecheck result, and anything NOT VERIFIED.
+4. Do NOT touch the backend, the vite proxy, env files, or the CSP. Touch only: `src/api/endpoints/groups.ts`, new `src/api/endpoints/projects.ts` (if needed), `src/app/router.tsx`, `src/features/groups/CreateGroupDialog.tsx`, optionally `src/live/liveRuntime.ts` (only to export mapGroup/mapProject), and tests.
+
+Style: match existing code conventions (function components, no semicolons dangling, single quotes, trailing commas). No new dependencies.

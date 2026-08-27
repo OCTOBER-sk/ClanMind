@@ -2,27 +2,18 @@ import './index.css'
 
 /**
  * Boot sequence (FE §196/§308):
- *   validate env → install demo runtime (demo only) → configure API client
- *   → render router shell. Remote sync never blocks first paint.
+ *   validate env → configure API client → render router shell.
+ *   Remote sync never blocks first paint.
  */
 
 async function prepare(): Promise<void> {
   const { assertLiveConfig, env } = await import('@/config/env');
   assertLiveConfig();
 
-  // Compile-time gate — production builds eliminate this entire branch
-  // (and the src/mocks chunk) at build time.
-  if (__DEMO_MODE__) {
-    const mocks = await import('@/mocks');
-    mocks.installDemoMode();
-  }
-
   const { configureApiClient } = await import('@/api/client');
   configureApiClient({
     baseUrl: env.apiBaseUrl,
     getToken: async () => {
-      // P1: live mode resolves the Supabase access token; demo uses a fixed one.
-      if (__DEMO_MODE__) return 'demo-token';
       const { getSupabase } = await import('@/api/supabase');
       const { data } = await getSupabase().auth.getSession();
       return data.session?.access_token ?? null;

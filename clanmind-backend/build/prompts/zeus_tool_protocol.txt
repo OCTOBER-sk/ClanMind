@@ -1,0 +1,26 @@
+Backend fix: make the AI web-research tool path work against a real OpenAI/OpenRouter-compatible provider. Live reproduction (verified) fails: triggering a run with an explicit `web.search` tool call returns `INTERNAL / Provider rejected this run; no fallback is permitted for this error class (invalid_request)` — i.e. the model provider returns HTTP 400 because the assembled OpenAI `messages` array is malformed.
+
+## Root cause (already diagnosed)
+In `clanmind-backend/packages/domain/src/ai/orchestrator.ts`, `executeRun`:
+- The `request.messages` passed to the provider NEVER includes a `tools` array (no tool schema), so the model can never self-initiate a call — fine for now.
+- After executing client-requested tool calls (the `requestedToolCalls` in the handler), the loop at ~lines 342-353 does `request.messages.push({ role: 'tool', content: JSON.stringify(safeOutput) })`. For OpenAI/OpenRouter, a `role:'tool'` message is only valid if an immediately-preceding assistant message declared the SAME `tool_calls`. Here there is no assistant `tool_calls` declaration, so the provider rejects with 400 invalid_request.
+
+## Required fix
+Make the client-requested tool results a well-formed, provider-agnostic CONTEXT injection instead of a bare `role:'tool'` message block:
+1. Replace the `role:'tool'` push with a `role:'system'` context block whose content labels the executed tool results, e.g.:
+   `{ role: 'system', content: `[tool_result tool="${call.tool_name}"]\n${JSON.stringify(safeOutput)}` }`
+   This keeps web results visible to the model (they flow into the final response) while being valid across OpenAI/OpenRouter/Anthropic/Google.
+2. Keep recording every tool call in the ledger (unchanged) — web.search usage must stay traceable.
+3. Ensure the tool executor path (web.search → Tavily) is unchanged and still returns hits; only the message-assembly changes.
+4. Also confirm the model request `messages` array always begins with the system message(s) and ends with a user message (never a trailing tool/assistant orphan). If a provider body util exists, keep it consistent.
+
+## Files to change
+- `clanmind-backend/packages/domain/src/ai/orchestrator.ts` (the tool-loop message push; and validate the assembled `request.messages` construction ~lines 275-285 + 350-353).
+- Add/adjust a unit test in `packages/domain/src/ai/*.test.ts` that runs a client-requested tool call and asserts: (a) the final `request.messages` passed to the provider contains NO orphan `role:'tool'` block and contains the tool result inside a `role:'system'` block; (b) the ledger recorded the tool call; (c) existing streaming still yields the response. Use the existing mock adapter/realtime infra.
+
+## Constraints
+- NO new npm dependencies. Preserve the `INVALID_TOKEN`/error contract and §61 fallback semantics. Do not change provider request otherwise (model_id, max_tokens, temperature untouched).
+- Backend must stay green: run `pnpm test` (report exact totals), `pnpm typecheck`, `pnpm lint` — report results, and anything NOT VERIFIED.
+- Do NOT touch frontend, routes/handlers beyond what's needed for the message assembly, or the search providers themselves.
+
+Self-review: re-read the diff as a hostile reviewer — confirm no orphan `role:'tool'` block can reach a provider, tool results are still fed to the model, ledger still records calls, all tests/typecheck/lint pass. Report exact counts + NOT VERIFIED items.

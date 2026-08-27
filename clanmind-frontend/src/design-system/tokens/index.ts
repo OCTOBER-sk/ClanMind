@@ -87,6 +87,90 @@ export const tokens = {
   focus: {
     ring: 'var(--focus-ring)',
   },
+  /**
+   * §6 Semantic Typography Hierarchy
+   * Each token defines fontSize, lineHeight, letterSpacing, fontWeight, and fontFamily.
+   * Components should use these tokens instead of ad-hoc font-size/weight combos.
+   */
+  typography: {
+    display: {
+      fontSize: '1.75rem',      // 28px
+      lineHeight: '1.2',
+      letterSpacing: '-0.025em',
+      fontWeight: 700,
+      fontFamily: 'var(--font-ui)',
+    },
+    pageTitle: {
+      fontSize: '1.25rem',      // 20px
+      lineHeight: '1.3',
+      letterSpacing: '-0.015em',
+      fontWeight: 600,
+      fontFamily: 'var(--font-ui)',
+    },
+    sectionTitle: {
+      fontSize: '1.125rem',     // 18px
+      lineHeight: '1.35',
+      letterSpacing: '-0.01em',
+      fontWeight: 600,
+      fontFamily: 'var(--font-ui)',
+    },
+    subsectionTitle: {
+      fontSize: '1rem',         // 16px
+      lineHeight: '1.4',
+      letterSpacing: '-0.005em',
+      fontWeight: 600,
+      fontFamily: 'var(--font-ui)',
+    },
+    body: {
+      fontSize: '0.875rem',     // 14px
+      lineHeight: '1.5',
+      letterSpacing: '0',
+      fontWeight: 400,
+      fontFamily: 'var(--font-ui)',
+    },
+    bodyStrong: {
+      fontSize: '0.875rem',     // 14px
+      lineHeight: '1.5',
+      letterSpacing: '0',
+      fontWeight: 600,
+      fontFamily: 'var(--font-ui)',
+    },
+    metadata: {
+      fontSize: '0.75rem',      // 12px
+      lineHeight: '1.5',
+      letterSpacing: '0.01em',
+      fontWeight: 400,
+      fontFamily: 'var(--font-ui)',
+    },
+    caption: {
+      fontSize: '0.75rem',      // 12px
+      lineHeight: '1.5',
+      letterSpacing: '0.01em',
+      fontWeight: 400,
+      fontFamily: 'var(--font-ui)',
+    },
+    label: {
+      fontSize: '0.8125rem',    // 13px
+      lineHeight: '1.4',
+      letterSpacing: '0.005em',
+      fontWeight: 500,
+      fontFamily: 'var(--font-ui)',
+    },
+    button: {
+      fontSize: '0.8125rem',    // 13px
+      lineHeight: '1.4',
+      letterSpacing: '0.005em',
+      fontWeight: 500,
+      fontFamily: 'var(--font-ui)',
+    },
+    code: {
+      fontSize: '0.8125rem',    // 13px
+      lineHeight: '1.5',
+      letterSpacing: '0',
+      fontWeight: 400,
+      fontFamily: 'var(--font-code)',
+    },
+  },
 } as const;
 
 export type Tokens = typeof tokens;

@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, FileText } from 'lucide-react';
 import { copyToClipboard } from '@/tauri/bridge';
 import { SafeMarkdownLink } from '@/tauri/externalLinks';
 
@@ -35,12 +35,25 @@ export function DocumentViewer({ content }: DocumentViewerProps) {
     setTimeout(() => setCopiedCodeIndex(null), 1800);
   };
 
+  // §42 — Empty state: honest, not a crash.
+  if (!content || content.trim() === '') {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center" role="status">
+        <FileText className="h-8 w-8 text-[var(--color-text-tertiary)]" aria-hidden="true" />
+        <p className="max-w-xs text-xs text-[var(--color-text-secondary)]">
+          This document version has no content. View an earlier version or ask Odin to regenerate it.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="relative flex-1 overflow-y-auto p-6 bg-[var(--color-surface-raised)] select-text leading-relaxed text-[var(--color-text)] text-xs">
       <div className="max-w-3xl mx-auto">
         <div className="flex justify-end mb-4">
           <button
             onClick={handleCopyAll}
+            aria-label={copied ? 'Markdown copied' : 'Copy markdown content'}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-pressed)] text-xs font-medium cursor-pointer transition-colors"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-[var(--color-success)]" /> : <Copy className="w-3.5 h-3.5" />}

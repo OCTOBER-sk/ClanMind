@@ -1,0 +1,33 @@
+Precise backend bug fix: extend Supabase JWT verification to support ES256 (ECDSA P-256) via JWKS, in addition to HS256.
+
+## Root cause (verified)
+ClanMind worker rejects real Supabase access tokens with `INVALID_TOKEN / Unsupported token algorithm`. This Supabase project (sdjvpsbifgglkanlpqle) issues ES256 JWTs: header `{"alg":"ES256","kid":"..."}`, and its JWKS endpoint `https://sdjvpsbifgglkanlpqle.supabase.co/auth/v1/.well-known/jwks.json` returns an EC P-256 public key (kty=EC, crv=P-256, alg=ES256, base64url fields x and y). The worker verifier currently requires header.alg === "HS256" and rejects everything else.
+
+## File to change (primary)
+clanmind-backend/packages/auth/src/jwt.ts — the function `verifySupabaseJwt(token, secret)`. Read it first.
+
+## Required
+1. Keep the existing HS256 path for backward compatibility (callers passing only `secret` keep working).
+2. Add an ES256 path when header.alg === "ES256":
+   - Require header.kid (string).
+   - Fetch the JWKS for that kid from `{supabaseUrl}/auth/v1/.well-known/jwks.json`. Extend the signature to `verifySupabaseJwt(token, secret, opts?: { supabaseUrl?: string })`.
+   - Cache the JWKS per url (Map keyed by url OR url+kid) so you do not refetch per request; a ~5min TTL is fine.
+   - Select the JWK whose kid matches AND kty=EC AND crv=P-256 (use for sig).
+   - Import the EC public key: `crypto.subtle.importKey('jwk', {kty:'EC', crv:'P-256', x, y, ext:true}, {name:'ECDSA', namedCurve:'P-256'}, false, ['verify'])`.
+   - Verify: `crypto.subtle.verify({name:'ECDSA', hash:'SHA-256'}, pubKey, signatureBytes, signingInputBytes)` where signingInputBytes = TextEncoder of `${headerSeg}.${payloadSeg}` and signatureBytes = base64url-decoded signatureSeg.
+   - Any failure throws AppError INVALID_TOKEN with a clear message (e.g. "Invalid token signature.", "JWKS key not found.", "JWKS fetch failed."). Fail closed.
+3. Move the SHARED payload validation (exp not past, sub non-empty string, email/role extraction) AFTER the signature verification so both paths reuse it.
+4. Update BOTH call sites to pass the URL:
+   - clanmind-backend/apps/worker/src/middleware/auth.ts — `verifySupabaseJwt(token, c.env.SUPABASE_JWT_SECRET)` → add `, { supabaseUrl: c.env.SUPABASE_URL }`.
+   - clanmind-backend/apps/worker/src/realtime/group-room.ts (~line 167) — same change, `this.env.SUPABASE_URL`.
+5. Use normal `fetch` for the JWKS (Cloudflare Workers supports it). On network error or no matching key → throw INVALID_TOKEN.
+6. Add unit tests in packages/auth covering at minimum: (a) HS256 still verifies a locally-signed HS256 token; (b) ES256 verifies a locally-generated ES256 token signed with a generated P-256 key, served by a stubbed JWKS (mock global fetch to return that JWKS JSON); (c) rejects bad-alg, bad-signature, expired, and missing-sub with INVALID_TOKEN.
+
+## Constraints
+- NO new npm dependencies — use WebCrypto (`crypto.subtle`) only.
+- Preserve the error contract `INVALID_TOKEN` (§102). Do not touch the frontend.
+- Touch ONLY packages/auth/src/jwt.ts, the two call-site files, and their tests.
+- Backend must stay green: run the backend test suite (pnpm test, or targeted package tests), `pnpm typecheck`, `pnpm lint`; report exact counts.
+
+## Self-review (before finishing)
+Re-read the diff as a hostile reviewer: confirm both algorithms verify correctly, the payload validation is shared and runs only after signature success, JWKS is cached and fetched from the passed supabaseUrl, both call sites pass supabaseUrl, and the new tests exercise the cases above. Run the backend tests/typecheck/lint and report counts + anything NOT VERIFIED.

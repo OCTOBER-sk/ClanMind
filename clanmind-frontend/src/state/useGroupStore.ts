@@ -44,9 +44,8 @@ export const DEFAULT_FLAGS: ServerFeatureFlags = {
   interactive_artifacts: false,
 };
 
-// §11/§283/§284 — runtime stores start EMPTY. Fixture content lives only in
-// src/mocks/dataset.ts and hydrates exclusively under VITE_DEMO_MODE; live
-// mode fills these via server queries.
+// §11/§283/§284 — runtime stores start EMPTY. Live mode fills these via
+// server queries.
 export const useGroupStore = create<GroupState>((set, get) => ({
   groups: [],
   activeGroup: null,
@@ -97,7 +96,7 @@ export const useGroupStore = create<GroupState>((set, get) => ({
     } catch {
       // LIVE honesty (D14): the real Worker has no §165A flags endpoint yet —
       // the request fails and safe all-off defaults stay in force rather than
-      // faking an answer. Demo mode serves the same route from the dataset.
+      // faking an answer.
       if (get().activeGroup?.id === groupId) {
         set({ featureFlags: { ...DEFAULT_FLAGS }, flagsLoading: false });
       }

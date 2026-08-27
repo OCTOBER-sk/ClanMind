@@ -106,6 +106,7 @@ export const MentionPicker = forwardRef<MentionPickerHandle, MentionPickerProps>
               key={item.id}
               role="option"
               aria-selected={i === clampedIndex}
+              aria-label={`Mention ${item.name}${item.isAi ? ' (AI)' : ''}${item.role ? `, ${item.role}` : ''}`}
               onMouseEnter={() => setSelectedIndex(i)}
               onClick={() => {
                 onSelect(item);

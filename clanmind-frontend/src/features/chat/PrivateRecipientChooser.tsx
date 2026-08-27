@@ -78,6 +78,7 @@ export const PrivateRecipientChooser = forwardRef<
           key={item.id}
           role="option"
           aria-selected={i === clampedIndex}
+          aria-label={`Private chat with ${item.name}${item.isAi ? ' (AI)' : ''}`}
           onMouseEnter={() => setSelectedIndex(i)}
           onClick={() => {
             onSelect(item);

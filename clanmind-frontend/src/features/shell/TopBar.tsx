@@ -245,6 +245,7 @@ export function TopBar({
         {meetingEnabled && !isMeetingActive && (
           <button
             onClick={onStartMeeting}
+            aria-label="Start meeting"
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors outline-none focus-visible:shadow-[var(--focus-ring)]"
             style={{
               color: 'var(--color-text)',
@@ -266,7 +267,7 @@ export function TopBar({
                 style={{ color: 'var(--color-text-secondary)' }}
                 aria-label={`Notifications${unreadNotificationsCount > 0 ? ` (${unreadNotificationsCount} unread)` : ''}`}
               >
-                <Bell className="w-4 h-4" aria-hidden="true" />
+                <Bell className="w-[18px] h-[18px]" aria-hidden="true" />
                 {/* §277 subtle unread badge on the nav surface */}
                 {unreadNotificationsCount > 0 && (
                   <span
@@ -287,11 +288,11 @@ export function TopBar({
           <Tooltip content="Activity">
             <button
               onClick={onOpenNotifications}
-              className="relative p-1.5 rounded-lg transition-colors cursor-pointer"
+              className="relative p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface-hover)] focus-visible:shadow-[var(--focus-ring)] outline-none"
               style={{ color: 'var(--color-text-secondary)' }}
               aria-label={`Notifications${unreadNotificationsCount > 0 ? ` (${unreadNotificationsCount} unread)` : ''}`}
             >
-              <Bell className="w-4 h-4" aria-hidden="true" />
+              <Bell className="w-[18px] h-[18px]" aria-hidden="true" />
               {unreadNotificationsCount > 0 && (
                 <span
                   className="absolute top-1 right-1 w-2 h-2 rounded-full"
