@@ -1,0 +1,517 @@
+[08:42:48] === PHASE 1: signup 4 accounts via UI ===
+[08:42:52] [santhosh] landing url=http://localhost:1420/auth has_signup_btn=True
+[08:42:52] SHOT p1_landing_santhosh
+[08:42:53] SHOT p1_signup_filled_santhosh
+[08:42:59] [santhosh] after-submit url=http://localhost:1420/onboarding authed=True body_head='A shared project room for people + AI | ONBOARDING · STEP 1 OF 7 | Team Setup | What’s your team called? |  | Groups are where your team thinks, talks, researches with AI'
+[08:43:00] SHOT p1_after_signup_santhosh
+[08:43:00] CONSOLE[p1-santhosh] errors=none
+[08:43:03] [kavitha] landing url=http://localhost:1420/auth has_signup_btn=True
+[08:43:03] SHOT p1_landing_kavitha
+[08:43:05] SHOT p1_signup_filled_kavitha
+[08:43:11] [kavitha] after-submit url=http://localhost:1420/onboarding authed=True body_head='A shared project room for people + AI | ONBOARDING · STEP 1 OF 7 | Team Setup | What’s your team called? |  | Groups are where your team thinks, talks, researches with AI'
+[08:43:11] SHOT p1_after_signup_kavitha
+[08:43:11] CONSOLE[p1-kavitha] errors=none
+[08:43:15] [arun] landing url=http://localhost:1420/auth has_signup_btn=True
+[08:43:15] SHOT p1_landing_arun
+[08:43:17] SHOT p1_signup_filled_arun
+[08:43:23] [arun] after-submit url=http://localhost:1420/onboarding authed=True body_head='A shared project room for people + AI | ONBOARDING · STEP 1 OF 7 | Team Setup | What’s your team called? |  | Groups are where your team thinks, talks, researches with AI'
+[08:43:23] SHOT p1_after_signup_arun
+[08:43:23] CONSOLE[p1-arun] errors=none
+[08:43:27] [priya] landing url=http://localhost:1420/auth has_signup_btn=True
+[08:43:27] SHOT p1_landing_priya
+[08:43:28] SHOT p1_signup_filled_priya
+[08:43:34] [priya] after-submit url=http://localhost:1420/onboarding authed=True body_head='A shared project room for people + AI | ONBOARDING · STEP 1 OF 7 | Team Setup | What’s your team called? |  | Groups are where your team thinks, talks, researches with AI'
+[08:43:34] SHOT p1_after_signup_priya
+[08:43:34] CONSOLE[p1-priya] errors=none
+[08:43:35] PHASE1 RESULT ok=['santhosh', 'kavitha', 'arun', 'priya'] fail=[]
+[08:50:09] === PHASE 2+3: group creation + invites + roles ===
+[08:50:13] SHOT p2_s1_santhosh
+[08:50:15] [santhosh-s1] clicked 'Continue'
+[08:50:16] [santhosh] clicked 'Copy Invite Link'
+[08:50:16] [santhosh] invite_link=https://clanmind.io/join/demo-team resp_keys=none
+[08:50:17] SHOT p2_s2_invite
+[08:50:18] [santhosh-s2] clicked 'Skip'
+[08:50:18] [santhosh-s3] NO BUTTON FOUND for ['Continue', 'Next', 'Meet']
+[08:50:18] [santhosh-s4] NO BUTTON FOUND for ['Skip', 'Continue']
+[08:50:18] [santhosh-s5] NO BUTTON FOUND for ['Continue', 'Skip', 'Next']
+[08:50:35] [santhosh] project fill failed: Locator.fill: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_placeholder("e.g. Flight Controller Firmware")
+
+[08:50:35] SHOT p2_s6_santhosh
+[08:50:35] [santhosh-s6] NO BUTTON FOUND for ['Create', 'Continue', 'Next']
+[08:50:35] SHOT p2_s7_santhosh
+[08:50:39] [santhosh] post-onboarding url=http://localhost:1420/onboarding
+[08:50:39] [santhosh] GID=None
+[08:50:39] SHOT p2_owner_chat
+[08:50:39] CONSOLE[p2-owner] errors=none
+[08:50:39] PHASE2 ABORT: missing gid or invite link — inspect screenshots
+[08:54:01] === PHASE 2+3 (v2): group creation + invites + roles ===
+[08:54:05] SHOT p2_s1_santhosh
+[08:54:07] [santhosh-s1] clicked 'Continue'
+[08:54:09] [santhosh-s2] clicked 'Skip for now'
+[08:54:10] [santhosh-s3] clicked variant-btn 'See the core loop'
+[08:54:12] [santhosh-s4] clicked 'Continue'
+[08:54:14] [santhosh-s5] clicked 'Create First Project'
+[08:54:14] SHOT p2_s6_santhosh
+[08:54:16] [santhosh-s6] clicked 'Continue'
+[08:54:16] SHOT p2_s7_santhosh
+[08:54:18] [santhosh-s7] clicked 'Enter SIH 2026 — Team Innovators'
+[08:54:22] [santhosh] post-onboarding url=http://localhost:1420/onboarding
+[08:54:22] [santhosh] onboarding_ok=False GID=None
+[08:54:22] SHOT p2_owner_chat
+[08:54:22] CONSOLE[p2-owner] errors=['error:Failed to load resource: the server responded with a status of 500 (Internal Server Error)', 'error:Failed to load resource: the server responded with a status of 500 (Internal Server Error)', 'error:Failed to load resource: the server responded with a status of 500 (Internal Server Error)']
+[08:54:22] PHASE2 ABORT: no gid
+[09:03:56] === PHASE 2+3 (v2): group creation + invites + roles ===
+[09:03:59] SHOT p2_s1_santhosh
+[09:04:01] [santhosh-s1] clicked 'Continue'
+[09:04:03] [santhosh-s2] clicked 'Skip for now'
+[09:04:04] [santhosh-s3] clicked variant-btn 'See the core loop'
+[09:04:06] [santhosh-s4] clicked 'Continue'
+[09:04:08] [santhosh-s5] clicked 'Create First Project'
+[09:04:08] SHOT p2_s6_santhosh
+[09:04:10] [santhosh-s6] clicked 'Continue'
+[09:04:10] SHOT p2_s7_santhosh
+[09:04:12] [santhosh-s7] clicked 'Enter SIH 2026 — Team Innovators'
+[09:04:16] [santhosh] post-onboarding url=http://localhost:1420/onboarding
+[09:04:16] [santhosh] onboarding_ok=False GID=None
+[09:04:16] SHOT p2_owner_chat
+[09:04:16] CONSOLE[p2-owner] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[09:04:16] PHASE2 ABORT: no gid
+[09:13:17] === PROBE direct chat access gid=dd369df2-0c85-4ec5-a5af-cab1c5863c1d ===
+[09:13:20] [probe] start url=http://localhost:1420/
+[09:13:26] [probe] final url=http://localhost:1420/group/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/chat
+[09:13:26] [probe] body_head='Skip to main content | Connected — all changes synced | SIH 2026 — Team Innovators | Smart Water Management | Search or jump to… | Ctrl+K | SA | Chat | PROJECTS | Smart Water Management | 0% | Overview | Tasks | Decisions | Team Memory | Team | Garage | Activity | Settings | Odin AI Acti'
+[09:13:27] SHOT probe_group_chat
+[09:13:27] CONSOLE[probe] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[09:13:27] [probe] api calls: 200 http://localhost:1420/api/v1/projects/9be1cf8d-6118-420b-a90f-094a5a738631/artifacts || 200 http://localhost:1420/api/v1/projects/9be1cf8d-6118-420b-a90f-094a5a738631/tasks || 200 http://localhost:1420/api/v1/notifications?limit=50 || 404 http://localhost:1420/api/v1/groups/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/flags || 200 http://localhost:1420/api/v1/groups/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/github/status || 200 http://localhost:1420/api/v1/projects/9be1cf8d-6118-420b-a90f-094a5a738631/memory || 200 http://localhost:1420/api/v1/groups/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/messages?limit=50 || 200 http://localhost:1420/api/v1/groups/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/memory/candidates || 200 http://localhost:1420/api/v1/groups/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/memory || 200 http://localhost:1420/api/v1/projects/9be1cf8d-6118-420b-a90f-094a5a738631/decisions || 200 http://localhost:1420/api/v1/projects/9be1cf8d-6118-420b-a90f-094a5a738631/tasks || 200 http://localhost:1420/api/v1/groups/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/activity?limit=50 || 200 http://localhost:1420/api/v1/groups/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/activity?limit=50 || 200 http://localhost:1420/api/v1/client-versions
+[09:15:40] === PHASE 3: real invite + joins + promote ===
+[09:15:45] SHOT p3b_teamview
+[09:15:45] [owner] teamview members_line=[]
+[09:15:45] [owner] invite button clicked=False
+[09:15:45] SHOT p3b_invite_dialog
+[09:15:45] [owner] dialog body_head='Loading your groups…'
+[09:15:45] [owner] invite_link= resp={}
+[09:15:45] SHOT p3b_invite_link
+[09:15:45] PHASE3 ABORT: no invite link
+[09:16:48] === PHASE 3: real invite + joins + promote ===
+[09:16:58] SHOT p3b_teamview
+[09:16:58] [owner] url=http://localhost:1420/group/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/team
+[09:16:58] [owner] teamview members_line=[]
+[09:17:00] [owner] invite button clicked=True
+[09:17:00] SHOT p3b_invite_dialog
+[09:17:00] [owner] dialog body_head='Skip to main content | Connected — all changes synced | SIH 2026 — Team Innovators | Smart Water Management | Search or jump to… | Ctrl+K | SA | Chat | PROJECTS | Smart Water Management | 0% | Overview | Tasks | Decisions | Team Memory | Team | Garage | '
+[09:17:00] [owner] invite_link= resp={}
+[09:17:00] SHOT p3b_invite_link
+[09:17:00] PHASE3 ABORT: no invite link
+[09:19:29] === PHASE 3: real invite + joins + promote ===
+[09:19:39] SHOT p3b_settings
+[09:19:39] [owner] url=http://localhost:1420/group/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/settings invite_card=False
+[09:19:39] [owner] invite_link=None
+[09:19:39] SHOT p3b_invite_link
+[09:19:39] PHASE3 ABORT: no invite link
+[09:20:56] === PHASE 3: real invite + joins + promote ===
+[09:21:08] SHOT p3b_settings_members
+[09:21:08] [owner] url=http://localhost:1420/group/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/settings invite_card=True
+[09:21:23] [owner] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_role("button", name="Send invites").first
+    - locator resolved to <button disabled type="button" aria-busy="false" aria-disabled="true" class="inline-flex items-cen
+[09:21:23] SHOT p3b_error_owner
+[09:21:23] PHASE3 ABORT: no invite link
+[09:27:31] === PHASE 3: real invite + joins + promote ===
+[09:27:32] [owner] ERROR Page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:1420/
+Call log:
+  - navigating to "http://localhost:1420/", waiting until "domcontentloaded"
+
+[09:27:32] SHOT p3b_error_owner
+[09:27:32] PHASE3 ABORT: no invite links
+[09:29:59] === PHASE 3: real invite + joins + promote ===
+[09:30:11] SHOT p3b_settings_members
+[09:30:11] [owner] url=http://localhost:1420/group/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/settings invite_card=True
+[09:30:11] [owner] invite for kavitha: http://localhost:1420/invite/PyUtWHLCMWAfq5y2RMPQGOCtcYPiJoR…
+[09:30:12] SHOT p3b_invite_kavitha
+[09:30:13] [owner] invite for arun: http://localhost:1420/invite/PyUtWHLCMWAfq5y2RMPQGOCtcYPiJoR…
+[09:30:13] SHOT p3b_invite_arun
+[09:30:14] [owner] invite for priya: http://localhost:1420/invite/maVgcI2nvTdAq4CRBg6nTXxWYuicpCZ…
+[09:30:14] SHOT p3b_invite_priya
+[09:30:22] [recover] now at http://localhost:1420/
+[09:30:37] [kavitha] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator("header button").first.first
+
+[09:30:37] SHOT p3b_error_kavitha
+[09:30:44] [recover] now at http://localhost:1420/
+[09:30:59] [arun] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator("header button").first.first
+
+[09:30:59] SHOT p3b_error_arun
+[09:31:06] [recover] now at http://localhost:1420/
+[09:31:21] [priya] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator("header button").first.first
+
+[09:31:21] SHOT p3b_error_priya
+[09:31:25] [team] members visible=[]
+[09:31:25] SHOT p3b_team_full
+[09:31:28] [team] promoted=False admin_count=0
+[09:31:28] SHOT p3b_team_after_promote
+[09:31:28] CONSOLE[p3b-team] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[09:31:28] PHASE3 RESULT joined={'kavitha': False, 'arun': False, 'priya': False} promote=False members=[]
+[09:33:44] === PHASE 3: real invite + joins + promote ===
+[09:33:56] SHOT p3b_settings_members
+[09:33:56] [owner] url=http://localhost:1420/group/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/settings invite_card=True
+[09:34:11] [owner] invite for kavitha: http://localhost:1420/invite/xdvVOzNWauh3tfTXmmqzOJ7ngwsF9P3… role_from_resp=None
+[09:34:11] SHOT p3b_invite_kavitha
+[09:34:27] [owner] invite for arun: http://localhost:1420/invite/08R5sKVF0jpYH03_QeAlllRrMXDpAOL… role_from_resp=None
+[09:34:27] SHOT p3b_invite_arun
+[09:34:43] [owner] invite for priya: http://localhost:1420/invite/QGRmJuWU0I4RI1BQJ1vQwvsCLPl34Su… role_from_resp=None
+[09:34:43] SHOT p3b_invite_priya
+[09:34:51] [kavitha] wizard done; url=http://localhost:1420/onboarding
+[09:34:54] [recover] now at http://localhost:1420/
+[09:35:28] [kavitha] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_role("button", name=re.compile(r"Scratch", re.IGNORECASE)).first
+
+[09:35:28] SHOT p3b_error_kavitha
+[09:35:34] [arun] wizard done; url=http://localhost:1420/onboarding
+[09:35:38] [recover] now at http://localhost:1420/
+[09:36:11] [arun] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_role("button", name=re.compile(r"Scratch", re.IGNORECASE)).first
+
+[09:36:11] SHOT p3b_error_arun
+[09:36:18] [priya] wizard done; url=http://localhost:1420/onboarding
+[09:36:21] [recover] now at http://localhost:1420/
+[09:36:55] [priya] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_role("button", name=re.compile(r"Scratch", re.IGNORECASE)).first
+
+[09:36:55] SHOT p3b_error_priya
+[09:36:59] [team] members visible=[]
+[09:36:59] SHOT p3b_team_full
+[09:37:02] [team] promoted=False admin_count=0
+[09:37:02] SHOT p3b_team_after_promote
+[09:37:02] CONSOLE[p3b-team] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[09:37:02] PHASE3 RESULT joined={'kavitha': False, 'arun': False, 'priya': False} promote=False members=[]
+[09:39:59] === PHASE 3: real invite + joins + promote ===
+[09:40:10] SHOT p3b_settings_members
+[09:40:10] [owner] url=http://localhost:1420/group/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/settings invite_card=True
+[09:40:25] [owner] invite for kavitha: http://localhost:1420/invite/HAboJqgkSbwWJGDI_ZBCnyjtrW4tJtT… role_from_resp=None
+[09:40:26] SHOT p3b_invite_kavitha
+[09:40:42] [owner] invite for arun: http://localhost:1420/invite/qgIQz8LP_e6iYZgzQtap4hDIqYBrm-H… role_from_resp=None
+[09:40:42] SHOT p3b_invite_arun
+[09:40:58] [owner] invite for priya: http://localhost:1420/invite/RuE3AtW-SJ6tUekhLMccvJ0-M4nKlRN… role_from_resp=None
+[09:40:58] SHOT p3b_invite_priya
+[09:41:05] [kavitha] wizard not at step1; url=http://localhost:1420/onboarding
+[09:41:09] [recover] now at http://localhost:1420/
+[09:41:42] [kavitha] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_role("button", name=re.compile(r"Scratch", re.IGNORECASE)).first
+
+[09:41:42] SHOT p3b_error_kavitha
+[09:41:49] [arun] wizard not at step1; url=http://localhost:1420/onboarding
+[09:41:52] [recover] now at http://localhost:1420/
+[09:42:26] [arun] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_role("button", name=re.compile(r"Scratch", re.IGNORECASE)).first
+
+[09:42:26] SHOT p3b_error_arun
+[09:42:32] [priya] wizard not at step1; url=http://localhost:1420/onboarding
+[09:42:36] [recover] now at http://localhost:1420/
+[09:43:09] [priya] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_role("button", name=re.compile(r"Scratch", re.IGNORECASE)).first
+
+[09:43:09] SHOT p3b_error_priya
+[09:43:13] [team] members visible=[]
+[09:43:14] SHOT p3b_team_full
+[09:43:16] [team] promoted=False admin_count=0
+[09:43:16] SHOT p3b_team_after_promote
+[09:43:16] CONSOLE[p3b-team] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[09:43:16] PHASE3 RESULT joined={'kavitha': False, 'arun': False, 'priya': False} promote=False members=[]
+[09:44:25] === PHASE 3: real invite + joins + promote ===
+[09:44:37] SHOT p3b_settings_members
+[09:44:37] [owner] url=http://localhost:1420/group/dd369df2-0c85-4ec5-a5af-cab1c5863c1d/settings invite_card=True
+[09:44:52] [owner] invite for kavitha: http://localhost:1420/invite/UOgj4H93piPa9kaA4eV1Is82huY6JWl… role_from_resp=None
+[09:44:52] SHOT p3b_invite_kavitha
+[09:45:08] [owner] invite for arun: http://localhost:1420/invite/6ZAb6cCKGx-dPRGFJnRwFS1qoPw5HoW… role_from_resp=None
+[09:45:08] SHOT p3b_invite_arun
+[09:45:24] [owner] invite for priya: http://localhost:1420/invite/_qqpDv_AanIYhfMedvWYtZ-8Vsd8gzg… role_from_resp=None
+[09:45:24] SHOT p3b_invite_priya
+[09:45:34] [kavitha-s1] clicked 'Continue'
+[09:45:36] [kavitha-s2] clicked 'Skip for now'
+[09:45:37] [kavitha-s3] clicked 'See the core loop'
+[09:45:39] [kavitha-s4] clicked 'Continue'
+[09:45:41] [kavitha-s5] clicked 'Create First Project'
+[09:45:43] [kavitha-s6] clicked 'Continue'
+[09:45:45] [kavitha-s7] clicked 'Enter Kavitha Scratch'
+[09:45:49] [kavitha] wizard done; url=http://localhost:1420/onboarding
+[09:45:52] [recover] now at http://localhost:1420/
+[09:46:26] [kavitha] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_role("button", name=re.compile(r"Scratch", re.IGNORECASE)).first
+
+[09:46:26] SHOT p3b_error_kavitha
+[09:46:35] [arun-s1] clicked 'Continue'
+[09:46:36] [arun-s2] clicked 'Skip for now'
+[09:46:38] [arun-s3] clicked 'See the core loop'
+[09:46:40] [arun-s4] clicked 'Continue'
+[09:46:42] [arun-s5] clicked 'Create First Project'
+[09:46:44] [arun-s6] clicked 'Continue'
+[09:46:45] [arun-s7] clicked 'Enter Arun Scratch'
+[09:46:49] [arun] wizard done; url=http://localhost:1420/onboarding
+[09:46:53] [recover] now at http://localhost:1420/
+[09:47:27] [arun] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_role("button", name=re.compile(r"Scratch", re.IGNORECASE)).first
+
+[09:47:27] SHOT p3b_error_arun
+[09:47:35] [priya-s1] clicked 'Continue'
+[09:47:37] [priya-s2] clicked 'Skip for now'
+[09:47:39] [priya-s3] clicked 'See the core loop'
+[09:47:40] [priya-s4] clicked 'Continue'
+[09:47:42] [priya-s5] clicked 'Create First Project'
+[09:47:44] [priya-s6] clicked 'Continue'
+[09:47:46] [priya-s7] clicked 'Enter Priya Scratch'
+[09:47:50] [priya] wizard done; url=http://localhost:1420/onboarding
+[09:47:54] [recover] now at http://localhost:1420/
+[09:48:27] [priya] ERROR Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_role("button", name=re.compile(r"Scratch", re.IGNORECASE)).first
+
+[09:48:27] SHOT p3b_error_priya
+[09:48:32] [team] members visible=[]
+[09:48:32] SHOT p3b_team_full
+[09:48:34] [team] promoted=False admin_count=0
+[09:48:34] SHOT p3b_team_after_promote
+[09:48:34] CONSOLE[p3b-team] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[09:48:34] PHASE3 RESULT joined={'kavitha': False, 'arun': False, 'priya': False} promote=False members=[]
+[09:55:46] === PHASE 3c: member joins (patient waits) ===
+[09:55:52] [kavitha] walking scratch wizard
+[09:57:44] [kavitha] shell NOT ready in 90s; body='A shared project room for people + AI\nONBOARDING · STEP 1 OF 7\nTeam Setup\nWhat’s your team called?\n\nGroups are where you'
+[09:57:47] [recover] now at http://localhost:1420/
+[09:59:17] [kavitha] shell NOT ready in 90s; body='A shared project room for people + AI\nONBOARDING · STEP 1 OF 7\nTeam Setup\nWhat’s your team called?\n\nGroups are where you'
+[09:59:49] [kavitha] switcher never opened
+[09:59:49] SHOT p3c_error_kavitha
+[09:59:56] [arun] walking scratch wizard
+[10:01:47] [arun] shell NOT ready in 90s; body='A shared project room for people + AI\nONBOARDING · STEP 1 OF 7\nTeam Setup\nWhat’s your team called?\n\nGroups are where you'
+[10:01:51] [recover] now at http://localhost:1420/
+[10:03:21] [arun] shell NOT ready in 90s; body='A shared project room for people + AI\nONBOARDING · STEP 1 OF 7\nTeam Setup\nWhat’s your team called?\n\nGroups are where you'
+[10:03:53] [arun] switcher never opened
+[10:03:53] SHOT p3c_error_arun
+[10:03:59] [priya] walking scratch wizard
+[10:05:27] === PHASE 3c: member joins (patient waits) ===
+[10:05:33] [kavitha] walking scratch wizard
+[10:05:49] [kavitha] entered shell after 2s
+[10:07:23] [kavitha] shell NOT ready in 90s; body='A shared project room for people + AI\nONBOARDING · STEP 1 OF 7\nTeam Setup\nWhat’s your team called?\n\nGroups are where you'
+[10:07:26] [recover] now at http://localhost:1420/
+[10:08:56] [kavitha] shell NOT ready in 90s; body='A shared project room for people + AI\nONBOARDING · STEP 1 OF 7\nTeam Setup\nWhat’s your team called?\n\nGroups are where you'
+[10:09:28] [kavitha] switcher never opened
+[10:09:28] SHOT p3c_error_kavitha
+[10:09:35] [arun] walking scratch wizard
+[10:09:50] [arun] entered shell after 2s
+[10:10:51] === DIAG kavitha ===
+[10:11:55] [diag] final url=http://localhost:1420/
+[10:11:55] [diag] body_head='A shared project room for people + AI | ONBOARDING · STEP 1 OF 7 | Team Setup | What’s your team called? |  | Groups are where your team thinks, talks, researches with AI, and builds together. |  | Group Name | Give '
+[10:11:55] [diag] authed=True token_head=eyJhbGciOiJFUzI1NiIs
+[10:11:55] [diag] localStorage keys: ['cm_sync', 'cm_chat', 'cm_auth', 'cm_device_id', 'sb-sdjvpsbifgglkanlpqle-auth-token', 'cm_ui']
+[10:11:55] [diag] api calls:
+[10:11:55]    200 GET http://localhost:1420/src/api/client.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/errors.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/schemas.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/transport.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/sync.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/supabase.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/projects.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/groups.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/github.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/meetings.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/artifacts.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/tasks.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/decisions.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/memory.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/notifications.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/attachments.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/messages.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/aiConfig.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/messageRow.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/members.ts
+[10:11:55]    200 GET http://localhost:1420/src/api/endpoints/me.ts
+[10:11:55]    200 GET http://localhost:1420/api/v1/groups
+[10:11:55]    200 GET http://localhost:1420/api/v1/groups/77d341c4-3734-427b-9f7a-41ab2545adc5/projects
+[10:11:55]    200 GET http://localhost:1420/api/v1/groups/77d341c4-3734-427b-9f7a-41ab2545adc5/members
+[10:11:55]    200 GET http://localhost:1420/api/v1/projects/225fd8df-14b6-454f-ac83-00f0fc663bdd/decisions
+[10:11:55]    200 GET http://localhost:1420/api/v1/projects/225fd8df-14b6-454f-ac83-00f0fc663bdd/tasks
+[10:11:55]    200 GET http://localhost:1420/api/v1/groups/77d341c4-3734-427b-9f7a-41ab2545adc5/activity?limit=50
+[10:11:55]    200 GET http://localhost:1420/api/v1/groups/77d341c4-3734-427b-9f7a-41ab2545adc5/memory
+[10:11:55]    200 GET http://localhost:1420/api/v1/projects/225fd8df-14b6-454f-ac83-00f0fc663bdd/artifacts
+[10:11:55]    200 GET http://localhost:1420/api/v1/groups/77d341c4-3734-427b-9f7a-41ab2545adc5/memory/candidates
+[10:11:55]    200 GET http://localhost:1420/api/v1/notifications
+[10:11:55]    200 GET http://localhost:1420/api/v1/client-versions
+[10:11:55] CONSOLE[diag-kavitha] errors=none
+[10:11:55] SHOT diag_kavitha
+[10:17:17] === PHASE 3c: member joins (patient waits) ===
+[10:17:22] [kavitha] shell ready after 0s url=http://localhost:1420/group/77d341c4-3734-427b-9f7a-41ab2545adc5/chat
+[10:17:22] [kavitha] shell ready after 0s url=http://localhost:1420/group/77d341c4-3734-427b-9f7a-41ab2545adc5/chat
+[10:17:24] SHOT p3c_switcher_kavitha
+[10:17:26] SHOT p3c_dialog_kavitha
+[10:17:56] [kavitha] JOINED=False url=http://localhost:1420/group/77d341c4-3734-427b-9f7a-41ab2545adc5/chat
+[10:17:56] SHOT p3c_after_join_kavitha
+[10:17:56] CONSOLE[p3c-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:18:00] [arun] shell ready after 0s url=http://localhost:1420/group/cff8e27d-aa9c-4c93-8459-a332fd399a0c/chat
+[10:18:00] [arun] shell ready after 0s url=http://localhost:1420/group/cff8e27d-aa9c-4c93-8459-a332fd399a0c/chat
+[10:18:02] SHOT p3c_switcher_arun
+[10:18:04] SHOT p3c_dialog_arun
+[10:18:34] [arun] JOINED=False url=http://localhost:1420/group/cff8e27d-aa9c-4c93-8459-a332fd399a0c/chat
+[10:18:34] SHOT p3c_after_join_arun
+[10:18:34] CONSOLE[p3c-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:18:39] [priya] shell ready after 0s url=http://localhost:1420/group/225a3507-f69b-4f51-a6d5-2d94bad898ba/chat
+[10:18:39] [priya] shell ready after 0s url=http://localhost:1420/group/225a3507-f69b-4f51-a6d5-2d94bad898ba/chat
+[10:18:40] SHOT p3c_switcher_priya
+[10:18:42] SHOT p3c_dialog_priya
+[10:19:13] [priya] JOINED=False url=http://localhost:1420/group/225a3507-f69b-4f51-a6d5-2d94bad898ba/chat
+[10:19:13] SHOT p3c_after_join_priya
+[10:19:13] CONSOLE[p3c-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:19:13] PHASE3c RESULT joined={'kavitha': False, 'arun': False, 'priya': False}
+[10:25:35] === PHASE 4: real-time messaging (4 live contexts) ===
+[10:25:48] [santhosh] chat ready after 0s
+[10:25:48] SHOT p4_chat_santhosh
+[10:25:48] [kavitha] chat ready after 0s
+[10:25:49] SHOT p4_chat_kavitha
+[10:25:49] [arun] chat ready after 0s
+[10:25:49] SHOT p4_chat_arun
+[10:25:49] [priya] chat ready after 0s
+[10:25:49] SHOT p4_chat_priya
+[10:25:50] RT santhosh -> kavitha: seen=True latency≈0.0s
+[10:25:51] SHOT p4_rt_santhosh_seen_by_kavitha
+[10:25:51] RT santhosh -> arun: seen=True latency≈0.0s
+[10:25:51] SHOT p4_rt_santhosh_seen_by_arun
+[10:25:51] RT santhosh -> priya: seen=True latency≈0.1s
+[10:25:51] SHOT p4_rt_santhosh_seen_by_priya
+[10:25:51] SHOT p4_sent_santhosh
+[10:25:52] RT kavitha -> santhosh: seen=True latency≈0.0s
+[10:25:52] SHOT p4_rt_kavitha_seen_by_santhosh
+[10:25:52] RT kavitha -> arun: seen=True latency≈0.0s
+[10:25:52] SHOT p4_rt_kavitha_seen_by_arun
+[10:25:52] RT kavitha -> priya: seen=True latency≈0.1s
+[10:25:53] SHOT p4_rt_kavitha_seen_by_priya
+[10:25:53] SHOT p4_sent_kavitha
+[10:25:54] RT arun -> santhosh: seen=True latency≈0.0s
+[10:25:54] SHOT p4_rt_arun_seen_by_santhosh
+[10:25:54] RT arun -> kavitha: seen=True latency≈0.0s
+[10:25:54] SHOT p4_rt_arun_seen_by_kavitha
+[10:25:54] RT arun -> priya: seen=True latency≈0.1s
+[10:25:54] SHOT p4_rt_arun_seen_by_priya
+[10:25:54] SHOT p4_sent_arun
+[10:25:56] RT priya -> santhosh: seen=True latency≈0.0s
+[10:25:56] SHOT p4_rt_priya_seen_by_santhosh
+[10:25:56] RT priya -> kavitha: seen=True latency≈0.0s
+[10:25:56] SHOT p4_rt_priya_seen_by_kavitha
+[10:25:56] RT priya -> arun: seen=True latency≈0.1s
+[10:25:56] SHOT p4_rt_priya_seen_by_arun
+[10:25:56] SHOT p4_sent_priya
+[10:26:04] REPLY: thread_reply_visible=True
+[10:26:04] SHOT p4_reply_kavitha
+[10:26:06] SEARCH: no search input found
+[10:26:06] CONSOLE[p4-santhosh] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:26:06] CONSOLE[p4-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:26:06] CONSOLE[p4-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:26:06] CONSOLE[p4-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:26:06] PHASE4 RESULT rt_deliveries=12/12 edit=False reply=True pin=False search=False
+[10:28:24] === PHASE 4b: edit/pin/search ===
+[10:28:40] EDIT: menu did not open / marker missing
+[10:28:42] PIN: menu did not open / marker missing
+[10:28:48] SEARCH: results_found=True
+[10:28:48] SHOT p4b_search
+[10:28:48] CONSOLE[p4b-santhosh] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:28:48] CONSOLE[p4b-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:28:48] CONSOLE[p4b-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:28:48] CONSOLE[p4b-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:28:48] PHASE4b RESULT edit=False others=[] pin=False search=True
+[10:31:24] === PHASE 4c: edit/pin via hover actions ===
+[10:31:44] SHOT p4c_menu
+[10:32:51] EDIT: applied=True others_live=[('kavitha', False), ('arun', False), ('priya', False)]
+[10:32:51] SHOT p4c_edit_done
+[10:33:59] PIN: kavitha=True others_live={'santhosh': False, 'arun': False, 'priya': False}
+[10:33:59] SHOT p4c_pin_done
+[10:33:59] CONSOLE[p4c-santhosh] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:33:59] CONSOLE[p4c-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:33:59] CONSOLE[p4c-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:34:00] CONSOLE[p4c-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:34:00] PHASE4c RESULT edit=True others=[('kavitha', False), ('arun', False), ('priya', False)] pin=True cross={'santhosh': False, 'arun': False, 'priya': False}
+[10:44:53] === PHASE 4c: edit/pin via hover actions ===
+[10:45:14] SHOT p4c_menu
+[10:46:21] EDIT: applied=True others_live=[('kavitha', False), ('arun', False), ('priya', False)]
+[10:46:21] SHOT p4c_edit_done
+[10:47:29] PIN: kavitha=True others_live={'santhosh': False, 'arun': False, 'priya': False}
+[10:47:29] SHOT p4c_pin_done
+[10:47:29] CONSOLE[p4c-santhosh] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 500 (Internal Server Error)', 'error:Failed to load resource: the server responded with a status of 500 (Internal Server Error)', 'error:Failed to load resource: the server responded with a status of 500 (Internal Server Error)']
+[10:47:29] CONSOLE[p4c-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:47:29] CONSOLE[p4c-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:47:29] CONSOLE[p4c-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[10:47:29] PHASE4c RESULT edit=True others=[('kavitha', False), ('arun', False), ('priya', False)] pin=True cross={'santhosh': False, 'arun': False, 'priya': False}
+[11:05:21] === PHASE 4c: edit/pin via hover actions ===
+[11:05:42] SHOT p4c_menu
+[11:06:49] EDIT: applied=True others_live=[('kavitha', False), ('arun', False), ('priya', False)]
+[11:06:49] SHOT p4c_edit_done
+[11:06:54] PIN: kavitha=True others_live={'santhosh': True, 'arun': True, 'priya': True}
+[11:06:54] SHOT p4c_pin_done
+[11:06:54] CONSOLE[p4c-santhosh] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:06:54] CONSOLE[p4c-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:06:54] CONSOLE[p4c-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:06:54] CONSOLE[p4c-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:06:55] PHASE4c RESULT edit=True others=[('kavitha', False), ('arun', False), ('priya', False)] pin=True cross={'santhosh': True, 'arun': True, 'priya': True}
+[11:11:00] === PHASE 4c: edit/pin via hover actions ===
+[11:11:21] SHOT p4c_menu
+[11:11:25] EDIT: applied=True others_live=[('kavitha', True), ('arun', True), ('priya', True)]
+[11:11:25] SHOT p4c_edit_done
+[11:11:30] PIN: kavitha=True others_live={'santhosh': True, 'arun': True, 'priya': True}
+[11:11:30] SHOT p4c_pin_done
+[11:11:30] CONSOLE[p4c-santhosh] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:11:30] CONSOLE[p4c-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:11:30] CONSOLE[p4c-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:11:30] CONSOLE[p4c-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:11:30] PHASE4c RESULT edit=True others=[('kavitha', True), ('arun', True), ('priya', True)] pin=True cross={'santhosh': True, 'arun': True, 'priya': True}
+[11:17:05] === PHASE 5: AI provider + mentions + @Odin ===
+[11:17:18] [p5] all four contexts in chat
+[11:17:18] [p5] BYOK ERROR BrowserType.launch_persistent_context: Failed to create a ProcessSingleton for your profile directory. This usually means that the profile is already in use by another instance of Chromium.
+Call log:
+
+[11:17:50] [p5] MENTION notification visible for priya=True
+[11:17:50] SHOT p5_mention_priya
+[11:17:52] [p5] ODIN reply visible to santhosh=True
+[11:17:52] [p5] ODIN reply visible to arun=True
+[11:17:52] [p5] ODIN reply visible to priya=True
+[11:17:52] [p5] ODIN streaming_seen=True final_seen=True
+[11:17:52] SHOT p5_odin_reply
+[11:17:52] CONSOLE[p5-santhosh] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:17:52] CONSOLE[p5-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 409 (Conflict)']
+[11:17:52] CONSOLE[p5-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:17:52] CONSOLE[p5-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:17:53] PHASE5 RESULT byok=False mention=True odin=True
+[11:19:22] === PHASE 5b: BYOK config via UI ===
+[11:19:26] [p5b] AI tab clicked=True
+[11:19:28] SHOT p5b_ai_tab
+[11:19:28] SHOT p5b_filled
+[11:19:28] [p5b] connected=True models=?
+[11:19:28] SHOT p5b_connected
+[11:19:43] [p5b] ERROR Locator.select_option: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_label("Primary provider")
+    - locator resolved to <select aria-label="Primary provider" class="px-2.5 py-1.5 rounded-lg border outline-n
+[11:19:43] SHOT p5b_error
+[11:19:43] CONSOLE[p5b] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:19:43] PHASE5b RESULT byok=False
+[11:21:59] === PHASE 5b: BYOK config via UI ===
+[11:22:04] [p5b] AI tab clicked=True
+[11:22:05] SHOT p5b_ai_tab
+[11:22:05] SHOT p5b_filled
+[11:22:05] [p5b] connected=True models=?
+[11:22:05] SHOT p5b_connected
+[11:22:05] [p5b] primary provider selected=True
+[11:22:09] [p5b] model chosen=tencent/hy4-preview
+[11:22:12] SHOT p5b_routes_saved
+[11:22:12] CONSOLE[p5b] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:22:12] PHASE5b RESULT byok=True
