@@ -99,3 +99,9 @@ def dump_errors(pg, tag):
     real = [e for e in errs if "favicon" not in e.lower()][:6]
     log(f"CONSOLE[{tag}] errors={real if real else 'none'}")
     return real
+
+def recover_to_shell(pg):
+    """If stuck on /onboarding, go to / — RootRedirect enters the first group."""
+    if "/onboarding" in pg.url:
+        goto(pg, "/", settle=3.5)
+        log(f"[recover] now at {pg.url}")

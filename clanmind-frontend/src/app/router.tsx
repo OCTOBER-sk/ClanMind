@@ -16,6 +16,7 @@ import {
   useParams,
 } from 'react-router';
 import type { ReactElement } from 'react';
+import { useEffect } from 'react';
 import { useAuthStore } from '@/state/useAuthStore';
 import { useGroupStore } from '@/state/useGroupStore';
 import { useUiStore } from '@/state/useUiStore';
@@ -65,6 +66,18 @@ function RootRedirect(): ReactElement {
 function OnboardingRoute(): ReactElement {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const onboardingComplete = useUiStore((s) => s.onboardingComplete);
+  const groups = useGroupStore((s) => s.groups);
+
+  // FE §69/§196 — if the user already has a Group (invitee, or completion raced
+  // a reload), the wizard must not trap them: exit to the Group once data lands
+  // and self-heal the persisted flag so future cold loads skip the redirect.
+  useEffect(() => {
+    if (groups.length > 0) {
+      if (!onboardingComplete) useUiStore.getState().setOnboardingComplete(true);
+      navigate(`/group/${groups[0].id}/chat`, { replace: true });
+    }
+  }, [onboardingComplete, groups, navigate]);
 
   const handleComplete = async (
     groupName: string,

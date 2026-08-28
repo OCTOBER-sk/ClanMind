@@ -29,12 +29,14 @@ export function JoinGroupDialog({ open, onOpenChange }: JoinGroupDialogProps) {
   function extractToken(input: string): string | null {
     const trimmed = input.trim();
     if (!trimmed) return null;
-    // Full URL: https://clanmind.io/join/<token>
+    // Full URL: https://host/join/<token> or https://host/invite/<token>
     try {
       const url = new URL(trimmed);
       const segments = url.pathname.split('/').filter(Boolean);
       const joinIdx = segments.indexOf('join');
       if (joinIdx >= 0 && segments[joinIdx + 1]) return segments[joinIdx + 1];
+      const inviteIdx = segments.indexOf('invite');
+      if (inviteIdx >= 0 && segments[inviteIdx + 1]) return segments[inviteIdx + 1];
     } catch {
       // not a URL — treat as bare token
     }
