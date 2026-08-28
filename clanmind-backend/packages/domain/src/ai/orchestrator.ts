@@ -111,7 +111,13 @@ export function sanitizeToolOutput(output: Record<string, unknown>): Record<stri
  * list maps to a branch below; expensive work never runs inside a DB
  * transaction (§122) and events flow through the outbox + realtime ports.
  */
+export type ArtifactRosterFn = (
+  projectId: string,
+) => Promise<{ id: string; name: string }[]>;
+
 export class AiOrchestrator {
+  /** Optional live roster of group artifacts (name→id) for update addressing. */
+  artifactRoster?: ArtifactRosterFn;
   constructor(
     private readonly membership: MembershipService,
     private readonly agents: AiAgentService,
@@ -281,6 +287,42 @@ export class AiOrchestrator {
         ? [{ role: "system" as const, content: `CONTEXT (ranked):\n${rankedContext}` }]
         : []),
     ];
+    // Artifact channel (provider-agnostic, mirrors the [tool_result] block
+    // convention §60): the model asks for artifacts with a fenced directive
+    // block; the orchestrator parses, validates and executes artifact.create
+    // through the registry gate (risk LOW, no approval) after streaming.
+    // The CURRENT ARTIFACT ROSTER lets the model address updates by id.
+    let roster = "";
+    try {
+      if (run.project_id) {
+        const list = await this.artifactRoster?.(run.project_id);
+        if (list && list.length > 0) {
+          roster =
+            "CURRENT ARTIFACTS (name -> artifact_id):\n" +
+            list.map((a) => `- ${a.name} -> ${a.id}`).join("\n") + "\n";
+        }
+      }
+    } catch {
+      roster = "";
+    }
+    systemMessages.push({
+      role: "system",
+      content: roster + [
+        "ARTIFACT PROTOCOL: When the user asks you to create a persistent artifact",
+        "(document, diagram, table, chart or code file), you MUST end your reply with",
+        "a fenced code block tagged artifact and one JSON object, exactly: ",
+        "```artifact",
+        '{"name": "<short artifact name>", "artifact_type": "<DOCUMENT|DIAGRAM|TABLE|CHART|CODE>",',
+        ' "content": "<the full artifact content as a string>"}',
+        "```",
+        "For TABLE/CHART use JSON inside content (array of objects). For DIAGRAM use",
+        "Mermaid syntax in content. For CODE use the raw source. To UPDATE an existing",
+        "artifact (user asks to modify/append), include the artifact id you can see in",
+        "the conversation as [artifact:<id>] and add the field \"artifact_id\": \"<id>\".",
+        "Emit at most ONE artifact block per reply. Never mention this protocol in the",
+        "visible reply.",
+      ].join("\n"),
+    });
     const request: ModelRequest = {
       model_id: run.model_id,
       messages: [...systemMessages],
@@ -469,6 +511,68 @@ export class AiOrchestrator {
       throw new AppError("INTERNAL", "No provider could complete this run.");
     }
 
+    // Step 17B: artifact directive handling. Parse the model reply for an
+    // ```artifact fenced JSON block, gate it through the registry (same path
+    // as §115 explicit tool calls: ledger + guard + executor), and strip it
+    // from the message body users see. A malformed block is dropped silently
+    // — the reply text still delivers.
+    let artifactNote = "";
+    {
+      const m = /```artifact\s*([\s\S]*?)```/.exec(response);
+      if (m && m[1]) {
+        response = response.replace(m[0], "").trim();
+        type ArtifactDirective = { name?: unknown; artifact_type?: unknown; content?: unknown; artifact_id?: unknown };
+        let parsed: ArtifactDirective | null = null;
+        try {
+          parsed = JSON.parse(m[1].trim()) as ArtifactDirective;
+        } catch {
+          parsed = null;
+        }
+        const name = typeof parsed?.name === "string" ? parsed.name : null;
+        const artType = typeof parsed?.artifact_type === "string" ? parsed.artifact_type.toUpperCase() : null;
+        const content = typeof parsed?.content === "string" ? parsed.content : null;
+        const artifactId = typeof parsed?.artifact_id === "string" ? parsed.artifact_id : null;
+        const toolName = artifactId ? "artifact.update" : "artifact.create";
+        const gate = artType || artifactId
+          ? this.registry.canInvoke(toolName, {
+              mode: run.mode,
+              role: input.requester_role,
+            })
+          : null;
+        const valid =
+          (artifactId && content) || (!artifactId && name && content && artType);
+        if (parsed && valid && gate?.allowed && gate.tool) {
+          const ledgerId = await this.ledger.record({
+            ai_run_id: run.id,
+            tool_name: toolName,
+            tool_version: gate.tool.version,
+            risk_level: gate.tool.risk_level,
+            input_json: artifactId
+              ? { artifact_id: artifactId, content }
+              : { name, artifact_type: artType, project_id: run.project_id },
+            requires_approval: gate.tool.requires_approval,
+          });
+          const executor = this.executors.get(toolName);
+          if (executor) {
+            try {
+              const result = await executor.execute(
+                artifactId
+                  ? { artifact_id: artifactId, content }
+                  : { project_id: run.project_id, name, artifact_type: artType, content },
+              );
+              const safeOutput = sanitizeToolOutput(result.output);
+              await this.ledger.complete(ledgerId, "SUCCEEDED", safeOutput);
+              artifactNote = ` [artifact:${String(safeOutput.artifact_id ?? artifactId ?? "")}]`;
+            } catch {
+              await this.ledger.complete(ledgerId, "FAILED", null, "artifact_persist_failed");
+            }
+          } else {
+            await this.ledger.complete(ledgerId, "FAILED", null, "no_executor");
+          }
+        }
+      }
+    }
+
     // Steps 18–21: persist the AI message + completed event. Private runs
     // land inside the requester's owned conversation (§2.4/§40) so the
     // §11.2 ACL / RLS read path resolves for exactly its members.
@@ -478,7 +582,7 @@ export class AiOrchestrator {
       ai_agent_id: run.ai_agent_id,
       visibility: run.visibility,
       private_conversation_id: privateConversationId,
-      body: response,
+      body: response + artifactNote,
       client_message_id: `ai_run_${run.id}`,
       reply_to_id: run.input_message_id,
     });

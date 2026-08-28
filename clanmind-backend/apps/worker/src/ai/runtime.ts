@@ -248,6 +248,23 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
   });
 
   registry.register({
+    name: "artifact.update",
+    version: "1",
+    description: "Append a new version to an existing artifact (versioned update).",
+    input_schema: {
+      artifact_id: "string",
+      content: "string",
+    },
+    output_schema: { artifact_id: "string", version_number: "number" },
+    risk_level: "LOW",
+    requires_approval: false,
+    allowed_modes: ["ASSIST", "FACILITATE", "ACT"],
+    allowed_roles: ["OWNER", "ADMIN", "MEMBER"],
+    timeout_ms: 10000,
+    retry_policy: "never",
+  });
+
+  registry.register({
     name: "artifact.create",
     version: "1",
     description: "Create a draft artifact version in the Garage.",
@@ -378,6 +395,36 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
     },
   });
 
+  executors.set("artifact.update", {
+    tool_name: "artifact.update",
+    async execute(input) {
+      const artifactId = String(input.artifact_id);
+      const version = await artifacts.newVersion({
+        artifact_id: artifactId,
+        content_type: "text/markdown",
+        content: String(input.content ?? ""),
+        created_by_user_id: null,
+      });
+      const artifactsRepo = new SupabaseArtifactRepository(db);
+      const existing = await artifactsRepo.findById(artifactId);
+      const groupId = existing ? await projectIdToGroupId(db, existing.project_id) : null;
+      if (groupId) {
+        await deps.outbox.publish({
+          event_type: "artifact.updated",
+          aggregate_type: "artifact",
+          aggregate_id: artifactId,
+          group_id: groupId,
+          actor_id: null,
+          payload: { artifact_id: artifactId, version: version.version_number },
+        });
+      }
+      return {
+        output: { artifact_id: artifactId, version_number: version.version_number },
+        duration_ms: 0,
+      };
+    },
+  });
+
   const messageSink: AiMessageSink = {
     async persistAiMessage(input) {
       // §122 atomic write path — same RPC human sends use; the RPC also
@@ -423,6 +470,7 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
     {
       async resolveAdapter(route) {
         const config = await configRepo.findById(route.provider_config_id);
+
         if (!config || !config.enabled) return null;
         const apiKey =
           config.kind === "BYOK"
@@ -480,6 +528,16 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
     expireStaleActions: () => approvalEngine.expireStaleActions(),
     buildContextCandidates: (input) => buildContextCandidates(db, deps.memory, input),
   };
+  // Artifact roster for update addressing (name -> id). Top-level in the
+  // runtime factory so it is always attached exactly once.
+  {
+    const artifactsRepoForRoster = new SupabaseArtifactRepository(db);
+    orchestrator.artifactRoster = async (projectId: string) => {
+      const list = await artifactsRepoForRoster.listByProject(projectId);
+      return list.filter((a) => a.status !== "DELETED").map((a) => ({ id: a.id, name: a.name }));
+    };
+  }
+
   return runtime;
 }
 
