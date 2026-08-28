@@ -44,6 +44,7 @@ import {
   endMeeting as endMeetingRequest,
 } from '@/api/endpoints/meetings';
 import { createProjectArtifact } from '@/api/endpoints/artifacts';
+import { editMessage, pinMessage, unpinMessage } from '@/api/endpoints/messageMutations';
 import { ContextInspector } from '@/features/artifacts/ContextInspector';
 import { ResearchDrawer } from '@/features/ai/ResearchDrawer';
 import { SyncConflictCard } from '@/features/sync/SyncConflictCard';
@@ -1386,11 +1387,21 @@ export function AppShell() {
                   // §30 — Reply opens the thread in the right work surface.
                   onReply={handleOpenThread}
                   onReact={(messageId, emoji) => addReaction(messageId, emoji, currentUserId)}
-                  onEditSave={(id, text) => updateMessage(id, { body: text, edited: true })}
+                  onEditSave={(id, text) => {
+                    updateMessage(id, { body: text, edited: true });
+                    void editMessage(id, text)
+                      .then(() => updateMessage(id, { is_pending: false }))
+                      .catch(() => updateMessage(id, { is_pending: false, is_failed: true }));
+                  }}
                   onDelete={deleteMessage}
                   onTogglePin={(id) => {
                     const m = scopedMessages.find((msg) => msg.id === id);
-                    if (m) updateMessage(id, { pinned: !m.pinned });
+                    if (!m) return;
+                    const nextPinned = !m.pinned;
+                    updateMessage(id, { pinned: nextPinned });
+                    void (nextPinned ? pinMessage(id) : unpinMessage(id))
+                      .then(() => updateMessage(id, { is_pending: false }))
+                      .catch(() => updateMessage(id, { is_pending: false, is_failed: true }));
                   }}
                   onCreateTask={handleCreateTaskFromMessage}
                   onCreateDecision={handleCreateDecisionFromMessage}

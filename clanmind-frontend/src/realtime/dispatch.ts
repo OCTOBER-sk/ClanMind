@@ -380,6 +380,16 @@ export function dispatchRealtimeEvent(event: RealtimeEvent): void {
       break;
     }
 
+    case 'message.pinned':
+    case 'message.unpinned': {
+      // §111 — pin fan-out: reconcile the pinned state on every member's UI.
+      const messageId =
+        firstString(payload.message_id, (payload.message as Record<string, unknown> | undefined)?.id) ?? '';
+      if (!messageId) return;
+      chat.updateMessage(messageId, { pinned: event.event_type === 'message.pinned' });
+      break;
+    }
+
     case 'ai.status': {
       const messageId = resolveMessageId(payload) || String(payload.message_id ?? '');
       if (!messageId) return;

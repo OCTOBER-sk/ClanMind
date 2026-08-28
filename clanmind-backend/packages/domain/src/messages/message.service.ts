@@ -148,6 +148,7 @@ export class MessageService {
         project_id: updated.project_id,
         group_id: updated.group_id,
         edited_at: updated.edited_at,
+        body: updated.body,
       },
     });
     return updated;

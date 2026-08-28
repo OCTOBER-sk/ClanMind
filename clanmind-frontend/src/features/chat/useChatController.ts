@@ -354,7 +354,14 @@ export function useChatController() {
           ...(isPrivatePair && newMsg.recipient_id ? { private_to: newMsg.recipient_id } : {}),
         })
         .then((row) => {
-          useChatStore.getState().updateMessage(newMsg.id, { is_pending: false });
+          const serverId = (row as unknown as { id?: string } | null)?.id;
+          // §39 reconcile: swap the optimistic local id for the SERVER id in
+          // place (keeps client_message_id) so later edits/pins/deletes and
+          // socket echoes address the same row.
+          useChatStore.getState().updateMessage(newMsg.id, {
+            is_pending: false,
+            ...(typeof serverId === 'string' && serverId ? { id: serverId } : {}),
+          });
           return row ?? null;
         })
         .catch(() => {
