@@ -260,6 +260,8 @@ export interface AiProviderConfig {
   group_id: string;
   kind: 'APPLICATION' | 'BYOK';
   provider: string;
+  /** §64bis: optional custom OpenAI-compatible base URL (local/custom gateways). */
+  base_url?: string | null;
   credential_ref: string | null;
   key_last4: string | null;
   enabled: boolean;

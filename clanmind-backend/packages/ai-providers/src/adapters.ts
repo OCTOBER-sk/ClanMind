@@ -101,6 +101,34 @@ export class OpenAICompatibleAdapter implements ModelProviderAdapter {
   estimateUsage(request: ModelRequest) {
     return estimateRequestUsage(request);
   }
+
+  /** §64ter: real model-level probe — a 5-token chat completion. */
+  async testChat(modelId: string): Promise<{ ok: boolean; sample?: string; error_code?: string }> {
+    try {
+      const fetcher = this.fetchImpl;
+      const res = await fetcher(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify({
+          model: modelId,
+          messages: [{ role: "user", content: "Reply with the single word: ok" }],
+          max_tokens: 5,
+          temperature: 0,
+          stream: false,
+        }),
+      });
+      if (!res.ok) {
+        return { ok: false, error_code: mapStatus(res.status) };
+      }
+      const json = (await res.json()) as {
+        choices?: { message?: { content?: string } }[];
+      };
+      const sample = json.choices?.[0]?.message?.content?.trim() ?? "";
+      return { ok: true, sample };
+    } catch {
+      return { ok: false, error_code: "provider_unavailable" };
+    }
+  }
 }
 
 /** §62 Anthropic adapter (Messages API). */
@@ -138,6 +166,10 @@ export class AnthropicAdapter implements ModelProviderAdapter {
 
   listModels(): Promise<ModelDescriptor[]> {
     return this.compat.listModels();
+  }
+
+  async testChat(modelId: string) {
+    return this.compat.testChat(modelId);
   }
 
   generate(request: ModelRequest): AsyncIterable<ModelEvent> {

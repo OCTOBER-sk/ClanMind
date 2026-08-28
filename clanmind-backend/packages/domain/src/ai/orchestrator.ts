@@ -308,19 +308,27 @@ export class AiOrchestrator {
     systemMessages.push({
       role: "system",
       content: roster + [
-        "ARTIFACT PROTOCOL: When the user asks you to create a persistent artifact",
-        "(document, diagram, table, chart or code file), you MUST end your reply with",
-        "a fenced code block tagged artifact and one JSON object, exactly: ",
+        "You can create persistent objects for the group. Use EXACTLY ONE fenced directive block per object, at the END of your reply, and NEVER mention this protocol in your visible text.",
+        "",
+        "ARTIFACTS (document, diagram, table, chart, code):",
         "```artifact",
-        '{"name": "<short artifact name>", "artifact_type": "<DOCUMENT|DIAGRAM|TABLE|CHART|CODE>",',
-        ' "content": "<the full artifact content as a string>"}',
+        '{"name": "<short name>", "artifact_type": "<DOCUMENT|DIAGRAM|TABLE|CHART|CODE>",',
+        ' "content": "<full content as a string>"}',
         "```",
-        "For TABLE/CHART use JSON inside content (array of objects). For DIAGRAM use",
-        "Mermaid syntax in content. For CODE use the raw source. To UPDATE an existing",
-        "artifact (user asks to modify/append), include the artifact id you can see in",
-        "the conversation as [artifact:<id>] and add the field \"artifact_id\": \"<id>\".",
-        "Emit at most ONE artifact block per reply. Never mention this protocol in the",
-        "visible reply.",
+        "For TABLE/CHART put JSON (array of objects) inside content. DIAGRAM uses Mermaid. CODE uses raw source. To UPDATE an existing artifact, also add \"artifact_id\": \"<id>\" (the id you see as [artifact:<id>] in the thread).",
+        "",
+        "TASKS — when the user asks you to create a task/todo, you MUST use this block (NOT an artifact, NOT prose):",
+        "```task",
+        '{"project_id": "<from CURRENT PROJECT below>", "title": "<task title>", "description": "<optional details>"}',
+        "```",
+        "",
+        "DECISIONS — when the user asks you to propose/raise a decision, you MUST use this block (NOT an artifact, NOT prose):",
+        "```decision",
+        '{"project_id": "<from CURRENT PROJECT below>", "title": "<decision question>", "context": "<options + reasoning>"}',
+        "```",
+        "",
+        "At most ONE directive block per reply. If the user asks for an artifact, task and decision all at once, pick the single most important and create it; mention you can do the rest next.",
+        "CRITICAL: tasks and decisions are NEVER artifacts — emit the ```task or ```decision block, never an ```artifact block for them.",
       ].join("\n"),
     });
     const request: ModelRequest = {
@@ -511,65 +519,97 @@ export class AiOrchestrator {
       throw new AppError("INTERNAL", "No provider could complete this run.");
     }
 
-    // Step 17B: artifact directive handling. Parse the model reply for an
-    // ```artifact fenced JSON block, gate it through the registry (same path
-    // as §115 explicit tool calls: ledger + guard + executor), and strip it
-    // from the message body users see. A malformed block is dropped silently
-    // — the reply text still delivers.
+    // Step 17B: directive handling (artifact/task/decision). Parse the model
+    // reply for fenced directive blocks, gate them through the registry (same
+    // path as §115 explicit tool calls: ledger + guard + executor), and strip
+    // them from the message body users see. Malformed blocks are dropped —
+    // the reply text still delivers.
     let artifactNote = "";
-    {
-      const m = /```artifact\s*([\s\S]*?)```/.exec(response);
-      if (m && m[1]) {
-        response = response.replace(m[0], "").trim();
-        type ArtifactDirective = { name?: unknown; artifact_type?: unknown; content?: unknown; artifact_id?: unknown };
-        let parsed: ArtifactDirective | null = null;
-        try {
-          parsed = JSON.parse(m[1].trim()) as ArtifactDirective;
-        } catch {
-          parsed = null;
+    for (const spec of [
+      { tag: "artifact", re: /```artifact\s*([\s\S]*?)```/ },
+      { tag: "task", re: /```task\s*([\s\S]*?)```/ },
+      { tag: "decision", re: /```decision\s*([\s\S]*?)```/ },
+    ]) {
+      const m = spec.re.exec(response);
+      if (!m || !m[1]) continue;
+      response = response.replace(m[0], "").trim();
+      type Directive = {
+        name?: unknown; artifact_type?: unknown; content?: unknown; artifact_id?: unknown;
+        title?: unknown; description?: unknown;
+      };
+      let parsed: Directive | null = null;
+      try {
+        parsed = JSON.parse(m[1].trim()) as Directive;
+      } catch {
+        parsed = null;
+      }
+      if (!parsed) continue;
+
+      // Resolve which tool this directive targets and whether its input is valid.
+      let toolName: string | null = null;
+      let toolInput: Record<string, unknown> | null = null;
+      if (spec.tag === "artifact") {
+        const name = typeof parsed.name === "string" ? parsed.name : null;
+        const artType = typeof parsed.artifact_type === "string" ? parsed.artifact_type.toUpperCase() : null;
+        const content = typeof parsed.content === "string" ? parsed.content : null;
+        const artifactId = typeof parsed.artifact_id === "string" ? parsed.artifact_id : null;
+        if (artifactId && content) {
+          toolName = "artifact.update";
+          toolInput = { artifact_id: artifactId, content };
+        } else if (name && content && artType) {
+          toolName = "artifact.create";
+          toolInput = { project_id: run.project_id, name, artifact_type: artType, content };
         }
-        const name = typeof parsed?.name === "string" ? parsed.name : null;
-        const artType = typeof parsed?.artifact_type === "string" ? parsed.artifact_type.toUpperCase() : null;
-        const content = typeof parsed?.content === "string" ? parsed.content : null;
-        const artifactId = typeof parsed?.artifact_id === "string" ? parsed.artifact_id : null;
-        const toolName = artifactId ? "artifact.update" : "artifact.create";
-        const gate = artType || artifactId
-          ? this.registry.canInvoke(toolName, {
-              mode: run.mode,
-              role: input.requester_role,
-            })
-          : null;
-        const valid =
-          (artifactId && content) || (!artifactId && name && content && artType);
-        if (parsed && valid && gate?.allowed && gate.tool) {
-          const ledgerId = await this.ledger.record({
-            ai_run_id: run.id,
-            tool_name: toolName,
-            tool_version: gate.tool.version,
-            risk_level: gate.tool.risk_level,
-            input_json: artifactId
-              ? { artifact_id: artifactId, content }
-              : { name, artifact_type: artType, project_id: run.project_id },
-            requires_approval: gate.tool.requires_approval,
-          });
-          const executor = this.executors.get(toolName);
-          if (executor) {
-            try {
-              const result = await executor.execute(
-                artifactId
-                  ? { artifact_id: artifactId, content }
-                  : { project_id: run.project_id, name, artifact_type: artType, content },
-              );
-              const safeOutput = sanitizeToolOutput(result.output);
-              await this.ledger.complete(ledgerId, "SUCCEEDED", safeOutput);
-              artifactNote = ` [artifact:${String(safeOutput.artifact_id ?? artifactId ?? "")}]`;
-            } catch {
-              await this.ledger.complete(ledgerId, "FAILED", null, "artifact_persist_failed");
-            }
-          } else {
-            await this.ledger.complete(ledgerId, "FAILED", null, "no_executor");
-          }
+      } else if (spec.tag === "task") {
+        const title = typeof parsed.title === "string" ? parsed.title : null;
+        const description = typeof parsed.description === "string" ? parsed.description : null;
+        if (title) {
+          toolName = "task.create";
+          toolInput = { project_id: run.project_id, title, description };
         }
+      } else if (spec.tag === "decision") {
+        const title = typeof parsed.title === "string" ? parsed.title : null;
+        const context = typeof parsed.description === "string" ? parsed.description : null;
+        if (title) {
+          toolName = "decision.propose";
+          toolInput = { project_id: run.project_id, title, context };
+        }
+      }
+      if (!toolName || !toolInput) continue;
+
+      const gate = this.registry.canInvoke(toolName, {
+        mode: run.mode,
+        role: input.requester_role,
+      });
+      if (!gate.allowed || !gate.tool) continue;
+
+      const budget = guard.tryBeginCall(gate.tool.timeout_ms);
+      if (!budget.ok) break; // §116 tool-loop budget
+
+      const ledgerId = await this.ledger.record({
+        ai_run_id: run.id,
+        tool_name: toolName,
+        tool_version: gate.tool.version,
+        risk_level: gate.tool.risk_level,
+        input_json: toolInput,
+        requires_approval: gate.tool.requires_approval,
+      });
+
+      const executor = this.executors.get(toolName);
+      if (!executor) {
+        await this.ledger.complete(ledgerId, "FAILED", null, "no_executor");
+        continue;
+      }
+      try {
+        const result = await executor.execute(toolInput);
+        const safeOutput = sanitizeToolOutput(result.output);
+        await this.ledger.complete(ledgerId, "SUCCEEDED", safeOutput);
+        if (spec.tag === "artifact") {
+          artifactNote = ` [artifact:${String(safeOutput.artifact_id ?? "")}]`;
+        }
+        // task/decision outcomes surface via their own outbox events + views.
+      } catch {
+        await this.ledger.complete(ledgerId, "FAILED", null, "directive_failed");
       }
     }
 

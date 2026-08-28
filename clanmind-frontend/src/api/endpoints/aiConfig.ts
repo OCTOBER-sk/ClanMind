@@ -49,10 +49,12 @@ export async function validateProviderKey(
   groupId: string,
   provider: string,
   apiKey: string,
+  baseUrl?: string | null,
 ): Promise<{ config: AiConfigResponse['configs'][number]; models: ModelDescriptor[] }> {
   const raw = await api.post(`/groups/${encodeURIComponent(groupId)}/ai/providers/validate`, {
     provider,
     api_key: apiKey,
+    base_url: baseUrl ?? null,
   });
   const parsed = ValidateProviderResponseSchema.safeParse(raw);
   if (!parsed.success) throw new Error('Provider validation response failed schema validation.');
@@ -62,7 +64,31 @@ export async function validateProviderKey(
   };
 }
 
-/** POST models — re-discover models for an ALREADY STORED config (no key sent). */
+/**
+ * §64ter provider+model connectivity test — does a REAL tiny chat completion
+ * against the chosen provider/base_url/model. No config is stored by this call.
+ */
+export interface ProviderModelTestInput {
+  provider: string;
+  api_key: string;
+  base_url?: string;
+  model: string;
+}
+
+export async function testProviderModel(
+  groupId: string,
+  input: ProviderModelTestInput,
+): Promise<{ ok: boolean; sample?: string; error_code?: string }> {
+  const raw = await api.post(
+    `/groups/${encodeURIComponent(groupId)}/ai/providers/test`,
+    input,
+  );
+  if (raw && typeof raw === 'object') {
+    const r = raw as { ok?: unknown; sample?: string; error_code?: string };
+    if (typeof r.ok === 'boolean') return { ok: r.ok, sample: r.sample, error_code: r.error_code };
+  }
+  throw new Error('Provider test response failed schema validation.');
+}
 export async function fetchProviderModels(
   groupId: string,
   configId: string,

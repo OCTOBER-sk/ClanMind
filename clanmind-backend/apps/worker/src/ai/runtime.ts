@@ -140,14 +140,11 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
   const configRepo = new SupabaseProviderConfigRepository(db);
   const routeRepo = new SupabaseModelRouteRepository(db);
 
-  const providers = new ProviderConfigService(configRepo, secrets, async (provider, apiKey) => {
+  const providers = new ProviderConfigService(configRepo, secrets, async (provider, apiKey, baseUrl) => {
     // §64 validate-before-store: a real listing call decides validity.
     try {
-      const adapter = new OpenAICompatibleAdapter(
-        provider,
-        apiKey,
-        PROVIDER_BASE_URLS[provider] ?? PROVIDER_BASE_URLS["openai"],
-      );
+      const effectiveBase = baseUrl || PROVIDER_BASE_URLS[provider] || PROVIDER_BASE_URLS["openai"]!;
+      const adapter = new OpenAICompatibleAdapter(provider, apiKey, effectiveBase);
       const result = await adapter.validateCredentials();
       return { valid: result.valid, models: result.models.map((m) => m.model_id) };
     } catch {
@@ -477,11 +474,10 @@ export function buildAiRuntime(deps: AiRuntimeDeps): AiRuntime {
             ? await secrets.getSecret(config.credential_ref?.replace(/^secret:/, "") ?? "")
             : env.APPLICATION_AI_API_KEY;
         if (!apiKey) return null;
-        return new OpenAICompatibleAdapter(
-          config.provider,
-          apiKey,
-          PROVIDER_BASE_URLS[config.provider] ?? PROVIDER_BASE_URLS["openai"],
-        );
+        // §64bis: config base_url wins (local/custom gateways); else built-in map.
+        const baseUrl =
+          config.base_url || PROVIDER_BASE_URLS[config.provider] || PROVIDER_BASE_URLS["openai"]!;
+        return new OpenAICompatibleAdapter(config.provider, apiKey, baseUrl);
       },
     },
     { resolveChain: (groupId) => router.resolveChain(groupId) },

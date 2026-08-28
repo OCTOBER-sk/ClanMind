@@ -24,8 +24,11 @@ import { api } from '@/api/client';
 import { ApiError } from '@/api/errors';
 import {
   fetchAiAgent,
+  fetchProviderModels,
   removeProviderConfig,
+  testProviderModel,
   updateAiAgent,
+  validateProviderKey,
 } from '@/api/endpoints/aiConfig';
 import { deleteGroup, updateGroup } from '@/api/endpoints/groups';
 import {
@@ -505,6 +508,9 @@ export function useSettingsController({
     // byok
     removeProvider,
     byokRemovalError,
+    // §64ter model-level connectivity probe (does NOT store the key)
+    handleTestProviderModel: async (provider: string, apiKey: string, baseUrl: string, model: string) =>
+      testProviderModel(group.id, { provider, api_key: apiKey, base_url: baseUrl || undefined, model }),
     // research probe + usage + danger
     testSearchProvider,
     usage,

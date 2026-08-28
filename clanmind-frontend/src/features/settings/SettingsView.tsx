@@ -99,8 +99,8 @@ type SettingsSection =
   | 'diagnostics'
   | 'danger';
 
-/** §156 provider list — mirrors BE PROVIDER_BASE_URLS keys. */
-const PROVIDERS = ['anthropic', 'openai', 'google', 'openrouter'] as const;
+/** §156 provider list — mirrors BE PROVIDER_BASE_URLS keys + a custom slot. */
+const PROVIDERS = ['anthropic', 'openai', 'google', 'openrouter', 'custom'] as const;
 
 const ROUTE_ROLES: Array<{ role: ModelRouteInput['role']; label: string }> = [
   { role: 'PRIMARY', label: 'Primary' },
@@ -1099,11 +1099,16 @@ function InviteCard({ ctl, groupName }: { ctl: SettingsController; groupName: st
 // ─── BYOK card (§156/§157 states + §232 removal) ─────────────────────────────
 
 function ByokCard({ ctl, groupId }: { ctl: SettingsController; groupId: string }) {
-  const [byokProvider, setByokProvider] = useState<(typeof PROVIDERS)[number]>('anthropic');
+  const [byokProvider, setByokProvider] = useState<string>('anthropic');
   const [byokKey, setByokKey] = useState('');
+  const [byokBaseUrl, setByokBaseUrl] = useState('');
+  const [byokModel, setByokModel] = useState('');
   type ProviderTestState = 'idle' | 'testing' | 'connected' | 'failed';
   const [providerTestState, setProviderTestState] = useState<ProviderTestState>('idle');
   const [providerModels, setProviderModels] = useState<ModelDescriptor[]>([]);
+  type ModelTestState = 'idle' | 'testing' | 'ok' | 'failed';
+  const [modelTestState, setModelTestState] = useState<ModelTestState>('idle');
+  const [modelTestSample, setModelTestSample] = useState<string>('');
   const [aiConfigs, setAiConfigs] = useState<AiProviderConfig[]>([]);
   const [aiRoutes, setAiRoutes] = useState<AiModelRoute[]>([]);
   const [aiConfigError, setAiConfigError] = useState<string | null>(null);
@@ -1159,16 +1164,40 @@ function ByokCard({ ctl, groupId }: { ctl: SettingsController; groupId: string }
    */
   const handleTestProvider = async () => {
     setProviderTestState('testing');
+    setModelTestState('idle');
     try {
-      const result = await validateProviderKey(groupId, byokProvider, byokKey);
+      const result = await validateProviderKey(groupId, byokProvider, byokKey, byokBaseUrl || undefined);
       setAiConfigs((prev) => [...prev.filter((c) => c.id !== result.config.id), result.config]);
       setProviderModels(result.models);
       setProviderTestState('connected');
       // §63.1/§325.11 — the raw key has served its purpose; drop it NOW.
       setByokKey('');
+      // Auto-fill the model field with the first discovered model when empty.
+      if (!byokModel && result.models[0]) setByokModel(result.models[0].model_id);
     } catch {
       // §157 failure copy — never leaks backend error internals.
       setProviderTestState('failed');
+    }
+  };
+
+  /**
+   * §64ter — model-level connectivity test. Does a REAL tiny chat completion
+   * against the exact provider/base_url/model without persisting the key.
+   */
+  const handleTestModel = async () => {
+    if (byokKey.length < 8 || byokModel.length === 0) return;
+    setModelTestState('testing');
+    setModelTestSample('');
+    try {
+      const r = await ctl.handleTestProviderModel(byokProvider, byokKey, byokBaseUrl, byokModel);
+      if (r.ok) {
+        setModelTestState('ok');
+        setModelTestSample(r.sample ?? '');
+      } else {
+        setModelTestState('failed');
+      }
+    } catch {
+      setModelTestState('failed');
     }
   };
 
@@ -1293,8 +1322,9 @@ function ByokCard({ ctl, groupId }: { ctl: SettingsController; groupId: string }
           <select
             value={byokProvider}
             onChange={(e) => {
-              setByokProvider(e.target.value as (typeof PROVIDERS)[number]);
+              setByokProvider(e.target.value);
               setProviderTestState('idle');
+              setModelTestState('idle');
             }}
             className="px-3.5 py-2 rounded-lg border outline-none cursor-pointer capitalize"
             style={{
@@ -1305,21 +1335,55 @@ function ByokCard({ ctl, groupId }: { ctl: SettingsController; groupId: string }
           >
             {PROVIDERS.map((p) => (
               <option key={p} value={p}>
-                {p}
+                {p === 'custom' ? 'Custom / Local (OpenAI-compatible)' : p}
               </option>
             ))}
           </select>
         </label>
+        {byokProvider === 'custom' && (
+          <label className="space-y-1 block">
+            <span className="block text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+              Base URL (optional — for local Ollama, LM Studio, etc.)
+            </span>
+            <Input
+              type="text"
+              placeholder="http://localhost:11434/v1"
+              value={byokBaseUrl}
+              autoComplete="off"
+              onChange={(e) => {
+                setByokBaseUrl(e.target.value);
+                setProviderTestState('idle');
+                setModelTestState('idle');
+              }}
+            />
+          </label>
+        )}
         <Input
           type="password"
-          placeholder={`Paste your ${byokProvider} API key`}
+          placeholder={`Paste your ${byokProvider === 'custom' ? 'API key (any value for local)' : byokProvider} API key`}
           value={byokKey}
           autoComplete="off"
           onChange={(e) => {
             setByokKey(e.target.value);
             setProviderTestState('idle');
+            setModelTestState('idle');
           }}
         />
+        <label className="space-y-1 block">
+          <span className="block text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+            Model
+          </span>
+          <Input
+            type="text"
+            placeholder="e.g. openai/gpt-4o-mini or llama3.1:8b (local)"
+            value={byokModel}
+            autoComplete="off"
+            onChange={(e) => {
+              setByokModel(e.target.value);
+              setModelTestState('idle');
+            }}
+          />
+        </label>
         <div className="flex items-center gap-3 flex-wrap">
           <Button
             size="sm"
@@ -1345,6 +1409,37 @@ function ByokCard({ ctl, groupId }: { ctl: SettingsController; groupId: string }
           {providerTestState === 'failed' && (
             <span className="font-medium" style={{ color: 'var(--color-danger)' }}>
               Couldn&rsquo;t authenticate. Check the provider key.
+            </span>
+          )}
+          {/* §64ter — model-level connectivity test (real chat completion). */}
+          <Button
+            size="sm"
+            variant="outline"
+            isLoading={modelTestState === 'testing'}
+            disabled={
+              byokKey.length === 0 ||
+              byokModel.length === 0 ||
+              modelTestState === 'testing' ||
+              providerTestState === 'testing'
+            }
+            onClick={() => void handleTestModel()}
+          >
+            Test model
+          </Button>
+          {modelTestState === 'testing' && (
+            <span className="flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Testing model…
+            </span>
+          )}
+          {modelTestState === 'ok' && (
+            <span className="flex items-center gap-1 font-medium" style={{ color: 'var(--color-success)' }}>
+              <Check className="w-3.5 h-3.5" aria-hidden="true" />
+              Model connected{modelTestSample ? ` · "${modelTestSample}"` : ''}
+            </span>
+          )}
+          {modelTestState === 'failed' && (
+            <span className="font-medium" style={{ color: 'var(--color-danger)' }}>
+              Model test failed — verify model id &amp; key.
             </span>
           )}
         </div>

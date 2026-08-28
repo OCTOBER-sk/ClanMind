@@ -76,6 +76,35 @@ export function aiConfigRoutes(): Hono<{ Bindings: Env; Variables: AuthVariables
     return c.json({ ok: true, routes: await rt.routeRepo.listByGroup(groupId) });
   });
 
+  app.post("/api/v1/groups/:groupId/ai/providers/test", async (c) => {
+    const services = c.get("services");
+    const user = c.get("user");
+    const groupId = c.req.param("groupId");
+    await services.membership.requireRole(groupId, user.user_id, ["OWNER", "ADMIN"]);
+    const body = (await c.req.json().catch(() => ({}))) as {
+      provider?: unknown;
+      api_key?: unknown;
+      base_url?: unknown;
+      model?: unknown;
+    };
+    if (
+      typeof body.provider !== "string" ||
+      typeof body.api_key !== "string" ||
+      body.api_key.length < 8 ||
+      typeof body.model !== "string" ||
+      body.model.length === 0
+    ) {
+      throw new AppError("VALIDATION_FAILED", "provider, api_key and model are required.");
+    }
+    const baseUrl =
+      typeof body.base_url === "string" && body.base_url.length > 0
+        ? body.base_url
+        : PROVIDER_BASE_URLS[body.provider] ?? PROVIDER_BASE_URLS["openai"]!;
+    const adapter = new OpenAICompatibleAdapter(body.provider, body.api_key, baseUrl);
+    const result = await adapter.testChat(body.model);
+    return c.json(result, result.ok ? 200 : 502);
+  });
+
   app.post("/api/v1/groups/:groupId/ai/providers/validate", async (c) => {
     const services = c.get("services");
     const user = c.get("user");
@@ -120,11 +149,9 @@ export function aiConfigRoutes(): Hono<{ Bindings: Env; Variables: AuthVariables
       apiKey = c.env.APPLICATION_AI_API_KEY ?? null;
     }
     if (!apiKey) throw new AppError("CONFLICT", "No usable credential for this provider config.");
-    const adapter = new OpenAICompatibleAdapter(
-      config.provider,
-      apiKey,
-      PROVIDER_BASE_URLS[config.provider] ?? PROVIDER_BASE_URLS["openai"]!,
-    );
+    const baseUrl =
+      config.base_url || PROVIDER_BASE_URLS[config.provider] || PROVIDER_BASE_URLS["openai"]!;
+    const adapter = new OpenAICompatibleAdapter(config.provider, apiKey, baseUrl);
     const result = await adapter.listModels();
     return c.json({ provider: config.provider, models: result });
   });

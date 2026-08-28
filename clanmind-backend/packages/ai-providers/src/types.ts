@@ -49,6 +49,8 @@ export interface ModelProviderAdapter {
   listModels(): Promise<ModelDescriptor[]>;
   generate(request: ModelRequest): AsyncIterable<ModelEvent>;
   estimateUsage?(request: ModelRequest): UsageEstimate;
+  /** §64ter: model-level connectivity probe — a real (tiny) chat completion. */
+  testChat(modelId: string): Promise<{ ok: boolean; sample?: string; error_code?: string }>;
 }
 
 /** Rough token estimate (~4 chars/token) used before provider usage returns. */

@@ -265,6 +265,7 @@ export class SupabaseProviderConfigRepository implements ProviderConfigRepositor
     group_id: string;
     kind: AiProviderConfig["kind"];
     provider: string;
+    base_url?: string | null;
     credential_ref: string | null;
     key_last4: string | null;
     created_by: string;
@@ -275,6 +276,7 @@ export class SupabaseProviderConfigRepository implements ProviderConfigRepositor
         group_id: input.group_id,
         kind: input.kind,
         provider: input.provider,
+        base_url: input.base_url ?? null,
         credential_ref: input.credential_ref,
         key_last4: input.key_last4,
         enabled: true,

@@ -6,6 +6,8 @@ export interface AiProviderConfig {
   group_id: string;
   kind: "APPLICATION" | "BYOK";
   provider: string;
+  /** §64bis: optional custom OpenAI-compatible base URL (local/custom gateways). */
+  base_url: string | null;
   credential_ref: string | null;
   key_last4: string | null;
   enabled: boolean;
@@ -31,6 +33,7 @@ export interface ProviderConfigRepository {
     group_id: string;
     kind: "APPLICATION" | "BYOK";
     provider: string;
+    base_url?: string | null;
     credential_ref: string | null;
     key_last4: string | null;
     created_by: string;
@@ -75,6 +78,7 @@ export class ProviderConfigService {
     private readonly validateKey: (
       provider: string,
       key: string,
+      baseUrl?: string | null,
     ) => Promise<{ valid: boolean; models: string[] }>,
   ) {}
 
@@ -83,12 +87,13 @@ export class ProviderConfigService {
     group_id: string;
     provider: string;
     api_key: string;
+    base_url?: string | null;
     created_by: string;
   }): Promise<{ config: AiProviderConfig; models: string[] }> {
     if (!input.api_key || input.api_key.length < 8) {
       throw new AppError("VALIDATION_FAILED", "API key looks invalid.");
     }
-    const check = await this.validateKey(input.provider, input.api_key);
+    const check = await this.validateKey(input.provider, input.api_key, input.base_url);
     if (!check.valid) {
       throw new AppError("VALIDATION_FAILED", "Provider rejected this key.");
     }
@@ -97,6 +102,7 @@ export class ProviderConfigService {
       group_id: input.group_id,
       kind: "BYOK",
       provider: input.provider,
+      base_url: input.base_url ?? null,
       credential_ref: secret_ref,
       key_last4,
       created_by: input.created_by,
