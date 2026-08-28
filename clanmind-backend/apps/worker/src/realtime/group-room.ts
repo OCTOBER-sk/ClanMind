@@ -114,8 +114,13 @@ export class GroupRoom implements DurableObject {
 
   /** The room id IS the Group id (one room per Group). */
   private get groupId(): string {
-    return this.state.id.name ?? "";
+    // Dev Miniflare exposes an empty state.id.name; handleConnect captures the
+    // real Group id from the x-room-group header as a fallback (§16).
+    return this.state.id.name || this.boundGroupId || "";
   }
+
+  /** Set in handleConnect: the x-room-group fallback for local dev. */
+  private boundGroupId = "";
 
   /**
    * §86/§185 #11: re-verify ACTIVE membership at write time. Connect-time
@@ -164,6 +169,7 @@ export class GroupRoom implements DurableObject {
     // empty state.id.name, so the entrypoint also forwards it as x-room-group.
     const groupId = this.state.id.name || request.headers.get("x-room-group") || "";
     if (!groupId) return new Response("bad room", { status: 400 });
+    this.boundGroupId = groupId;
 
     // 1. authenticate (token via query; browsers cannot set WS headers)
     const token = url.searchParams.get("token") ?? "";
@@ -423,11 +429,18 @@ export class GroupRoom implements DurableObject {
           } else {
             await reactions.remove(message.data.message_id, userId, message.data.emoji);
           }
+          // §86/§114 — broadcast the AUTHORITATIVE state for this emoji so every
+          // client (including the actor) reconciles to count + user_ids.
+          const reactEmoji = message.data.emoji;
+          const all = await reactions.listByMessage(message.data.message_id);
+          const forEmoji = all.filter((r) => r.emoji === reactEmoji);
           this.broadcastSystem("reaction.updated", {
             message_id: message.data.message_id,
-            emoji: message.data.emoji,
+            emoji: reactEmoji,
             user_id: userId,
             action: message.data.action,
+            count: forEmoji.length,
+            user_ids: forEmoji.map((r) => r.user_id),
           });
         } catch (error) {
           this.sendDomainError(ws, error);

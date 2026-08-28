@@ -147,6 +147,9 @@ export const clientEvents = {
         : {}),
     }),
   roomSubscribe: (groupId: string) => frame('room.subscribe', { group_id: groupId }),
+  /** §86 — add/remove an emoji reaction (room-scoped, group messages only). */
+  reaction: (payload: { message_id: string; emoji: string; action: 'add' | 'remove' }) =>
+    frame('message.react', payload),
   /**
    * WS message.send mirrors `messageSendSchema`: body, project_id,
    * reply_to_id, mention_user_ids. Private scope is NOT addressable over WS

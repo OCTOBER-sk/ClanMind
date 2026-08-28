@@ -45,6 +45,8 @@ import {
 } from '@/api/endpoints/meetings';
 import { createProjectArtifact } from '@/api/endpoints/artifacts';
 import { editMessage, pinMessage, unpinMessage } from '@/api/endpoints/messageMutations';
+import { getRealtime } from '@/realtime/connection';
+import { clientEvents } from '@/realtime/events';
 import { ContextInspector } from '@/features/artifacts/ContextInspector';
 import { ResearchDrawer } from '@/features/ai/ResearchDrawer';
 import { SyncConflictCard } from '@/features/sync/SyncConflictCard';
@@ -1386,7 +1388,25 @@ export function AppShell() {
                   onOpenSettings={() => navigateToSection('settings')}
                   // §30 — Reply opens the thread in the right work surface.
                   onReply={handleOpenThread}
-                  onReact={(messageId, emoji) => addReaction(messageId, emoji, currentUserId)}
+                  onReact={(messageId, emoji) => {
+                    // Local optimism for instant UI, then the authoritative
+                    // WS write (§86) — server echo reconciles every client.
+                    const current = useChatStore
+                      .getState()
+                      .messages.find((m) => m.id === messageId)
+                      ?.reactions.find((r) => r.emoji === emoji);
+                    const alreadyMine = current?.user_ids.includes(currentUserId) ?? false;
+                    addReaction(messageId, emoji, currentUserId);
+                    try {
+                      getRealtime().send(
+                        clientEvents.reaction({
+                          message_id: messageId,
+                          emoji,
+                          action: alreadyMine ? 'remove' : 'add',
+                        }),
+                      );
+                    } catch { /* offline: reaction stays local-pending */ }
+                  }}
                   onEditSave={(id, text) => {
                     updateMessage(id, { body: text, edited: true });
                     void editMessage(id, text)

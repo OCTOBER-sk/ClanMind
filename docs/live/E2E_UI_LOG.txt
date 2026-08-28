@@ -515,3 +515,69 @@ Call log:
 [11:22:12] SHOT p5b_routes_saved
 [11:22:12] CONSOLE[p5b] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)', 'error:Failed to load resource: the server responded with a status of 404 (Not Found)']
 [11:22:12] PHASE5b RESULT byok=True
+[11:25:25] === PHASE 6: reactions real-time ===
+[11:25:38] SHOT p6_before_react
+[11:25:40] [p6] arun clicked reaction=True
+[11:26:57] [p6] REACTION fan-out: {'santhosh': False, 'kavitha': False, 'priya': False}
+[11:26:57] SHOT p6_reaction_seen_santhosh
+[11:27:02] [p6] TOGGLE-OFF removal visible={'santhosh': True, 'kavitha': True, 'priya': True}
+[11:27:02] SHOT p6_reaction_removed
+[11:27:02] CONSOLE[p6-santhosh] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:27:02] CONSOLE[p6-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:27:02] CONSOLE[p6-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:27:02] CONSOLE[p6-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:27:02] PHASE6 RESULT clicked=True fanout={'santhosh': False, 'kavitha': False, 'priya': False}
+[11:41:23] === PHASE 6: reactions real-time ===
+[11:41:37] SHOT p6_before_react
+[11:41:39] [p6] arun clicked reaction=True
+[11:42:55] [p6] REACTION fan-out: {'santhosh': False, 'kavitha': False, 'priya': False}
+[11:42:55] SHOT p6_reaction_seen_santhosh
+[11:43:00] [p6] TOGGLE-OFF removal visible={'santhosh': True, 'kavitha': True, 'priya': True}
+[11:43:00] SHOT p6_reaction_removed
+[11:43:00] CONSOLE[p6-santhosh] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:43:00] CONSOLE[p6-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:43:00] CONSOLE[p6-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:43:01] CONSOLE[p6-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[11:43:01] PHASE6 RESULT clicked=True fanout={'santhosh': False, 'kavitha': False, 'priya': False}
+[11:58:35] === PHASE 6: reactions real-time ===
+[11:58:48] SHOT p6_before_react
+[11:58:50] [p6] arun clicked reaction=True
+[12:00:07] [p6] REACTION fan-out: {'santhosh': False, 'kavitha': False, 'priya': False}
+[12:00:07] SHOT p6_reaction_seen_santhosh
+[12:00:12] [p6] TOGGLE-OFF removal visible={'santhosh': True, 'kavitha': True, 'priya': True}
+[12:00:12] SHOT p6_reaction_removed
+[12:00:12] CONSOLE[p6-santhosh] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[12:00:12] CONSOLE[p6-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[12:00:12] CONSOLE[p6-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[12:00:12] CONSOLE[p6-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[12:00:12] PHASE6 RESULT clicked=True fanout={'santhosh': False, 'kavitha': False, 'priya': False}
+[12:07:50] === PHASE 6b: reactions on fresh message ===
+[12:08:04] [p6b] santhosh sees fresh msg=True
+[12:08:05] [p6b] kavitha sees fresh msg=True
+[12:08:05] [p6b] arun sees fresh msg=True
+[12:08:05] [p6b] priya sees fresh msg=True
+[12:08:09] [p6b] arun reacted=True
+[12:08:11] [p6b] FAN-OUT {'santhosh': True, 'kavitha': True, 'priya': True}
+[12:08:11] SHOT p6b_reaction_fanout
+[12:08:16] [p6b] TOGGLE-OFF removal={'santhosh': False, 'kavitha': False, 'priya': False}
+[12:08:16] SHOT p6b_removed
+[12:08:16] CONSOLE[p6b-santhosh] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[12:08:16] CONSOLE[p6b-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[12:08:16] CONSOLE[p6b-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[12:08:16] CONSOLE[p6b-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[12:08:16] PHASE6b RESULT clicked=True fanout={'santhosh': True, 'kavitha': True, 'priya': True}
+[12:10:52] === PHASE 6b: reactions on fresh message ===
+[12:11:06] [p6b] santhosh sees fresh msg=True
+[12:11:08] [p6b] kavitha sees fresh msg=True
+[12:11:08] [p6b] arun sees fresh msg=True
+[12:11:08] [p6b] priya sees fresh msg=True
+[12:11:11] [p6b] arun reacted=True
+[12:11:13] [p6b] FAN-OUT {'santhosh': True, 'kavitha': True, 'priya': True}
+[12:11:13] SHOT p6b_reaction_fanout
+[12:11:18] [p6b] TOGGLE-OFF removal={'santhosh': True, 'kavitha': True, 'priya': True}
+[12:11:18] SHOT p6b_removed
+[12:11:18] CONSOLE[p6b-santhosh] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[12:11:18] CONSOLE[p6b-kavitha] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[12:11:19] CONSOLE[p6b-arun] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[12:11:19] CONSOLE[p6b-priya] errors=['error:Failed to load resource: the server responded with a status of 404 (Not Found)']
+[12:11:19] PHASE6b RESULT clicked=True fanout={'santhosh': True, 'kavitha': True, 'priya': True}
