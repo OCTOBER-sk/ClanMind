@@ -64,10 +64,10 @@ const DOC_TYPES = new Set<ArtifactType>(['DOCUMENT', 'MARKDOWN', 'RESEARCH', 'CO
 
 function ViewerSkeleton() {
   return (
-    <div className="flex flex-1 items-center justify-center p-8" role="status" aria-label="Loading artifact viewer">
+    <div className="flex flex-1 items-center justify-center p-8 bg-surface-container-low" role="status" aria-label="Loading artifact viewer">
       <div className="flex flex-col items-center gap-3">
-        <div className="h-9 w-9 animate-pulse rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-hover)]" />
-        <span className="text-[11px] text-[var(--color-text-tertiary)]">Loading viewer…</span>
+        <div className="h-9 w-9 animate-pulse rounded-md border border-outline-variant bg-surface-container motion-reduce:transition-none" />
+        <span className="text-[11px] text-on-surface-variant">Loading viewer…</span>
       </div>
     </div>
   );
@@ -76,11 +76,11 @@ function ViewerSkeleton() {
 /** §291 isolation fallback — a renderer crash never propagates further. */
 function RendererIsolationFallback({ onExportRaw }: { onExportRaw?: () => void }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-      <p className="max-w-xs text-xs font-semibold text-[var(--color-text)]">
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center bg-surface-container-low">
+      <p className="max-w-xs text-xs font-semibold text-on-surface">
         This artifact cannot be rendered in this version.
       </p>
-      <p className="max-w-xs text-[11px] text-[var(--color-text-secondary)]">
+      <p className="max-w-xs text-[11px] text-on-surface-variant">
         View raw or export it — everything else in ClanMind keeps working.
       </p>
       {onExportRaw && (
@@ -192,7 +192,7 @@ function ArtifactPanelBody({
     {
       id: 'ctx_toggle',
       label: artifact.used_as_context ? '✓ Used by Odin' : 'Use as Project Context',
-      icon: <Sparkles className={cn('h-3.5 w-3.5', artifact.used_as_context && 'text-amber-500')} />,
+      icon: <Sparkles className={cn('h-3.5 w-3.5', artifact.used_as_context && 'text-tertiary')} />,
       onClick: () => toggleContext(artifact.id),
     },
     ...(onSendToChat
@@ -219,13 +219,13 @@ function ArtifactPanelBody({
   ];
 
   const rawView = viewRaw ? (
-    <div className="flex-1 overflow-auto p-4 select-text">
+    <div className="flex-1 overflow-auto p-4 select-text bg-surface-container-low">
       <div className="mb-3 flex justify-end">
         <Button size="sm" variant="ghost" onClick={() => setViewRaw(false)} aria-label="Exit raw content view">
           Exit raw view
         </Button>
       </div>
-      <pre className="whitespace-pre-wrap rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 font-mono text-[11px] leading-relaxed text-[var(--color-text)]" role="textbox" aria-readonly="true" aria-label="Raw artifact content">
+      <pre className="whitespace-pre-wrap rounded-md border border-outline-variant bg-surface-container-lowest p-4 font-mono text-[11px] leading-relaxed text-on-surface motion-reduce:transition-none" role="textbox" aria-readonly="true" aria-label="Raw artifact content">
         {currentVersion.content || '(no content stored for this version)'}
       </pre>
     </div>
@@ -312,17 +312,17 @@ function ArtifactPanelBody({
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 flex-col border-l border-[var(--color-border)] bg-[var(--color-surface-raised)] transition-all duration-200',
-        isFullscreen && 'fixed inset-0 z-50 border-none',
+        'flex h-full min-h-0 flex-col border-l border-outline-variant bg-surface-container-low rounded-l-lg overflow-hidden motion-reduce:transition-none transition-colors duration-standard ease-emphasized',
+        isFullscreen && 'fixed inset-0 z-50 border-none rounded-none',
       )}
     >
       {/* ─── Header (§96) ─────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5">
+      <div className="flex items-center justify-between gap-3 border-b border-outline-variant bg-surface-container-low px-4 py-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="min-w-0">
-            <h2 className="truncate text-[13px] font-semibold text-[var(--color-text)] leading-tight">{artifact.title}</h2>
-            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] leading-tight text-[var(--color-text-tertiary)]">
-              <span className="font-medium uppercase tracking-wider">{artifact.artifact_type}</span>
+            <h2 className="truncate text-[22px] font-normal leading-[28px] tracking-normal text-on-surface">{artifact.title}</h2>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[11px] leading-tight text-on-surface-variant">
+              <span className="font-medium uppercase tracking-wider text-on-surface-variant">{artifact.artifact_type}</span>
               <span aria-hidden="true">·</span>
               {/* §102 — version selector popover with per-version actions */}
               <Popover
@@ -331,39 +331,39 @@ function ArtifactPanelBody({
                 align="start"
                 trigger={
                   <button
-                    className="cursor-pointer font-semibold text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text)]"
+                    className="cursor-pointer font-semibold text-on-surface-variant transition-colors duration-micro ease-emphasized hover:text-on-surface focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none rounded-full px-1.5 py-0.5 -my-0.5 relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] active:before:opacity-[0.10] before:transition-opacity before:duration-micro motion-reduce:transition-none motion-reduce:before:transition-none"
                     aria-label={`Version ${activeVersionNumber} — open version history`}
                   >
                     v{activeVersionNumber}
                   </button>
                 }
               >
-                <div className="max-h-72 w-72 overflow-y-auto" role="listbox" aria-label="Artifact versions">
+                <div className="max-h-72 w-72 overflow-y-auto bg-surface-container-high rounded-md" role="listbox" aria-label="Artifact versions">
                   {[...effectiveVersions].sort((a, b) => b.version_number - a.version_number).map((v) => {
                     const isActive = v.version_number === activeVersionNumber;
                     return (
                       <div
                         key={v.version_number}
                         className={cn(
-                          'mb-1 rounded-lg border p-2.5 text-left transition-colors',
-                          isActive ? 'border-[var(--color-border-strong)] bg-[var(--color-surface-hover)]' : 'border-transparent hover:bg-[var(--color-surface-hover)]',
+                          'mb-1 rounded-md border p-2.5 text-left transition-colors duration-micro ease-emphasized motion-reduce:transition-none relative isolate overflow-hidden',
+                          isActive ? 'border-outline bg-surface-container-high' : 'border-transparent hover:bg-surface-container-high before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity',
                         )}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <button
-                            className="min-w-0 cursor-pointer text-left"
+                            className="min-w-0 cursor-pointer text-left focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none rounded-sm motion-reduce:transition-none"
                             onClick={() => {
                               onSelectVersion(v.version_number);
                               setVersionMenuOpen(false);
                             }}
                             aria-label={`View version ${v.version_number}`}
                           >
-                            <span className="text-xs font-bold text-[var(--color-text)]">v{v.version_number}</span>
-                            <span className="ml-2 text-[10px] text-[var(--color-text-secondary)]">
+                            <span className="text-xs font-bold text-on-surface">v{v.version_number}</span>
+                            <span className="ml-2 text-[10px] text-on-surface-variant">
                               {v.created_by_name} · {relativeTime(v.created_at)}
                             </span>
                             {v.ai_run_id && (
-                              <span className="ml-1 text-[10px] text-[var(--color-text-tertiary)]">· AI run</span>
+                              <span className="ml-1 text-[10px] text-on-surface-variant">· AI run</span>
                             )}
                           </button>
                           <div className="flex shrink-0 items-center gap-1">
@@ -386,7 +386,7 @@ function ArtifactPanelBody({
                           </div>
                         </div>
                         {v.change_summary && (
-                          <p className="mt-1 line-clamp-2 text-[10px] text-[var(--color-text-tertiary)]">{v.change_summary}</p>
+                          <p className="mt-1 line-clamp-2 text-[10px] text-on-surface-variant">{v.change_summary}</p>
                         )}
                       </div>
                     );
@@ -408,7 +408,7 @@ function ArtifactPanelBody({
           <Tooltip content={artifact.pinned ? 'Unpin from Garage' : 'Pin to Garage'}>
             <IconButton aria-label={artifact.pinned ? 'Unpin artifact' : 'Pin artifact'} size="xs"
               onClick={() => togglePin(artifact.id)}>
-              <Pin className={cn('h-3.5 w-3.5', artifact.pinned && 'fill-current text-amber-500')} />
+              <Pin className={cn('h-3.5 w-3.5', artifact.pinned && 'fill-current text-tertiary')} />
             </IconButton>
           </Tooltip>
 
@@ -424,7 +424,7 @@ function ArtifactPanelBody({
       {/* ─── Body (§291 isolated viewers; §100 completion glow once; §41 spectral border during construction) ──────── */}
       <div
         className={cn(
-          'flex min-h-0 flex-1 flex-col overflow-hidden',
+          'flex min-h-0 flex-1 flex-col overflow-hidden bg-surface-container-low',
           glowing && 'completion-glow',
           isConstructing && 'spectral-border',
         )}
@@ -445,4 +445,3 @@ function ArtifactPanelBody({
  * comparison is sufficient — no custom comparator that could go stale.
  */
 export const ArtifactPanel = memo(ArtifactPanelBody);
-

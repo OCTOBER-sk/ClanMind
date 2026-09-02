@@ -15,16 +15,16 @@ export interface UnsupportedArtifactCardProps {
  */
 export function UnsupportedArtifactCard({ onViewRaw, onExportRaw, onUpdate }: UnsupportedArtifactCardProps) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-xs space-y-4 bg-[var(--color-surface-raised)]" role="status" aria-label="Unsupported artifact">
-      <div className="p-3 rounded-full bg-[var(--color-warning-bg)] border border-[var(--color-warning)]/20">
-        <AlertCircle className="w-8 h-8 text-[var(--color-warning)]" aria-hidden="true" />
+    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-xs space-y-4 bg-surface-container-low motion-reduce:transition-none" role="status" aria-label="Unsupported artifact">
+      <div className="p-3 rounded-full bg-surface-container border border-outline-variant">
+        <AlertCircle className="w-8 h-8 text-on-surface-variant" aria-hidden="true" />
       </div>
 
       <div className="max-w-sm space-y-1">
-        <h3 className="font-bold text-sm text-[var(--color-text)]">
+        <h3 className="font-bold text-sm text-on-surface">
           This artifact was created by a newer ClanMind version.
         </h3>
-        <p className="text-[var(--color-text-secondary)]">
+        <p className="text-on-surface-variant">
           Update to view it here — or open the raw source below. Everything else in
           ClanMind keeps working.
         </p>
