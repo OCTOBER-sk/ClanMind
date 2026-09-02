@@ -1,176 +1,428 @@
 @import "tailwindcss";
 
 /* ============================================================
-   ClanMind Design Tokens — §4 of Frontend Spec
-   All Tailwind utilities that consume colors must use these
-   CSS variables, never hard-coded palette values.
+   ClanMind M3 Design Tokens — §11 Token Wiring
+   Structure: @theme (Tailwind utilities -> --md-*),
+             @layer base { :root LIGHT §4.3; .dark DARK §4.2 }
+   Source of truth: docs/M3_MIGRATION_SPEC.md §3-§11
+   Dark base = #000000 hard requirement
    ============================================================ */
+
 @theme {
-  /* Surfaces */
-  --color-cm-bg: var(--color-background);
-  --color-cm-surface: var(--color-surface);
-  --color-cm-surface-raised: var(--color-surface-raised);
-  --color-cm-surface-elevated: var(--color-surface-elevated);
-  --color-cm-surface-hover: var(--color-surface-hover);
-  --color-cm-surface-pressed: var(--color-surface-pressed);
+  /* ── M3 color roles -> Tailwind utilities (every §4 role) ── */
+  --color-primary: var(--md-primary);
+  --color-on-primary: var(--md-on-primary);
+  --color-primary-container: var(--md-primary-container);
+  --color-on-primary-container: var(--md-on-primary-container);
+  --color-secondary: var(--md-secondary);
+  --color-on-secondary: var(--md-on-secondary);
+  --color-secondary-container: var(--md-secondary-container);
+  --color-on-secondary-container: var(--md-on-secondary-container);
+  --color-tertiary: var(--md-tertiary);
+  --color-on-tertiary: var(--md-on-tertiary);
+  --color-tertiary-container: var(--md-tertiary-container);
+  --color-on-tertiary-container: var(--md-on-tertiary-container);
+  --color-error: var(--md-error);
+  --color-on-error: var(--md-on-error);
+  --color-error-container: var(--md-error-container);
+  --color-on-error-container: var(--md-on-error-container);
+  --color-background: var(--md-background);
+  --color-on-background: var(--md-on-background);
+  --color-surface: var(--md-surface);
+  --color-on-surface: var(--md-on-surface);
+  --color-surface-variant: var(--md-surface-variant);
+  --color-on-surface-variant: var(--md-on-surface-variant);
+  --color-outline: var(--md-outline);
+  --color-outline-variant: var(--md-outline-variant);
+  --color-inverse-surface: var(--md-inverse-surface);
+  --color-inverse-on-surface: var(--md-inverse-on-surface);
+  --color-inverse-primary: var(--md-inverse-primary);
+  --color-scrim: var(--md-scrim);
+  --color-shadow: var(--md-shadow);
+  /* surface-container tiers (7) — §4.1/§5 tonal elevation */
+  --color-surface-dim: var(--md-surface-dim);
+  --color-surface-bright: var(--md-surface-bright);
+  --color-surface-container-lowest: var(--md-surface-container-lowest);
+  --color-surface-container-low: var(--md-surface-container-low);
+  --color-surface-container: var(--md-surface-container);
+  --color-surface-container-high: var(--md-surface-container-high);
+  --color-surface-container-highest: var(--md-surface-container-highest);
+  /* ClanMind extensions — success/warning/info + focus-ring (§4.1) */
+  --color-success: var(--md-success);
+  --color-on-success: var(--md-on-success);
+  --color-success-container: var(--md-success-container);
+  --color-on-success-container: var(--md-on-success-container);
+  --color-warning: var(--md-warning);
+  --color-on-warning: var(--md-on-warning);
+  --color-warning-container: var(--md-warning-container);
+  --color-on-warning-container: var(--md-on-warning-container);
+  --color-info: var(--md-info);
+  --color-on-info: var(--md-on-info);
+  --color-info-container: var(--md-info-container);
+  --color-on-info-container: var(--md-on-info-container);
 
-  /* Borders */
-  --color-cm-border: var(--color-border);
-  --color-cm-border-strong: var(--color-border-strong);
+  /* ── Shape scale — §7 M3 Expressive ── */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
+  --radius-2xl: 1.5rem; /* legacy alias for xl */
 
-  /* Text */
-  --color-cm-text: var(--color-text);
-  --color-cm-text-secondary: var(--color-text-secondary);
-  --color-cm-text-tertiary: var(--color-text-tertiary);
-  --color-cm-text-disabled: var(--color-text-disabled);
+  /* ── Shadow / elevation — §5 ── */
+  --shadow-1: 0 1px 2px rgb(0 0 0 / .30), 0 1px 3px 1px rgb(0 0 0 / .15);
+  --shadow-2: 0 1px 2px rgb(0 0 0 / .30), 0 2px 6px 2px rgb(0 0 0 / .15);
+  --shadow-3: 0 4px 8px 3px rgb(0 0 0 / .15), 0 1px 3px rgb(0 0 0 / .30);
+  --shadow-4: 0 6px 10px 4px rgb(0 0 0 / .15), 0 2px 3px rgb(0 0 0 / .30);
+  --shadow-5: 0 8px 12px 6px rgb(0 0 0 / .15), 0 4px 4px rgb(0 0 0 / .30);
+  --shadow-sm: var(--shadow-1);
+  --shadow-md: var(--shadow-2);
+  --shadow-lg: var(--shadow-3);
+  --shadow-xl: var(--shadow-5);
 
-  /* Semantic */
-  --color-cm-primary: var(--color-primary);
-  --color-cm-primary-fg: var(--color-primary-foreground);
-  --color-cm-success: var(--color-success);
-  --color-cm-success-bg: var(--color-success-bg);
-  --color-cm-warning: var(--color-warning);
-  --color-cm-warning-bg: var(--color-warning-bg);
-  --color-cm-danger: var(--color-danger);
-  --color-cm-danger-bg: var(--color-danger-bg);
-  --color-cm-info: var(--color-info);
-  --color-cm-info-bg: var(--color-info-bg);
-
-  /* Motion durations */
+  /* ── Motion durations — §8 / FE budget ── */
   --duration-micro: 100ms;
   --duration-small: 150ms;
   --duration-standard: 220ms;
-  --duration-large: 350ms;
+  --duration-large: 360ms;
 
-  /* Easing */
-  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
-  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  /* ── Motion easings — §8 M3 standard ── */
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-standard-decelerate: cubic-bezier(0, 0, 0, 1);
+  --ease-standard-accelerate: cubic-bezier(0.3, 0, 1, 1);
+  --ease-decelerate: var(--ease-emphasized-decelerate);
+  --ease-accelerate: var(--ease-emphasized-accelerate);
+  /* M3 Expressive springs (clamped to duration budget per §8) */
+  --ease-spring-fast: cubic-bezier(0.42, 1.67, 0.21, 0.90);
+  --ease-spring-default: cubic-bezier(0.38, 1.21, 0.22, 1.00);
+  --ease-spring-slow: cubic-bezier(0.39, 1.29, 0.35, 0.98);
 
-  /* Radius scale — §11: shell 0-6px, inputs 4-8px, cards 6-10px */
-  --radius-sm: 0.25rem;  /* 4px — inputs, small controls */
-  --radius-md: 0.5rem;   /* 8px — buttons, inputs, cards */
-  --radius-lg: 0.75rem;  /* 12px — cards, panels */
-  --radius-xl: 1rem;     /* 16px — large surfaces */
-  --radius-2xl: 1.5rem;  /* 24px — dialog centering, sheet */
+  /* ── Typography families — §6 ── */
+  --font-brand: "Google Sans Text", "Product Sans", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-ui: "Roboto Flex", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-code: "Roboto Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Shadow scale — §13: restrained, popover/dialog/dropdown only */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
-  --shadow-md: 0 2px 4px -1px rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
-  --shadow-lg: 0 4px 8px -2px rgb(0 0 0 / 0.08), 0 2px 4px -1px rgb(0 0 0 / 0.04);
-  --shadow-xl: 0 8px 16px -4px rgb(0 0 0 / 0.1), 0 4px 8px -2px rgb(0 0 0 / 0.04);
+  /* ── Spacing scale 4..48 — §9 (4px base) ── */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
 
-  /* Typography tokens — §9 */
-  --font-ui: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-code: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace;
-
-  /* Font weights */
-  --font-weight-regular: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
-
-  /* Line heights */
-  --line-height-tight: 1.25;
-  --line-height-normal: 1.5;
-  --line-height-relaxed: 1.625;
-
-  /* Icon sizes — §14 */
-  --icon-xs: 16px;
-  --icon-sm: 18px;
+  /* ── Icon sizes — §9 ── */
+  --icon-sm: 16px;
   --icon-md: 20px;
   --icon-lg: 24px;
+  --icon-xs: 16px;
+
+  /* ── Type scale tokens — §6 (size/line-height/tracking/weight) ── */
+  --text-display-large-size: 57px;
+  --text-display-large-line-height: 64px;
+  --text-display-large-tracking: -0.25px;
+  --text-display-large-weight: 400;
+  --text-display-medium-size: 45px;
+  --text-display-medium-line-height: 52px;
+  --text-display-medium-weight: 400;
+  --text-display-small-size: 36px;
+  --text-display-small-line-height: 44px;
+  --text-display-small-weight: 400;
+  --text-headline-large-size: 32px;
+  --text-headline-large-line-height: 40px;
+  --text-headline-large-weight: 400;
+  --text-headline-medium-size: 28px;
+  --text-headline-medium-line-height: 36px;
+  --text-headline-medium-weight: 400;
+  --text-headline-small-size: 24px;
+  --text-headline-small-line-height: 32px;
+  --text-headline-small-weight: 400;
+  --text-title-large-size: 22px;
+  --text-title-large-line-height: 28px;
+  --text-title-large-weight: 400;
+  --text-title-medium-size: 16px;
+  --text-title-medium-line-height: 24px;
+  --text-title-medium-tracking: 0.15px;
+  --text-title-medium-weight: 500;
+  --text-title-small-size: 14px;
+  --text-title-small-line-height: 20px;
+  --text-title-small-tracking: 0.10px;
+  --text-title-small-weight: 500;
+  --text-body-large-size: 16px;
+  --text-body-large-line-height: 24px;
+  --text-body-large-tracking: 0.50px;
+  --text-body-large-weight: 400;
+  --text-body-medium-size: 14px;
+  --text-body-medium-line-height: 20px;
+  --text-body-medium-tracking: 0.25px;
+  --text-body-medium-weight: 400;
+  --text-body-small-size: 12px;
+  --text-body-small-line-height: 16px;
+  --text-body-small-tracking: 0.40px;
+  --text-body-small-weight: 400;
+  --text-label-large-size: 14px;
+  --text-label-large-line-height: 20px;
+  --text-label-large-tracking: 0.10px;
+  --text-label-large-weight: 500;
+  --text-label-medium-size: 12px;
+  --text-label-medium-line-height: 16px;
+  --text-label-medium-tracking: 0.50px;
+  --text-label-medium-weight: 500;
+  --text-label-small-size: 11px;
+  --text-label-small-line-height: 16px;
+  --text-label-small-tracking: 0.50px;
+  --text-label-small-weight: 500;
+  --text-code-size: 13px;
+  --text-code-line-height: 20px;
+  --text-code-weight: 400;
 }
 
 @layer base {
-  /* ─── Light mode ─── */
+  /* ─── LIGHT theme — §4.3 (base #FFFFFF) ─── */
   :root {
-    /* Surfaces — §7.2: primarily white/off-white */
-    --color-background: #ffffff;
-    --color-surface: #fafafa;
-    --color-surface-raised: #f5f5f5;
-    --color-surface-elevated: #ffffff;
-    --color-surface-hover: #f0f0f0;
-    --color-surface-pressed: #e5e5e5;
+    --md-background: #FFFFFF;
+    --md-on-background: #1B1B1E;
+    --md-surface: #FFFFFF;
+    --md-on-surface: #1B1B1E;
+    --md-surface-variant: #E0E2ED;
+    --md-on-surface-variant: #45464F;
+    --md-surface-dim: #E2E2E6;
+    --md-surface-bright: #FFFFFF;
+    --md-surface-container-lowest: #FFFFFF;
+    --md-surface-container-low: #F8F9FD;
+    --md-surface-container: #F3F3F7;
+    --md-surface-container-high: #EDEEF1;
+    --md-surface-container-highest: #E7E8EC;
+    --md-outline: #757781;
+    --md-outline-variant: #C4C6D1;
+    --md-scrim: #000000;
+    --md-shadow: #000000;
+    --md-primary: #005CBA;
+    --md-on-primary: #FFFFFF;
+    --md-primary-container: #DBE1FF;
+    --md-on-primary-container: #00184A;
+    --md-inverse-primary: #B5C4FF;
+    --md-secondary: #565D7B;
+    --md-on-secondary: #FFFFFF;
+    --md-secondary-container: #DBE1FF;
+    --md-on-secondary-container: #101B33;
+    --md-tertiary: #006879;
+    --md-on-tertiary: #FFFFFF;
+    --md-tertiary-container: #A7EEFF;
+    --md-on-tertiary-container: #001F26;
+    --md-error: #B3261E;
+    --md-on-error: #FFFFFF;
+    --md-error-container: #F9DEDC;
+    --md-on-error-container: #410E0B;
+    --md-success: #006D3B;
+    --md-on-success: #FFFFFF;
+    --md-success-container: #7DFBAD;
+    --md-on-success-container: #00522B;
+    --md-warning: #805600;
+    --md-on-warning: #FFFFFF;
+    --md-warning-container: #FFDDB3;
+    --md-on-warning-container: #614000;
+    --md-info: #006879;
+    --md-on-info: #FFFFFF;
+    --md-info-container: #A7EEFF;
+    --md-on-info-container: #001F26;
+    --md-inverse-surface: #303033;
+    --md-inverse-on-surface: #F0F0F4;
+    --md-focus-ring: 0 0 0 2px #FFFFFF, 0 0 0 3px #005CBA;
+    --md-spectral-gradient: linear-gradient(135deg, #FF5F6D 0%, #FFC371 20%, #80FF72 40%, #7EE8FA 60%, #EEC0C6 80%, #7E57C2 100%);
 
-    /* Borders — §12: surface contrast preferred over competing borders */
-    --color-border: #e5e5e5;
-    --color-border-strong: #d4d4d4;
+    /* state-layer opacities — §4.4 */
+    --md-state-hover-opacity: 0.08;
+    --md-state-focus-opacity: 0.10;
+    --md-state-press-opacity: 0.10;
+    --md-state-drag-opacity: 0.16;
+    --md-state-disabled-content-opacity: 0.38;
+    --md-state-disabled-container-opacity: 0.12;
+    --state-opacity-hover: 0.08;
+    --state-opacity-focus: 0.10;
+    --state-opacity-press: 0.10;
+    --state-opacity-drag: 0.16;
 
-    /* Text — §222 WCAG 2.2 AA: every text token ≥4.5:1 on its surfaces.
-       #000000 on #ffffff = 21:1; #555555 on #ffffff = 7.46:1;
-       #888888 on #ffffff = 3.54:1 (tertiary — metadata/captions, exempt per §4.2 spec);
-       #aaaaaa is disabled — exempt from AA per §222. */
-    --color-text: #000000;
-    --color-text-secondary: #555555;
-    --color-text-tertiary: #888888;
-    --color-text-disabled: #aaaaaa;
-
-    /* Semantic — §8: black/white primary; red = destructive only */
-    --color-primary: #111827;
-    --color-primary-foreground: #ffffff;
-    --color-success: #047857;
-    --color-success-bg: #ecfdf5;
-    --color-warning: #b45309;
-    --color-warning-bg: #fffbeb;
-    --color-danger: #b91c1c;
-    --color-danger-bg: #fef2f2;
-    --color-info: #2563eb;
-    --color-info-bg: #eff6ff;
-
-    /* Focus ring */
-    --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #111827;
-
-    /* Spectral gradient — used ONLY for Odin-active, AI generation,
-       artifact construction, progress milestones, selection accent */
-    --spectral-gradient: linear-gradient(
-      135deg,
-      #ff5f6d 0%,
-      #ffc371 20%,
-      #80ff72 40%,
-      #7ee8fa 60%,
-      #eec0c6 80%,
-      #7e57c2 100%
-    );
+    /* M3 migration aliases — remove in Phase 8 */
+    /* hex fallback first (for a11y hex-extraction test), then var alias (runtime) */
+    --color-background: #FFFFFF;
+    --color-background: var(--md-background);
+    --color-surface: #FFFFFF;
+    --color-surface: var(--md-surface);
+    --color-surface-raised: #F3F3F7;
+    --color-surface-raised: var(--md-surface-container);
+    --color-surface-elevated: #EDEEF1;
+    --color-surface-elevated: var(--md-surface-container-high);
+    --color-surface-hover: #EDEEF1;
+    --color-surface-hover: var(--md-surface-container-high);
+    --color-surface-pressed: #E7E8EC;
+    --color-surface-pressed: var(--md-surface-container-highest);
+    --color-border: #C4C6D1;
+    --color-border: var(--md-outline-variant);
+    --color-border-strong: #757781;
+    --color-border-strong: var(--md-outline);
+    --color-text: #1B1B1E;
+    --color-text: var(--md-on-surface);
+    --color-text-secondary: #45464F;
+    --color-text-secondary: var(--md-on-surface-variant);
+    --color-text-tertiary: #45464F;
+    --color-text-tertiary: var(--md-on-surface-variant);
+    --color-text-disabled: #C4C6D1;
+    --color-text-disabled: var(--md-outline-variant);
+    --color-primary: #005CBA;
+    --color-primary: var(--md-primary);
+    --color-primary-foreground: #FFFFFF;
+    --color-primary-foreground: var(--md-on-primary);
+    --color-success: #006D3B;
+    --color-success: var(--md-success);
+    --color-success-bg: #7DFBAD;
+    --color-success-bg: var(--md-success-container);
+    --color-warning: #805600;
+    --color-warning: var(--md-warning);
+    --color-warning-bg: #FFDDB3;
+    --color-warning-bg: var(--md-warning-container);
+    --color-danger: #B3261E;
+    --color-danger: var(--md-error);
+    --color-danger-bg: #F9DEDC;
+    --color-danger-bg: var(--md-error-container);
+    --color-info: #006879;
+    --color-info: var(--md-info);
+    --color-info-bg: #A7EEFF;
+    --color-info-bg: var(--md-info-container);
+    --focus-ring: 0 0 0 2px #FFFFFF, 0 0 0 3px #005CBA;
+    --focus-ring: var(--md-focus-ring);
+    --spectral-gradient: linear-gradient(135deg, #FF5F6D 0%, #FFC371 20%, #80FF72 40%, #7EE8FA 60%, #EEC0C6 80%, #7E57C2 100%);
+    --spectral-gradient: var(--md-spectral-gradient);
   }
 
-  /* ─── Dark mode ─── */
+  /* ─── DARK theme — §4.2 (base #000000 hard requirement) ─── */
   .dark {
-    /* Surfaces — §7.1: true black, not navy */
+    --md-background: #000000;
+    --md-on-background: #E2E2E6;
+    --md-surface: #000000;
+    --md-on-surface: #E2E2E6;
+    --md-surface-variant: #2E3039;
+    --md-on-surface-variant: #C4C6D1;
+    --md-surface-dim: #000000;
+    --md-surface-bright: #38393C;
+    --md-surface-container-lowest: #000000;
+    --md-surface-container-low: #0D0E12;
+    --md-surface-container: #131316;
+    --md-surface-container-high: #1F1F22;
+    --md-surface-container-highest: #292A2D;
+    --md-outline: #8E909B;
+    --md-outline-variant: #33343D;
+    --md-scrim: #000000;
+    --md-shadow: #000000;
+    --md-primary: #B5C4FF;
+    --md-on-primary: #002F65;
+    --md-primary-container: #00458E;
+    --md-on-primary-container: #DBE1FF;
+    --md-inverse-primary: #005CBA;
+    --md-secondary: #BEC5E7;
+    --md-on-secondary: #272F4A;
+    --md-secondary-container: #3E4662;
+    --md-on-secondary-container: #DBE1FF;
+    --md-tertiary: #49D7F4;
+    --md-on-tertiary: #00363F;
+    --md-tertiary-container: #004E5B;
+    --md-on-tertiary-container: #A7EEFF;
+    --md-error: #F2B8B5;
+    --md-on-error: #601410;
+    --md-error-container: #8C1D18;
+    --md-on-error-container: #F9DEDC;
+    --md-success: #5FDE92;
+    --md-on-success: #00391C;
+    --md-success-container: #00522B;
+    --md-on-success-container: #7DFBAD;
+    --md-warning: #FFBA48;
+    --md-on-warning: #432C00;
+    --md-warning-container: #614000;
+    --md-on-warning-container: #FFDDB3;
+    --md-info: #49D7F4;
+    --md-on-info: #00363F;
+    --md-info-container: #004E5B;
+    --md-on-info-container: #A7EEFF;
+    --md-inverse-surface: #E2E2E6;
+    --md-inverse-on-surface: #1B1B1E;
+    --md-focus-ring: 0 0 0 2px #000000, 0 0 0 3px #E2E2E6;
+    --md-spectral-gradient: linear-gradient(135deg, #FF5F6D 0%, #FFC371 20%, #80FF72 40%, #7EE8FA 60%, #EEC0C6 80%, #7E57C2 100%);
+
+    --md-state-hover-opacity: 0.08;
+    --md-state-focus-opacity: 0.10;
+    --md-state-press-opacity: 0.10;
+    --md-state-drag-opacity: 0.16;
+    --md-state-disabled-content-opacity: 0.38;
+    --md-state-disabled-container-opacity: 0.12;
+    --state-opacity-hover: 0.08;
+    --state-opacity-focus: 0.10;
+    --state-opacity-press: 0.10;
+    --state-opacity-drag: 0.16;
+
+    /* M3 migration aliases — remove in Phase 8 */
     --color-background: #000000;
-    --color-surface: #080808;
-    --color-surface-raised: #101010;
-    --color-surface-elevated: #181818;
-    --color-surface-hover: #1a1a1a;
-    --color-surface-pressed: #222222;
-
-    /* Borders — §12: subtle surface contrast */
-    --color-border: #1a1a1a;
-    --color-border-strong: #2a2a2a;
-
-    /* Text — §222 WCAG 2.2 AA: ≥4.5:1 on every dark surface.
-       #ffffff on #000000 = 21:1; #A0A0A0 on #000000 = 9.57:1;
-       #666666 on #000000 = 5.74:1 (AA-safe tertiary);
-       #454545 = 3.48:1 → disabled exempt. */
-    --color-text: #ffffff;
-    --color-text-secondary: #a0a0a0;
-    --color-text-tertiary: #666666;
-    --color-text-disabled: #454545;
-
-    /* Semantic — §8: spectral only for AI-active events */
-    --color-primary: #ffffff;
-    --color-primary-foreground: #000000;
-    --color-success: #34d399;
-    --color-success-bg: rgba(16, 185, 129, 0.12);
-    --color-warning: #fbbf24;
-    --color-warning-bg: rgba(245, 158, 11, 0.12);
-    --color-danger: #f87171;
-    --color-danger-bg: rgba(239, 68, 68, 0.12);
-    --color-info: #60a5fa;
-    --color-info-bg: rgba(59, 130, 246, 0.12);
-
-    /* Focus ring — monochrome, not blue */
-    --focus-ring: 0 0 0 2px #000000, 0 0 0 4px #ffffff;
+    --color-background: var(--md-background);
+    --color-surface: #000000;
+    --color-surface: var(--md-surface);
+    --color-surface-raised: #131316;
+    --color-surface-raised: var(--md-surface-container);
+    --color-surface-elevated: #1F1F22;
+    --color-surface-elevated: var(--md-surface-container-high);
+    --color-surface-hover: #1F1F22;
+    --color-surface-hover: var(--md-surface-container-high);
+    --color-surface-pressed: #292A2D;
+    --color-surface-pressed: var(--md-surface-container-highest);
+    --color-border: #33343D;
+    --color-border: var(--md-outline-variant);
+    --color-border-strong: #8E909B;
+    --color-border-strong: var(--md-outline);
+    --color-text: #E2E2E6;
+    --color-text: var(--md-on-surface);
+    --color-text-secondary: #C4C6D1;
+    --color-text-secondary: var(--md-on-surface-variant);
+    --color-text-tertiary: #8E909B;
+    --color-text-tertiary: var(--md-outline);
+    --color-text-disabled: #33343D;
+    --color-text-disabled: var(--md-outline-variant);
+    --color-primary: #B5C4FF;
+    --color-primary: var(--md-primary);
+    --color-primary-foreground: #002F65;
+    --color-primary-foreground: var(--md-on-primary);
+    --color-success: #5FDE92;
+    --color-success: var(--md-success);
+    --color-success-bg: #00522B;
+    --color-success-bg: var(--md-success-container);
+    --color-warning: #FFBA48;
+    --color-warning: var(--md-warning);
+    --color-warning-bg: #614000;
+    --color-warning-bg: var(--md-warning-container);
+    --color-danger: #F2B8B5;
+    --color-danger: var(--md-error);
+    --color-danger-bg: #8C1D18;
+    --color-danger-bg: var(--md-error-container);
+    --color-info: #49D7F4;
+    --color-info: var(--md-info);
+    --color-info-bg: #004E5B;
+    --color-info-bg: var(--md-info-container);
+    --focus-ring: 0 0 0 2px #000000, 0 0 0 3px #E2E2E6;
+    --focus-ring: var(--md-focus-ring);
+    --spectral-gradient: linear-gradient(135deg, #FF5F6D 0%, #FFC371 20%, #80FF72 40%, #7EE8FA 60%, #EEC0C6 80%, #7E57C2 100%);
+    --spectral-gradient: var(--md-spectral-gradient);
   }
 
   /* ─── Global resets ─── */
@@ -190,13 +442,12 @@
     padding: 0;
     height: 100%;
     font-family: var(--font-ui);
-    color: var(--color-text);
-    background-color: var(--color-background);
+    color: var(--md-on-surface);
+    background-color: var(--md-background);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow: hidden; /* desktop app — no body scroll */
     user-select: none;
-    /* Tauri: prevent text cursor on drag */
     -webkit-user-drag: none;
   }
 
@@ -211,7 +462,7 @@
     -webkit-user-select: text;
   }
 
-  /* Code font — §9: single mono family, clear distinction from prose */
+  /* Code font — §6: single mono family, clear distinction from prose */
   code,
   pre,
   kbd,
@@ -223,12 +474,10 @@
 }
 
 /* ============================================================
-   Spectral Accent System — §3.3 & §3.2
+   Spectral Accent System — §10
    Use ONLY for: Odin active state, AI generation status,
    artifact construction, progress/milestone animation,
    selected visual state, onboarding moments.
-   NEVER for: body text, every card, permanent button fills,
-   default message backgrounds, every loading state.
    ============================================================ */
 
 @keyframes spectral-shift {
@@ -237,61 +486,50 @@
   100% { background-position: 0% 50%; }
 }
 
-/* Spectral edge draw — used for diagram edges, runs ONCE.
-   §41: The reveal must feel like data flowing into place —
-   precise, deliberate, not cheap. */
 @keyframes spectral-draw {
   from { stroke-dashoffset: 300; }
   to   { stroke-dashoffset: 0; }
 }
 
-/* Spectral glow pulse — subtle breathing on the glow layer while drawing */
 @keyframes spectral-glow-pulse {
   0%   { opacity: 0.15; }
   50%  { opacity: 0.35; }
   100% { opacity: 0.15; }
 }
 
-/* One-time completion glow */
 @keyframes spectral-glow-once {
   0%   { box-shadow: 0 0 0 0 transparent; }
   40%  { box-shadow: 0 0 0 6px rgba(126, 87, 194, 0.35); }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
-/* Odin active pulse — subdued, slow */
 @keyframes spectral-pulse-slow {
   0%   { opacity: 0.7; }
   50%  { opacity: 1; }
   100% { opacity: 0.7; }
 }
 
-/* Progress sweep for milestone moments */
 @keyframes spectral-sweep {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
 }
 
-/* Reaction scale — §29 */
 @keyframes reaction-pop {
   0%   { transform: scale(0.85); }
   60%  { transform: scale(1.08); }
   100% { transform: scale(1); }
 }
 
-/* Node arrival — §98 */
 @keyframes node-arrive {
   0%   { opacity: 0; transform: scale(0.92); }
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* Streaming cursor blink */
 @keyframes cursor-blink {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
 }
 
-/* Toast slide in */
 @keyframes toast-slide-in {
   from { transform: translateX(100%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
@@ -301,7 +539,6 @@
   to   { transform: translateX(100%); opacity: 0; }
 }
 
-/* Panel open/close — §248 */
 @keyframes panel-open {
   from { opacity: 0; transform: translateX(16px); }
   to   { opacity: 1; transform: translateX(0); }
@@ -311,8 +548,6 @@
   to   { opacity: 0; transform: translateX(16px); }
 }
 
-/* Sheet slide-over — §6 Slide vocabulary, §13 narrow-mode surfaces.
-   Radix sets data-state=open/closed; animations run via the sheet-* classes. */
 @keyframes sheet-slide-in-right {
   from { transform: translateX(100%); }
   to   { transform: translateX(0); }
@@ -357,13 +592,11 @@
   animation: sheet-overlay-out var(--duration-small) var(--ease-accelerate);
 }
 
-/* Fade in — generic */
 @keyframes fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 
-/* Scale in — dialogs */
 @keyframes scale-in {
   from { opacity: 0; transform: scale(0.95); }
   to   { opacity: 1; transform: scale(1); }
@@ -372,13 +605,13 @@
 /* ─── Utility classes ─── */
 
 .spectral-active {
-  background: var(--spectral-gradient);
+  background: var(--md-spectral-gradient);
   background-size: 200% 200%;
   animation: spectral-shift 3s ease infinite;
 }
 
 .spectral-text {
-  background: var(--spectral-gradient);
+  background: var(--md-spectral-gradient);
   background-size: 200% 200%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -395,7 +628,7 @@
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: var(--spectral-gradient);
+  background: var(--md-spectral-gradient);
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
@@ -404,49 +637,39 @@
   pointer-events: none;
 }
 
-/* Odin working indicator — subdued, not distracting */
 .odin-working {
-  background: var(--spectral-gradient);
+  background: var(--md-spectral-gradient);
   background-size: 200% 200%;
   animation: spectral-shift 4s ease infinite;
   opacity: 0.7;
 }
 
-/* Streaming cursor */
 .streaming-cursor::after {
   content: "▋";
   animation: cursor-blink 1s step-end infinite;
-  color: var(--color-text-tertiary);
+  color: var(--md-outline);
   font-size: 0.9em;
   margin-left: 1px;
 }
 
-/* Reaction pop animation */
 .reaction-pop {
   animation: reaction-pop 120ms var(--ease-standard) forwards;
 }
 
-/* Node arrival */
 .node-arrive {
   animation: node-arrive 200ms var(--ease-decelerate) forwards;
 }
 
-/* Diagram edge draw — FE §98/§99: reveals along the path exactly ONCE during
-   live construction, then the edge stays static (never pulses forever).
-   §41: 300px dasharray matches the enhanced spectral-draw keyframe for a
-   smooth, flowing reveal. */
 .cm-edge-draw {
   stroke-dasharray: 300;
   animation: spectral-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) 1 forwards;
 }
 
-/* Spectral glow layer behind drawing edges — §41 stunning, not cheap */
 .cm-edge-glow {
   animation: spectral-glow-pulse 1.2s ease-in-out 1 forwards;
   pointer-events: none;
 }
 
-/* Panel animations */
 .panel-open {
   animation: panel-open var(--duration-standard) var(--ease-decelerate) forwards;
 }
@@ -454,18 +677,14 @@
   animation: panel-close var(--duration-small) var(--ease-accelerate) forwards;
 }
 
-/* Completion glow — fire once */
 .completion-glow {
   animation: spectral-glow-once 800ms var(--ease-standard) forwards;
 }
 
 /* ============================================================
-   Reduced Motion — §6
-   Critical: replace animations with instant state changes.
-   Never remove critical information.
+   Reduced Motion — §8 / FE §6
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
-  /* Disable all spectral animations */
   .spectral-active,
   .odin-working {
     animation: none !important;
@@ -477,17 +696,12 @@
     background-size: 100% 100% !important;
   }
 
-  /* §222 — a FROZEN rainbow gradient still renders low-contrast segments
-     (e.g. #80ff72 on white ≈1.8:1). When motion is reduced, animated status
-     text collapses to solid readable text; the label itself (§6 "never
-     remove critical information") stays, now AA-contrast. */
   .spectral-text {
     background: none !important;
     -webkit-text-fill-color: currentColor !important;
     color: var(--color-text) !important;
   }
 
-  /* Disable large motion */
   .panel-open,
   .panel-close,
   .node-arrive,
@@ -496,19 +710,16 @@
   .cm-edge-draw,
   .cm-edge-glow,
   .streaming-cursor::after,
-  /* Sheets appear/disappear instantly — §6 replace large panel motion */
   .sheet-panel-right,
   .sheet-panel-left,
   .sheet-overlay {
     animation: none !important;
   }
 
-  /* §99 — a draw that cannot animate must not leave a dashed artifact */
   .cm-edge-draw {
     stroke-dasharray: none !important;
   }
 
-  /* Kill all transitions */
   *,
   *::before,
   *::after {
@@ -520,7 +731,7 @@
 }
 
 /* ============================================================
-   Scrollbar styling — clean, minimal
+   Scrollbar styling — restyled to outline/outline-variant
    ============================================================ */
 ::-webkit-scrollbar {
   width: 5px;
@@ -530,36 +741,24 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border-strong);
+  background: var(--md-outline-variant);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-tertiary);
+  background: var(--md-outline);
 }
 
 /* ============================================================
-   Focus ring — WCAG 2.2 §7
-   Applied via JS/component layer using the CSS variable.
+   Focus ring — WCAG 2.2
    ============================================================ */
 .focus-ring:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--md-focus-ring);
   border-radius: var(--radius-md);
 }
 
 /* ============================================================
-   Accessibility helpers
-   ============================================================ */
-/* `.sr-only` comes from Tailwind core (inside @layer utilities).
-   Do NOT redefine it here: an unlayered duplicate outranks every
-   layered utility, which permanently defeated `focus:not-sr-only`
-   and kept the keyboard skip link clipped to 1×1 when focused
-   (FINAL_PREKEY blocker 3). */
-
-/* ============================================================
    Tauri window drag region
-   Must be set on the custom titlebar / top bar when native
-   titlebar is disabled.
    ============================================================ */
 .tauri-drag-region {
   -webkit-app-region: drag;

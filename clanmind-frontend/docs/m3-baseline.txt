@@ -1,0 +1,33 @@
+FAIL  src/design-system/tokens.a11y.test.ts > §222 — dark theme text tokens meet WCAG AA > --color-text-tertiary ≥ 4.5:1 on every surface
+FAIL  src/design-system/tokens.a11y.test.ts > §222 — light theme text tokens meet WCAG AA > --color-text-tertiary ≥ 4.5:1 on every surface
+FAIL  src/features/approvals/ApprovalCard.test.tsx > ApprovalCard — §164A generalized approval > non-GitHub kinds reuse the same shell with their own payload summary (§164A.5)
+FAIL  src/features/approvals/ApprovalCard.test.tsx > ApprovalCard — §164A generalized approval > reject path submits only the action id and resets its busy state (§163/§164A.1)
+FAIL  src/features/approvals/GitHubActionCard.test.tsx > GitHubActionCard — §163 dialog flow > dialog Approve submits the EXACT displayed hash+version once (§164A.2)
+FAIL  src/features/approvals/GitHubActionCard.test.tsx > GitHubActionCard — §163 dialog flow > rejects straight from the generic card without the confirm step
+FAIL  src/features/approvals/GitHubActionCard.test.tsx > GitHubActionCard — §163 dialog flow > routes "Review Changes" to the diff viewer binding (§162 entry point)
+FAIL  src/features/approvals/GitHubDiffViewer.test.tsx > GitHubDiffViewer — §164 high-impact merge dialog > Approve & Merge opens the exact §164 dialog before anything executes
+FAIL  src/features/artifacts/ArtifactPanel.test.tsx > ArtifactPanel > §200 — unknown artifact types show the update-to-view card, no crash
+FAIL  src/features/chat/aiStreamingUi.test.tsx > MessageRow AI run states (§137/§138/§139/§142) > FAILED run renders the §140 card with Retry / Try fallback
+FAIL  src/features/meetings/MeetingDialogs.test.tsx > MeetingEndSummaryDialog — §127/§124A.3/§128 > Review & Save posts the trimmed summary text and the §128 artifact choice
+FAIL  src/features/meetings/MeetingDialogs.test.tsx > MeetingEndSummaryDialog — §127/§124A.3/§128 > Save inside the review promotes only through onAcceptCandidate (real endpoint path)
+FAIL  src/features/meetings/MeetingDialogs.test.tsx > MeetingEndSummaryDialog — §127/§124A.3/§128 > an unsuccessful end (server error) keeps the dialog open and the meeting ACTIVE
+FAIL  src/features/meetings/MeetingDialogs.test.tsx > MeetingEndSummaryDialog — §127/§124A.3/§128 > unchecking the §128 box asks the caller not to create the Garage artifact
+FAIL  src/features/meetings/MeetingDialogs.test.tsx > MeetingStartDialog — §126 > a failed start leaves the meeting inactive with the dialog open for retry
+FAIL  src/features/meetings/MeetingDialogs.test.tsx > MeetingStartDialog — §126 > never starts without a Project context (§112 sessions are project-scoped)
+FAIL  src/features/meetings/MeetingDialogs.test.tsx > MeetingStartDialog — §126 > starts through POST /projects/:id/meetings and adopts the server session row
+FAIL  src/features/meetings/MeetingPanel.test.tsx > MeetingPanel — §124 sections & §124A candidate lifecycle > empty edit drafts cannot be saved
+FAIL  src/features/meetings/MeetingPanel.test.tsx > MeetingPanel — §124 sections & §124A candidate lifecycle > maps RESEARCH_NEED into Odin suggestions with a /research shortcut pre-filled from the topic (§124A.1)
+FAIL  src/features/meetings/MeetingPanel.test.tsx > MeetingPanel — §124 sections & §124A candidate lifecycle > §124 Edit refines a pending candidate through onEditCandidate with the new headline
+FAIL  src/features/memory/MemoryView.test.tsx > MemoryView — empty state (§179) > explains what/why/next per section
+FAIL  src/features/memory/MemoryView.test.tsx > MemoryView — §118 explicit memory > opens "Remember this" with Project preselected inside a project
+FAIL  src/features/memory/MemoryView.test.tsx > MemoryView — §118 explicit memory > outside a project the chooser offers Group/Private only, Group default
+FAIL  src/features/notifications/notificationsP10.test.tsx > NotificationCenterPanel — §207 state coverage > mark-all-read disables while mutating and when nothing is unread (§215)
+FAIL  src/features/notifications/notificationsP10.test.tsx > NotificationCenterPanel — §207 state coverage > mark-all-read is enabled with unread items and fires; refresh button present
+FAIL  src/features/settings/byok.test.tsx > §157 Provider Test states > Testing… → Connected · N models found; raw key wiped after validation
+FAIL  src/features/sync/SyncConflictCard.test.tsx > SyncConflictCard — §186A.3 conflict-type copy > deleted_upstream shows the narrower action set (§186A.3)
+FAIL  src/features/sync/SyncConflictCard.test.tsx > SyncConflictCard — §186A.3 conflict-type copy > offers the merged strategy after opening Compare (§186A.4)
+FAIL  src/features/sync/SyncConflictCard.test.tsx > SyncConflictCard — §186A.3 conflict-type copy > resolution strategies map to the contract (§186A.4)
+FAIL  src/features/tasks/TasksView.test.tsx > TasksView — interactions > status select, owner select and Done button each invoke their handler
+Test Files  13 failed | 46 passed (59)
+Tests  30 failed | 458 passed (488)
+⎯⎯⎯⎯⎯⎯ Failed Tests 30 ⎯⎯⎯⎯⎯⎯⎯
