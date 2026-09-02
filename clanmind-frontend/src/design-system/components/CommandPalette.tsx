@@ -17,6 +17,7 @@ import { cn } from '../utils';
 
 // §310: CommandPalette is a design-system primitive.
 // §61: sections — Messages, Files, Artifacts, Tasks, Decisions, People, Projects, Commands.
+// §14.7 M3: surface-container-high · corner-large (16px) · shadow-5 · scrim 60% · token-only.
 
 export interface CommandPaletteProps {
   open: boolean;
@@ -37,10 +38,13 @@ export interface CommandPaletteProps {
   onSelectMember?: (member: GroupMember) => void;
 }
 
+// M3 item — text-on-surface with state-layer hover (8% currentColor) per §4.4.
+// Selected / aria-selected maps to secondary-container per §14.7 selected treatment.
 const itemClass =
-  'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] cursor-pointer';
+  'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium text-on-surface cursor-pointer transition-colors duration-micro ease-emphasized relative isolate overflow-hidden before:absolute before:inset-0 before:rounded-lg before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity before:duration-micro data-[selected=true]:bg-secondary-container data-[selected=true]:text-on-secondary-container aria-selected:bg-secondary-container aria-selected:text-on-secondary-container focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none motion-reduce:transition-none motion-reduce:before:transition-none';
+
 const groupHeadingClass =
-  'text-[10px] font-bold text-[var(--color-text-tertiary)] uppercase tracking-wider px-2 py-1';
+  'text-[10px] font-bold text-on-surface-variant uppercase tracking-wider px-2 py-1.5 select-none';
 
 export function CommandPalette({
   open,
@@ -57,7 +61,6 @@ export function CommandPalette({
   onSelectMessage,
   onSelectMember,
 }: CommandPaletteProps) {
-
   // §120 numbering — one derivation shared with DecisionsView/Overview.
   const decisionLabels = React.useMemo(() => {
     const labels = new Map<string, string>();
@@ -147,28 +150,28 @@ export function CommandPalette({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center pt-24 animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 bg-scrim/60 backdrop-blur-xs flex items-start justify-center pt-24 animate-in fade-in duration-150 motion-reduce:transition-none"
       onClick={() => onOpenChange(false)}
     >
       <div
         ref={dialogRef}
-        className="w-full max-w-xl bg-[var(--color-surface-elevated)] rounded-[var(--radius-xl)] shadow-[var(--shadow-xl)] border border-[var(--color-border)] overflow-hidden"
+        className="w-full max-w-xl bg-surface-container-high rounded-lg shadow-xl border border-outline-variant overflow-hidden motion-reduce:transition-none"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label="Search and commands"
       >
         <Command label="ClanMind Command Palette" className="w-full">
-          <div className="flex items-center px-4 py-3 border-b border-[var(--color-border)] gap-2.5">
-            <Search className="w-4 h-4 text-[var(--color-text-tertiary)] shrink-0" />
+          <div className="flex items-center px-4 py-3 border-b border-outline-variant gap-2.5 bg-surface-container-high motion-reduce:transition-none">
+            <Search className="w-4 h-4 text-on-surface-variant shrink-0" aria-hidden="true" />
             <Command.Input
               placeholder="Search ClanMind projects, artifacts, tasks, decisions..."
-              className="w-full text-sm bg-transparent outline-none text-[var(--color-text)] placeholder:text-[var(--color-text-tertiary)]"
+              className="w-full text-sm bg-transparent outline-none text-on-surface placeholder:text-on-surface-variant"
             />
           </div>
 
-          <Command.List className="max-h-80 overflow-y-auto p-2">
-            <Command.Empty className="py-6 text-center text-xs text-[var(--color-text-tertiary)]">
+          <Command.List className="max-h-80 overflow-y-auto p-2 bg-surface-container-high">
+            <Command.Empty className="py-6 text-center text-xs text-on-surface-variant">
               {/* §235: command no results copy */}
               No matches. Try a shorter phrase or another filter.
             </Command.Empty>
@@ -182,7 +185,7 @@ export function CommandPalette({
                 }}
                 className={itemClass}
               >
-                <Video className="w-4 h-4 text-[var(--color-danger)]" aria-hidden="true" />
+                <Video className="w-4 h-4 text-error" aria-hidden="true" />
                 <span>Start Meeting Mode</span>
               </Command.Item>
               <Command.Item
@@ -192,7 +195,7 @@ export function CommandPalette({
                 }}
                 className={itemClass}
               >
-                <CheckSquare className="w-4 h-4 text-[var(--color-info)]" aria-hidden="true" />
+                <CheckSquare className="w-4 h-4 text-info" aria-hidden="true" />
                 <span>Create New Task</span>
               </Command.Item>
               <Command.Item
@@ -202,7 +205,7 @@ export function CommandPalette({
                 }}
                 className={itemClass}
               >
-                <Bookmark className="w-4 h-4 text-[var(--color-success)]" aria-hidden="true" />
+                <Bookmark className="w-4 h-4 text-success" aria-hidden="true" />
                 <span>Propose Architectural Decision</span>
               </Command.Item>
             </Command.Group>
@@ -219,7 +222,7 @@ export function CommandPalette({
                     }}
                     className={itemClass}
                   >
-                    <MessageSquare className="w-4 h-4 text-[var(--color-text-tertiary)]" aria-hidden="true" />
+                    <MessageSquare className="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
                     <span className="truncate max-w-[30rem]">
                       {msg.sender_name}: {msg.body.slice(0, 60)}
                     </span>
@@ -240,7 +243,7 @@ export function CommandPalette({
                     }}
                     className={itemClass}
                   >
-                    <User className="w-4 h-4 text-[var(--color-text-tertiary)]" aria-hidden="true" />
+                    <User className="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
                     <span>{m.nickname || m.user.name}</span>
                   </Command.Item>
                 ))}
@@ -258,7 +261,7 @@ export function CommandPalette({
                   }}
                   className={itemClass}
                 >
-                  <FolderKanban className="w-4 h-4 text-[var(--color-info)]" aria-hidden="true" />
+                  <FolderKanban className="w-4 h-4 text-info" aria-hidden="true" />
                   <span>{proj.name}</span>
                 </Command.Item>
               ))}
@@ -275,7 +278,7 @@ export function CommandPalette({
                   }}
                   className={itemClass}
                 >
-                  <FileCode className="w-4 h-4 text-[var(--color-warning)]" aria-hidden="true" />
+                  <FileCode className="w-4 h-4 text-warning" aria-hidden="true" />
                   <span>{art.title}</span>
                 </Command.Item>
               ))}
@@ -284,7 +287,7 @@ export function CommandPalette({
             {/* FILES (§61) — populated when file indexing lands; kept minimal for now */}
             <Command.Group heading="Files" className={cn(groupHeadingClass, 'hidden')}>
               <Command.Item onSelect={() => {}} className={itemClass}>
-                <FileText className="w-4 h-4 text-[var(--color-text-tertiary)]" aria-hidden="true" />
+                <FileText className="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
                 <span>Local project files</span>
               </Command.Item>
             </Command.Group>
@@ -301,7 +304,7 @@ export function CommandPalette({
                     }}
                     className={itemClass}
                   >
-                    <CheckSquare className="w-4 h-4 text-[var(--color-info)]" aria-hidden="true" />
+                    <CheckSquare className="w-4 h-4 text-info" aria-hidden="true" />
                     <span>{t.title}</span>
                   </Command.Item>
                 ))}
@@ -320,7 +323,7 @@ export function CommandPalette({
                     }}
                     className={itemClass}
                   >
-                    <Bookmark className="w-4 h-4 text-[var(--color-success)]" aria-hidden="true" />
+                    <Bookmark className="w-4 h-4 text-success" aria-hidden="true" />
                     <span>
                       {decisionLabels.get(d.id) ?? 'Decision'}: {d.title}
                     </span>

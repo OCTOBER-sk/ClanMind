@@ -8,10 +8,12 @@
  * Notification categories map 1:1 to backend identifiers (§171).
  *
  * §56: Full activity feed with filters by category and read state.
+ * M3: surface / surface-container-low · outline-variant dividers · on-surface tokens
+ *     selected filter = secondary-container pill per §12.1 chip treatment
  */
 
 import React, { useMemo, useState } from 'react';
-import { Bell, Filter } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { EmptyState } from '@/design-system/components/EmptyState';
 import { cn } from '@/design-system/utils';
 import { useProjectDataStore } from '@/state/useProjectDataStore';
@@ -61,21 +63,16 @@ export function ActivityView({ onNavigate, onMarkRead }: ActivityViewProps) {
   }, [notifications, categoryFilter, readFilter]);
 
   return (
-    <div className="h-full flex flex-col min-h-0" style={{ background: 'var(--color-background)' }}>
-      <header className="px-6 pt-5 pb-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
-        <h1 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
-          Activity
-        </h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+    <div className="h-full flex flex-col min-h-0 bg-surface motion-reduce:transition-none">
+      <header className="px-6 pt-5 pb-3 border-b border-outline-variant bg-surface motion-reduce:transition-none">
+        <h1 className="text-base font-bold text-on-surface">Activity</h1>
+        <p className="text-xs mt-0.5 text-on-surface-variant">
           {unread > 0 ? `${unread} unread item${unread === 1 ? '' : 's'}` : 'You are all caught up.'}
         </p>
       </header>
 
-      {/* §56 Filter bar — category + read state */}
-      <div
-        className="flex items-center justify-between gap-3 px-6 py-2.5 border-b overflow-x-auto"
-        style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
-      >
+      {/* §56 Filter bar — category + read state · M3 chip treatment */}
+      <div className="flex items-center justify-between gap-3 px-6 py-2.5 border-b border-outline-variant overflow-x-auto bg-surface-container-low motion-reduce:transition-none">
         <div className="flex items-center gap-1" role="group" aria-label="Filter by category">
           {CATEGORY_FILTERS.map((f) => (
             <button
@@ -84,10 +81,10 @@ export function ActivityView({ onNavigate, onMarkRead }: ActivityViewProps) {
               aria-pressed={categoryFilter === f.key}
               aria-label={`Filter by ${f.label}`}
               className={cn(
-                'shrink-0 px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer',
+                'shrink-0 px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-colors duration-micro ease-emphasized cursor-pointer focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none',
                 categoryFilter === f.key
-                  ? 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)]'
-                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]',
+                  ? 'bg-secondary-container text-on-secondary-container border-outline-variant'
+                  : 'bg-transparent text-on-surface-variant border-outline hover:bg-surface-container',
               )}
             >
               {f.label}
@@ -101,10 +98,10 @@ export function ActivityView({ onNavigate, onMarkRead }: ActivityViewProps) {
               onClick={() => setReadFilter(f)}
               aria-pressed={readFilter === f}
               className={cn(
-                'shrink-0 px-2 py-1 text-[10px] font-semibold rounded-md transition-colors cursor-pointer capitalize',
+                'shrink-0 px-2 py-1 text-[10px] font-semibold rounded-full border transition-colors duration-micro ease-emphasized cursor-pointer capitalize focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none',
                 readFilter === f
-                  ? 'bg-[var(--color-surface-hover)] text-[var(--color-text)]'
-                  : 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-hover)]',
+                  ? 'bg-surface-container-high text-on-surface border-outline-variant'
+                  : 'bg-transparent text-on-surface-variant border-transparent hover:bg-surface-container hover:text-on-surface',
               )}
             >
               {f}
@@ -113,7 +110,7 @@ export function ActivityView({ onNavigate, onMarkRead }: ActivityViewProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-surface motion-reduce:transition-none">
         {filteredNotifications.length === 0 && activityEvents.length === 0 ? (
           <EmptyState
             icon={<Bell className="w-8 h-8" />}
@@ -132,37 +129,32 @@ export function ActivityView({ onNavigate, onMarkRead }: ActivityViewProps) {
                     onNavigate(n.target_route);
                   }}
                   aria-label={`${n.title}${isUnread ? ' (unread)' : ''}`}
-                  className="w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-xl border transition-colors cursor-pointer focus-visible:shadow-[var(--focus-ring)] outline-none"
-                  style={{
-                    borderColor: isUnread ? 'var(--color-info)' : 'var(--color-border)',
-                    background: isUnread ? 'var(--color-info-bg)' : 'transparent',
-                    opacity: isUnread ? 1 : 0.75,
-                  }}
+                  className={cn(
+                    'w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-md border transition-colors duration-micro ease-emphasized cursor-pointer focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:rounded-md before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none',
+                    isUnread
+                      ? 'border-info bg-info-container/40'
+                      : 'border-outline-variant bg-surface-container-low opacity-75 hover:opacity-100 hover:bg-surface-container',
+                  )}
                 >
                   <span
-                    className="mt-0.5 shrink-0"
-                    style={{ color: isUnread ? 'var(--color-info)' : 'var(--color-text-tertiary)' }}
+                    className={cn('mt-0.5 shrink-0', isUnread ? 'text-info' : 'text-on-surface-variant')}
+                    aria-hidden="true"
                   >
                     {notificationCategoryIcon(n.category)}
                   </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-xs font-semibold truncate" style={{ color: 'var(--color-text)' }}>
-                      {n.title}
-                    </span>
+                  <span className="flex-1 min-w-0 relative z-10">
+                    <span className="block text-xs font-semibold truncate text-on-surface">{n.title}</span>
                     {n.body && (
-                      <span className="block text-xs mt-0.5 line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>
-                        {n.body}
-                      </span>
+                      <span className="block text-xs mt-0.5 line-clamp-2 text-on-surface-variant">{n.body}</span>
                     )}
-                    <span className="block text-[10px] mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
+                    <span className="block text-[10px] mt-1 text-on-surface-variant">
                       {notificationCategoryLabel(n.category)} · {new Date(n.created_at).toLocaleString()}
                     </span>
                   </span>
                   {/* §277 subtle unread badge */}
                   {isUnread && (
                     <span
-                      className="mt-1.5 w-2 h-2 rounded-full shrink-0"
-                      style={{ background: 'var(--color-info)' }}
+                      className="mt-1.5 w-2 h-2 rounded-full shrink-0 bg-info relative z-10"
                       aria-label="Unread"
                     />
                   )}
@@ -173,22 +165,18 @@ export function ActivityView({ onNavigate, onMarkRead }: ActivityViewProps) {
             {/* §172/§98A — the Group attention stream (pre-rendered summaries) */}
             {activityEvents.length > 0 && (
               <section className="pt-3">
-                <h2
-                  className="text-[10px] font-bold uppercase tracking-wider mb-2"
-                  style={{ color: 'var(--color-text-tertiary)' }}
-                >
+                <h2 className="text-[10px] font-bold uppercase tracking-wider mb-2 text-on-surface-variant">
                   Group activity
                 </h2>
                 <ul className="space-y-1" role="feed" aria-label="Group activity feed">
                   {activityEvents.map((e) => (
                     <li
                       key={e.id}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs"
-                      style={{ background: 'var(--color-surface-raised)', color: 'var(--color-text-secondary)' }}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-surface-container text-on-surface-variant border border-outline-variant motion-reduce:transition-none"
                       role="article"
                     >
                       <span className="truncate flex-1">{e.summary}</span>
-                      <span className="text-[10px] shrink-0" style={{ color: 'var(--color-text-tertiary)' }}>
+                      <span className="text-[10px] shrink-0 text-on-surface-variant">
                         {new Date(e.occurred_at).toLocaleTimeString()}
                       </span>
                     </li>
