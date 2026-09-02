@@ -81,19 +81,12 @@ export function MemoryView({
   );
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--color-background)' }}>
+    <div className="flex flex-col h-full overflow-hidden bg-surface motion-reduce:transition-none">
       {/* Header */}
-      <div
-        className="flex items-center justify-between gap-3 border-b px-6 py-4"
-        style={{ borderColor: 'var(--color-border)' }}
-      >
+      <div className="flex items-center justify-between gap-3 border-b border-outline-variant px-6 py-4 bg-surface motion-reduce:transition-none">
         <div>
-          <h1 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
-            Memory
-          </h1>
-          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
-            Scoped context {aiName} retains across sessions.
-          </p>
+          <h1 className="text-base font-bold text-on-surface">Memory</h1>
+          <p className="text-[11px] mt-0.5 text-on-surface-variant">Scoped context {aiName} retains across sessions.</p>
         </div>
         <Button
           size="sm"
@@ -108,25 +101,21 @@ export function MemoryView({
 
       {/* §117 — Odin's uncertain candidates */}
       {pendingCandidates.length > 0 && (
-        <div
-          className="px-6 py-3 border-b text-xs"
-          style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-        >
-          <div className="flex items-center gap-2 font-bold mb-2" style={{ color: 'var(--color-text)' }}>
-            <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
+        <div className="px-6 py-3 border-b border-outline-variant bg-surface-container-low text-xs motion-reduce:transition-none">
+          <div className="flex items-center gap-2 font-bold mb-2 text-on-surface">
+            <Sparkles className="w-3.5 h-3.5 text-warning" aria-hidden="true" />
             <span>{aiName} noticed a possible memory</span>
           </div>
           <div className="space-y-2">
             {pendingCandidates.map((cand) => (
               <div
                 key={cand.id}
-                className="flex items-center justify-between p-2.5 rounded-lg border"
-                style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+                className="flex items-center justify-between p-2.5 rounded-md border border-outline-variant bg-surface-container motion-reduce:transition-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity before:duration-micro"
                 data-testid="memory-candidate"
               >
                 <div className="min-w-0 pr-2">
-                  <p className="font-medium" style={{ color: 'var(--color-text)' }}>&ldquo;{cand.content}&rdquo;</p>
-                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
+                  <p className="font-medium text-on-surface">&ldquo;{cand.content}&rdquo;</p>
+                  <p className="text-[10px] mt-0.5 text-on-surface-variant">
                     {Math.round(cand.confidence * 100)}% confident · suggests{' '}
                     {cand.recommended_scope === 'USER_PRIVATE'
                       ? 'your private'
@@ -155,10 +144,7 @@ export function MemoryView({
       )}
 
       {/* §116 tabs — icon + text for scope clarity */}
-      <div
-        className="px-6 pt-2 border-b"
-        style={{ borderColor: 'var(--color-border)' }}
-      >
+      <div className="px-6 pt-2 border-b border-outline-variant bg-surface motion-reduce:transition-none">
         <div className="flex items-center gap-3" role="tablist" aria-label="Memory scope">
           {SECTIONS.map((s) => (
             <button
@@ -168,11 +154,7 @@ export function MemoryView({
               aria-selected={activeSection === s.key}
               aria-controls={`memory-panel-${s.key}`}
               data-testid={`memory-section-${s.key}`}
-              className="flex items-center gap-1.5 pb-2.5 text-[11px] font-semibold border-b-2 transition-colors cursor-pointer"
-              style={{
-                borderColor: activeSection === s.key ? 'var(--color-text)' : 'transparent',
-                color: activeSection === s.key ? 'var(--color-text)' : 'var(--color-text-secondary)',
-              }}
+              className={`flex items-center gap-1.5 pb-2.5 text-[11px] font-semibold border-b-2 transition-colors duration-micro ease-emphasized cursor-pointer focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none ${activeSection === s.key ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
             >
               {s.icon}
               {s.label}
@@ -183,18 +165,14 @@ export function MemoryView({
 
       {/* Error — §64 */}
       {error && (
-        <div
-          role="alert"
-          className="px-6 py-2.5 text-xs border-b"
-          style={{ color: 'var(--color-danger)', background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-        >
+        <div role="alert" className="px-6 py-2.5 text-xs border-b border-outline-variant bg-error-container text-on-error-container motion-reduce:transition-none">
           {error}
         </div>
       )}
 
       {/* Memories list */}
       <div
-        className="flex-1 overflow-y-auto p-6 space-y-2"
+        className="flex-1 overflow-y-auto p-6 space-y-2 bg-surface motion-reduce:transition-none"
         aria-busy={isLoading}
         role="tabpanel"
         id={`memory-panel-${activeSection}`}
@@ -203,11 +181,7 @@ export function MemoryView({
         {isLoading && sectionRows.length === 0 ? (
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="p-4 rounded-lg border space-y-2"
-                style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
-              >
+              <div key={i} className="p-4 rounded-md border border-outline-variant bg-surface-container-low space-y-2 motion-reduce:transition-none">
                 <div className="flex items-center gap-2">
                   <Skeleton variant="text" className="h-4 w-16 rounded-full" />
                   <Skeleton variant="text" className="h-3 w-12" />
@@ -284,7 +258,7 @@ function RememberForm({
       }}
     >
       <div>
-        <span className="block font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>Remember in:</span>
+        <span className="block font-semibold mb-1 text-on-surface-variant">Remember in:</span>
         <div className="flex gap-1.5" role="radiogroup" aria-label="Memory scope">
           {(inProject
             ? (['PROJECT', 'GROUP', 'USER_PRIVATE'] as const)
@@ -296,12 +270,7 @@ function RememberForm({
               role="radio"
               aria-checked={scope === s}
               onClick={() => setScope(s)}
-              className="px-2.5 py-1 rounded-md border font-semibold cursor-pointer transition-colors"
-              style={{
-                borderColor: scope === s ? 'var(--color-text)' : 'var(--color-border-strong)',
-                background: scope === s ? 'var(--color-text)' : 'transparent',
-                color: scope === s ? 'var(--color-background)' : 'var(--color-text-secondary)',
-              }}
+              className={`px-2.5 py-1 rounded-full border font-semibold cursor-pointer transition-colors duration-micro ease-emphasized focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none ${scope === s ? 'border-secondary-container bg-secondary-container text-on-secondary-container' : 'border-outline text-on-surface-variant bg-transparent hover:bg-surface-container'}`}
             >
               {s === 'PROJECT' ? 'Project' : s === 'GROUP' ? 'Group' : 'Private'}
             </button>
@@ -309,19 +278,14 @@ function RememberForm({
         </div>
       </div>
       <div>
-        <label
-          htmlFor="memory-type"
-          className="block font-semibold mb-1"
-          style={{ color: 'var(--color-text-secondary)' }}
-        >
+        <label htmlFor="memory-type" className="block font-semibold mb-1 text-on-surface-variant">
           Type
         </label>
         <select
           id="memory-type"
           value={memoryType}
           onChange={(e) => setMemoryType(e.target.value as MemoryCardType)}
-          className="w-full px-3 py-1.5 rounded-md border text-xs outline-none"
-          style={{ borderColor: 'var(--color-border-strong)', background: 'var(--color-surface-raised)', color: 'var(--color-text)' }}
+          className="w-full px-3 py-1.5 rounded-md border border-outline bg-surface-container text-xs outline-none text-on-surface focus-visible:shadow-[var(--md-focus-ring)] transition-colors duration-micro ease-emphasized motion-reduce:transition-none"
         >
           {CARD_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -331,11 +295,7 @@ function RememberForm({
         </select>
       </div>
       <div>
-        <label
-          htmlFor="memory-content"
-          className="block font-semibold mb-1"
-          style={{ color: 'var(--color-text-secondary)' }}
-        >
+        <label htmlFor="memory-content" className="block font-semibold mb-1 text-on-surface-variant">
           Content
         </label>
         <textarea
@@ -345,8 +305,7 @@ function RememberForm({
           rows={3}
           maxLength={2000}
           placeholder="e.g. We will use PostgreSQL for all new services."
-          className="w-full px-3 py-1.5 rounded-md border text-xs outline-none resize-none"
-          style={{ borderColor: 'var(--color-border-strong)', background: 'var(--color-surface-raised)', color: 'var(--color-text)' }}
+          className="w-full px-3 py-1.5 rounded-md border border-outline bg-surface-container text-xs outline-none resize-none text-on-surface placeholder:text-on-surface-variant focus-visible:shadow-[var(--md-focus-ring)] transition-colors duration-micro ease-emphasized motion-reduce:transition-none"
         />
       </div>
       <div className="flex justify-end gap-2 pt-2">
@@ -409,11 +368,13 @@ function MemoryCardRow({
     }
   };
 
+  const isContradiction = memory.memory_type === 'CONTRADICTION';
+  const isWarningKind = memory.memory_type === 'CONTRADICTION' || memory.memory_type === 'CONFLICT';
+
   return (
     <div
       data-testid="memory-card"
-      className="p-3 rounded-lg border space-y-2 text-xs"
-      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+      className={`p-3 rounded-md border space-y-2 text-xs motion-reduce:transition-none relative isolate overflow-hidden ${isContradiction ? 'border-warning bg-warning-container text-on-warning-container' : isWarningKind ? 'border-outline-variant bg-warning-container/30 text-on-surface' : 'border-outline-variant bg-surface-container-low text-on-surface'} ${!isContradiction ? 'hover:bg-surface-container focus-within:bg-surface-container before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity before:duration-micro' : ''}`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -421,7 +382,7 @@ function MemoryCardRow({
             {isTypedVocabulary ? memory.memory_type : memory.memory_type || 'FACT'}
           </Badge>
           {/* §50 — scope icon + text, not color-only */}
-          <span className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+          <span className="flex items-center gap-1 text-[10px] text-on-surface-variant">
             {memory.scope_type === 'USER_PRIVATE' && <Lock className="w-2.5 h-2.5" aria-hidden="true" />}
             {memory.scope_type === 'GROUP' && <Users className="w-2.5 h-2.5" aria-hidden="true" />}
             {memory.scope_type === 'PROJECT' && <Folder className="w-2.5 h-2.5" aria-hidden="true" />}
@@ -434,8 +395,7 @@ function MemoryCardRow({
             <button
               type="button"
               onClick={() => setIsEditing(true)}
-              className="p-1 rounded transition-colors cursor-pointer hover:bg-[var(--color-surface-hover)]"
-              style={{ color: 'var(--color-text-tertiary)' }}
+              className="p-1 rounded-full border border-transparent text-on-surface-variant transition-colors duration-micro ease-emphasized hover:bg-surface-container-high focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none cursor-pointer"
               aria-label={`Edit memory: ${memory.content.slice(0, 40)}`}
             >
               <Pencil className="w-3 h-3" />
@@ -445,8 +405,7 @@ function MemoryCardRow({
             <button
               type="button"
               onClick={() => setShowDeleteConfirm(true)}
-              className="p-1 rounded transition-colors cursor-pointer hover:bg-[var(--color-surface-hover)]"
-              style={{ color: 'var(--color-text-tertiary)' }}
+              className="p-1 rounded-full border border-transparent text-on-surface-variant transition-colors duration-micro ease-emphasized hover:bg-surface-container-high focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none cursor-pointer"
               aria-label={`Delete memory: ${memory.content.slice(0, 40)}`}
             >
               <Trash2 className="w-3 h-3" />
@@ -463,8 +422,7 @@ function MemoryCardRow({
             onChange={(e) => setEditContent(e.target.value)}
             rows={3}
             maxLength={2000}
-            className="w-full px-3 py-1.5 rounded-md border text-xs outline-none resize-none"
-            style={{ borderColor: 'var(--color-border-strong)', background: 'var(--color-surface)', color: 'var(--color-text)' }}
+            className="w-full px-3 py-1.5 rounded-md border border-outline bg-surface-container text-xs outline-none resize-none text-on-surface placeholder:text-on-surface-variant focus-visible:shadow-[var(--md-focus-ring)] transition-colors duration-micro ease-emphasized motion-reduce:transition-none"
             aria-label="Edit memory content"
           />
           <div className="flex justify-end gap-1.5">
@@ -477,10 +435,10 @@ function MemoryCardRow({
           </div>
         </div>
       ) : (
-        <p style={{ color: 'var(--color-text)' }}>{memory.content}</p>
+        <p className={isContradiction ? 'text-on-warning-container' : 'text-on-surface'}>{memory.content}</p>
       )}
 
-      <ul className="pt-1 border-t text-[10px] flex flex-wrap gap-x-3 gap-y-0.5" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-tertiary)' }}>
+      <ul className="pt-1 border-t border-outline-variant text-[10px] flex flex-wrap gap-x-3 gap-y-0.5 text-on-surface-variant">
         {provenance.map((line) => (
           <li key={line}>{line}</li>
         ))}
@@ -489,11 +447,10 @@ function MemoryCardRow({
       {/* §55 delete confirmation */}
       {showDeleteConfirm && (
         <div
-          className="flex items-center justify-between p-2 rounded-md border text-xs"
-          style={{ borderColor: 'var(--color-danger)', background: 'var(--color-surface)' }}
+          className="flex items-center justify-between p-2 rounded-md border border-error bg-error-container text-on-error-container motion-reduce:transition-none"
           role="alert"
         >
-          <span style={{ color: 'var(--color-text-secondary)' }}>Delete this memory?</span>
+          <span className="text-on-error-container">Delete this memory?</span>
           <div className="flex items-center gap-1.5">
             <Button size="sm" variant="ghost" onClick={() => setShowDeleteConfirm(false)} aria-label="Cancel delete">
               Cancel
