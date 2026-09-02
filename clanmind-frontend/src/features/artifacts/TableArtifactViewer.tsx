@@ -125,9 +125,9 @@ export function TableArtifactViewer({ content }: TableArtifactViewerProps) {
   // §44 — Empty / error state.
   if (!data || data.headers.length === 0) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center" role="status">
-        <Table2 className="h-8 w-8 text-[var(--color-text-tertiary)]" aria-hidden="true" />
-        <p className="max-w-xs text-xs text-[var(--color-text-secondary)]">
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center bg-surface-container-low motion-reduce:transition-none" role="status">
+        <Table2 className="h-8 w-8 text-on-surface-variant" aria-hidden="true" />
+        <p className="max-w-xs text-xs leading-[16px] tracking-[0.4px] text-on-surface-variant">
           This table version has no renderable data. View an earlier version or export the raw source.
         </p>
       </div>
@@ -135,32 +135,32 @@ export function TableArtifactViewer({ content }: TableArtifactViewerProps) {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--color-surface-raised)] text-xs">
+    <div className="flex h-full flex-col overflow-hidden bg-surface-container-low text-xs motion-reduce:transition-none">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5">
+      <div className="flex items-center justify-between gap-3 border-b border-outline-variant bg-surface-container-low px-4 py-2.5 motion-reduce:transition-none">
         <div className="relative w-60">
-          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-[var(--color-text-tertiary)]" aria-hidden="true" />
+          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-on-surface-variant" aria-hidden="true" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search rows…"
             aria-label="Search table rows"
-            className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] py-1.5 pl-8 pr-3 text-xs text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-border-strong)]"
+            className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest py-1.5 pl-8 pr-3 text-xs leading-[16px] tracking-[0.25px] text-on-surface outline-none transition-colors duration-micro ease-emphasized focus:border-outline focus-visible:shadow-[var(--md-focus-ring)] motion-reduce:transition-none placeholder:text-on-surface-variant"
           />
         </div>
 
         <div className="flex items-center gap-2">
           {data.rows.length > 0 && (
-            <span className="text-[10px] text-[var(--color-text-tertiary)]">
+            <span className="text-[10px] leading-[16px] tracking-[0.5px] text-on-surface-variant">
               {processedRows.length} of {data.rows.length} row{data.rows.length !== 1 ? 's' : ''}
             </span>
           )}
           <button
             onClick={handleCopy}
             aria-label="Copy table as CSV"
-            className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2.5 py-1.5 font-medium text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)]"
+            className="flex cursor-pointer items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container px-2.5 py-1.5 font-medium tracking-[0.1px] text-on-surface transition-colors duration-micro ease-emphasized hover:bg-surface-container-high focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] active:before:opacity-[0.10] before:transition-opacity motion-reduce:transition-none"
           >
-            {copied ? <Check className="h-3.5 w-3.5 text-[var(--color-success)]" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
             <span>{copied ? 'Copied CSV' : 'Copy CSV'}</span>
           </button>
         </div>
@@ -170,7 +170,7 @@ export function TableArtifactViewer({ content }: TableArtifactViewerProps) {
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-left" role="grid" aria-label={`${data.headers.join(', ')} table`}>
           <thead className="sticky top-0 z-10">
-            <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-hover)] text-[var(--color-text)] font-semibold">
+            <tr className="border-b border-outline-variant bg-surface-container text-on-surface font-medium tracking-[0.1px] motion-reduce:transition-none">
               {data.headers.map((h, i) => {
                 const isActive = sortCol === i;
                 const isNum = numericCols.has(i);
@@ -179,13 +179,13 @@ export function TableArtifactViewer({ content }: TableArtifactViewerProps) {
                     key={i}
                     scope="col"
                     className={cn(
-                      'cursor-pointer select-none p-2.5 transition-colors hover:bg-[var(--color-surface-pressed)]',
+                      'cursor-pointer select-none p-2.5 transition-colors duration-micro ease-emphasized motion-reduce:transition-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] active:before:opacity-[0.10] before:transition-opacity focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none',
                       isNum && 'text-right',
                     )}
                     onClick={() => handleSort(i)}
                     aria-sort={isActive ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                   >
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1 relative">
                       {h}
                       {isActive && sortDir === 'asc' && <ArrowUp className="h-3 w-3" aria-hidden="true" />}
                       {isActive && sortDir === 'desc' && <ArrowDown className="h-3 w-3" aria-hidden="true" />}
@@ -195,21 +195,21 @@ export function TableArtifactViewer({ content }: TableArtifactViewerProps) {
               })}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--color-border)]">
+          <tbody className="divide-y divide-outline-variant">
             {processedRows.length === 0 ? (
               <tr>
-                <td colSpan={data.headers.length} className="p-4 text-center text-[var(--color-text-tertiary)]">
+                <td colSpan={data.headers.length} className="p-4 text-center text-on-surface-variant">
                   No rows match your search.
                 </td>
               </tr>
             ) : (
               processedRows.map((row, rIdx) => (
-                <tr key={rIdx} className="font-mono text-[11px] transition-colors hover:bg-[var(--color-surface-hover)]">
+                <tr key={rIdx} className={cn('font-mono text-[11px] leading-[16px] transition-colors duration-micro ease-emphasized motion-reduce:transition-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity', rIdx % 2 === 1 && 'bg-surface-container/50')}>
                   {row.map((cell, cIdx) => (
                     <td
                       key={cIdx}
                       className={cn(
-                        'p-2.5 text-[var(--color-text)]',
+                        'p-2.5 text-on-surface relative',
                         numericCols.has(cIdx) && 'text-right tabular-nums',
                       )}
                     >

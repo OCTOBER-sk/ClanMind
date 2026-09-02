@@ -84,17 +84,17 @@ function CmNodeView({ data, selected }: NodeProps<CmFlowNode>) {
       <div
         key={animKey}
         className={cn(
-          'flex h-full w-full flex-col items-center justify-center gap-0.5 rounded-xl border bg-[var(--color-surface-raised)] px-3 text-center shadow-xs',
+          'flex h-full w-full flex-col items-center justify-center gap-0.5 rounded-xl border bg-surface-container px-3 text-center shadow-xs motion-reduce:transition-none',
           selected
-            ? 'border-transparent outline outline-2 outline-offset-1 outline-[var(--color-text)]'
-            : 'border-[var(--color-border-strong)]',
+            ? 'border-transparent outline outline-2 outline-offset-1 outline-primary'
+            : 'border-outline-variant',
           data.arriveIndex >= 0 && 'node-arrive',
         )}
       >
-        <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)]">
+        <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">
           {data.kind ?? 'node'}
         </span>
-        <span className="line-clamp-2 text-[11px] font-semibold leading-tight text-[var(--color-text)]">
+        <span className="line-clamp-2 text-[11px] font-semibold leading-tight text-on-surface">
           {data.label}
         </span>
       </div>
@@ -134,7 +134,7 @@ function SpectralEdgeView({
       <BaseEdge
         id={id}
         path={path}
-        style={{ stroke: 'var(--color-border-strong)', strokeWidth: 1.5 }}
+        style={{ stroke: 'var(--md-outline)', strokeWidth: 1.5 }}
       />
     );
   }
@@ -228,7 +228,7 @@ function DiagramFlowInner({
   return (
     <>
       {/* §105 zoom controls — keyboard-operable buttons with labels */}
-      <div className="absolute right-3 top-3 z-20 flex items-center gap-0.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)]/90 p-1 shadow-sm backdrop-blur-xs">
+      <div className="absolute right-3 top-3 z-20 flex items-center gap-0.5 rounded-lg border border-outline-variant bg-surface-container-high/90 p-1 shadow-sm backdrop-blur-xs motion-reduce:transition-none">
         <Tooltip content="Zoom in">
           <IconButton aria-label="Zoom in" size="xs" onClick={() => void zoomIn({ duration: 180 })}>
             <Plus className="h-3.5 w-3.5" />
@@ -253,7 +253,7 @@ function DiagramFlowInner({
             <Crosshair className="h-3.5 w-3.5" />
           </IconButton>
         </Tooltip>
-        <span className="px-1.5 font-mono text-[10px] text-[var(--color-text-tertiary)]" aria-live="off">
+        <span className="px-1.5 font-mono text-[10px] text-on-surface-variant" aria-live="off">
           {Math.round(zoom * 100)}%
         </span>
       </div>
@@ -273,7 +273,7 @@ function DiagramFlowInner({
         fitView
         deleteKeyCode={null}
       >
-        <Background color="var(--color-border)" gap={22} size={1} />
+        <Background color="var(--md-outline-variant)" gap={22} size={1} />
       </ReactFlow>
 
       {/* Keep selectedId referenced for a11y queries without extra renders */}
@@ -375,16 +375,16 @@ export default function DiagramViewer({
   // Broken/absent content never crashes the surface (FE §291).
   if (!parsed || !activeContent) {
     return (
-      <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+      <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 p-8 text-center bg-surface-container-low motion-reduce:transition-none">
         {livePhase === 'constructing' ? (
           <>
-            <div className="spectral-pulse h-10 w-10 rounded-full border-2 border-dashed border-[var(--color-border-strong)]" />
-            <p className="text-xs font-semibold text-[var(--color-text-secondary)]">
+            <div className="spectral-pulse h-10 w-10 rounded-full border-2 border-dashed border-outline-variant motion-reduce:transition-none" />
+            <p className="text-xs font-semibold leading-[16px] tracking-[0.5px] text-on-surface-variant">
               {construction?.statusText ?? 'Preparing diagram…'}
             </p>
           </>
         ) : (
-          <p className="max-w-xs text-xs text-[var(--color-text-secondary)]">
+          <p className="max-w-xs text-xs leading-[16px] tracking-[0.4px] text-on-surface-variant">
             This diagram version has no renderable content. View an earlier version, export the raw
             source, or ask Odin to regenerate it.
           </p>
@@ -394,7 +394,7 @@ export default function DiagramViewer({
   }
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-[var(--color-surface)] select-none">
+    <div className="relative flex h-full flex-col overflow-hidden bg-surface-container-low select-none motion-reduce:transition-none [&_.react-flow__attribution]:hidden">
       <div className="relative min-h-0 flex-1">
         <ReactFlowProvider>
           <DiagramFlowInner
@@ -409,7 +409,7 @@ export default function DiagramViewer({
       {/* §97/§219 — textual build status; the ONLY motion info channel needed */}
       {livePhase === 'constructing' && (
         <div
-          className="flex items-center gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 text-[11px] font-medium text-[var(--color-text-secondary)]"
+          className="flex items-center gap-2 border-t border-outline-variant bg-surface-container-low px-4 py-1.5 text-[11px] font-medium leading-[16px] tracking-[0.5px] text-on-surface-variant motion-reduce:transition-none"
           role="status"
         >
           <span className="odin-working inline-block h-1.5 w-1.5 rounded-full" aria-hidden="true" />
@@ -419,16 +419,16 @@ export default function DiagramViewer({
 
       {/* §106/§107 — selection details + Ask Odin with object context */}
       {selectedNode && (
-        <div className="flex items-center justify-between gap-3 border-t border-[var(--color-border)] bg-[var(--color-surface-raised)] p-3">
+        <div className="flex items-center justify-between gap-3 border-t border-outline-variant bg-surface-container-high p-3 motion-reduce:transition-none">
           <div className="min-w-0">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)]">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
               Selected · {selectedNode.kind ?? 'node'}
             </span>
-            <p className="truncate text-xs font-semibold text-[var(--color-text)]">{selectedNode.label}</p>
+            <p className="truncate text-xs font-semibold leading-[16px] tracking-[0.4px] text-on-surface">{selectedNode.label}</p>
           </div>
           <button
             onClick={() => onAskOdinAboutNode?.(selectedNode.label)}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--color-primary-foreground)] transition-opacity hover:opacity-90"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium leading-[16px] tracking-[0.1px] text-on-primary transition-colors duration-micro ease-emphasized hover:opacity-90 focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-on-primary before:opacity-0 hover:before:opacity-[0.08] active:before:opacity-[0.10] before:transition-opacity motion-reduce:transition-none"
           >
             <Sparkles className="h-3 w-3 text-amber-400" aria-hidden="true" />
             Ask Odin about this
