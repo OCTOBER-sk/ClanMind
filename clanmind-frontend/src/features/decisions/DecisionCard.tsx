@@ -58,13 +58,12 @@ export function DecisionCard({
   return (
     <div
       data-testid="decision-card"
-      className="p-4 rounded-lg border space-y-2.5 text-xs"
-      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+      className="p-4 rounded-md border border-outline-variant bg-surface-container-low space-y-2.5 text-xs transition-colors duration-micro ease-emphasized motion-reduce:transition-none hover:bg-surface-container hover:border-outline-variant relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.04] before:transition-opacity before:duration-micro motion-reduce:before:transition-none"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <Bookmark className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />
-          <span className="font-bold text-xs truncate" style={{ color: 'var(--color-text)' }}>
+          <Bookmark className="w-3.5 h-3.5 shrink-0 text-on-surface-variant" aria-hidden="true" />
+          <span className="font-bold text-xs truncate text-on-surface">
             Decision #{ordinal}: {decision.title}
           </span>
         </div>
@@ -75,18 +74,18 @@ export function DecisionCard({
 
       {decision.context && (
         <div>
-          <span className="text-[10px] font-bold uppercase block mb-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
+          <span className="text-[10px] font-bold uppercase block mb-0.5 text-on-surface-variant">
             Context &amp; Problem
           </span>
-          <p className="leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>{decision.context}</p>
+          <p className="leading-relaxed text-on-surface-variant">{decision.context}</p>
         </div>
       )}
 
       {/* §120 "Reason" — the §47 rationale column */}
       {decision.rationale && (
         <div>
-          <span className="text-[10px] font-bold uppercase block mb-0.5" style={{ color: 'var(--color-text-tertiary)' }}>Reason</span>
-          <p className="leading-relaxed font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+          <span className="text-[10px] font-bold uppercase block mb-0.5 text-on-surface-variant">Reason</span>
+          <p className="leading-relaxed font-medium text-on-surface-variant">
             {decision.rationale}
           </p>
         </div>
@@ -94,7 +93,7 @@ export function DecisionCard({
 
       {decision.options != null && Array.isArray(decision.options) && decision.options.length > 0 && (
         <div>
-          <span className="text-[10px] font-bold uppercase block mb-0.5" style={{ color: 'var(--color-text-tertiary)' }}>Options</span>
+          <span className="text-[10px] font-bold uppercase block mb-0.5 text-on-surface-variant">Options</span>
           <ul className="space-y-0.5">
             {(decision.options as Array<Record<string, unknown>>).map((opt, i) => {
               const label = typeof opt === 'string' ? opt : String(opt.label ?? `Option ${i + 1}`);
@@ -105,8 +104,7 @@ export function DecisionCard({
               return (
                 <li
                   key={`${label}-${i}`}
-                  className={selected ? 'font-semibold' : ''}
-                  style={{ color: selected ? 'var(--color-success)' : 'var(--color-text-secondary)' }}
+                  className={selected ? 'font-semibold text-success' : 'text-on-surface-variant'}
                 >
                   {selected ? '✓ ' : '· '}
                   {label}
@@ -118,15 +116,15 @@ export function DecisionCard({
       )}
 
       {/* §120 "Sources" — rendered only when data provides them (no §47
-          column yet; live rows show an honest absence instead of fake cites) */}
+           column yet; live rows show an honest absence instead of fake cites) */}
       {decision.sources && decision.sources.length > 0 && (
-        <div className="pt-2 border-t text-[10px]" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-tertiary)' }}>
+        <div className="pt-2 border-t border-outline-variant text-[10px] text-on-surface-variant motion-reduce:transition-none">
           <span>Sources: {decision.sources.join(' • ')}</span>
         </div>
       )}
 
       <div className="flex items-center justify-between gap-3 pt-1">
-        <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+        <span className="text-[10px] text-on-surface-variant">
           {decision.status === 'APPROVED'
             ? `Approved by ${approvedByName ?? 'the team'}${decision.approved_at ? ` · ${new Date(decision.approved_at).toLocaleDateString()}` : ''}`
             : proposedByName
@@ -141,8 +139,7 @@ export function DecisionCard({
                 type="button"
                 onClick={() => onReject(decision)}
                 disabled={disabled}
-                className="flex items-center gap-1 px-2 py-1 rounded-md border font-semibold transition-colors cursor-pointer disabled:opacity-40"
-                style={{ borderColor: 'var(--color-border)', color: 'var(--color-danger)' }}
+                className="flex items-center gap-1 px-2 py-1 rounded-full border border-outline text-[11px] font-semibold text-error transition-colors duration-micro ease-emphasized hover:bg-error-container hover:text-on-error-container hover:border-transparent focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none cursor-pointer disabled:opacity-40"
                 aria-label={`Reject ${decision.title}`}
               >
                 <X className="w-3 h-3" aria-hidden="true" /> Reject
@@ -153,8 +150,7 @@ export function DecisionCard({
                 type="button"
                 onClick={() => onApprove(decision)}
                 disabled={disabled}
-                className="flex items-center gap-1 px-2 py-1 rounded-md font-semibold transition-colors cursor-pointer disabled:opacity-40"
-                style={{ background: 'var(--color-success)', color: '#fff' }}
+                className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold bg-success text-on-success transition-colors duration-micro ease-emphasized hover:opacity-90 focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none cursor-pointer disabled:opacity-40"
                 aria-label={`Approve ${decision.title}`}
               >
                 <Check className="w-3 h-3" aria-hidden="true" /> Approve

@@ -100,26 +100,26 @@ export function ProjectOverview({
     approvedDecisions.length === 0;
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-5" style={{ background: 'var(--color-background)' }}>
+    <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-surface motion-reduce:transition-none">
       {/* §21 Goal Header — project name, type, goal, members */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h1 className="text-lg font-bold" style={{ color: 'var(--color-text)' }}>
+            <h1 className="text-lg font-bold text-on-surface">
               {project.name}
             </h1>
             <Badge variant="neutral" size="sm">
               {project.project_type}
             </Badge>
           </div>
-          <p className="text-xs max-w-2xl leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+          <p className="text-xs max-w-2xl leading-relaxed text-on-surface-variant">
             {project.goal || project.description || 'No goal set yet.'}
           </p>
           {/* §21 Members row */}
           {members.length > 0 && (
             <div className="flex items-center gap-2 mt-2">
-              <Users className="w-3 h-3" style={{ color: 'var(--color-text-tertiary)' }} aria-hidden="true" />
-              <span className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+              <Users className="w-3 h-3 text-on-surface-variant" aria-hidden="true" />
+              <span className="text-[11px] text-on-surface-variant">
                 {members.length} member{members.length !== 1 ? 's' : ''} · {aiName} is active
               </span>
             </div>
@@ -133,21 +133,19 @@ export function ProjectOverview({
           <button
             key={action.id}
             onClick={() => onNavigateToSection(action.id)}
-            className="flex items-center gap-2.5 p-3 rounded-lg border text-left transition-all hover:border-[var(--color-border-strong)] cursor-pointer group"
-            style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+            className="flex items-center gap-2.5 p-3 rounded-md border border-outline-variant bg-surface-container-low text-left transition-colors duration-micro ease-emphasized hover:bg-surface-container focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] active:before:opacity-[0.10] before:transition-opacity before:duration-micro motion-reduce:transition-none motion-reduce:before:transition-none cursor-pointer group"
             aria-label={`${action.label}: ${action.description}`}
           >
             <span
-              className="p-1.5 rounded-md transition-colors group-hover:bg-[var(--color-surface-hover)]"
-              style={{ color: 'var(--color-text-secondary)' }}
+              className="p-1.5 rounded-full bg-surface-container text-on-surface-variant transition-colors duration-micro ease-emphasized group-hover:bg-surface-container-high motion-reduce:transition-none"
             >
               {action.icon}
             </span>
             <div className="min-w-0">
-              <span className="block text-xs font-semibold" style={{ color: 'var(--color-text)' }}>
+              <span className="block text-xs font-semibold text-on-surface">
                 {action.label}
               </span>
-              <span className="block text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+              <span className="block text-[10px] text-on-surface-variant">
                 {action.description}
               </span>
             </div>
@@ -173,16 +171,14 @@ export function ProjectOverview({
             <>
               <button
                 onClick={() => onNavigateToSection('chat')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer"
-                style={{ background: 'var(--color-primary)', color: 'var(--color-primary-foreground)' }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors duration-micro ease-emphasized bg-primary text-on-primary hover:opacity-90 focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none cursor-pointer"
                 aria-label="Start a discussion"
               >
                 <MessageSquare className="w-3 h-3" /> Discuss
               </button>
               <button
                 onClick={() => onNavigateToSection('garage')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-semibold transition-colors cursor-pointer"
-                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-outline text-xs font-semibold transition-colors duration-micro ease-emphasized bg-transparent text-primary hover:bg-surface-container focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none cursor-pointer"
                 aria-label="Add references"
               >
                 <Search className="w-3 h-3" /> Add references
@@ -196,18 +192,16 @@ export function ProjectOverview({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Active Tasks Box */}
             <div
-              className="p-4 rounded-lg border space-y-2.5"
-              style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+              className="p-4 rounded-md border border-outline-variant bg-surface-container-low space-y-2.5 motion-reduce:transition-none"
             >
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-xs flex items-center gap-1.5" style={{ color: 'var(--color-text)' }}>
-                  <CheckSquare className="w-3.5 h-3.5" style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />
+                <h3 className="font-bold text-xs flex items-center gap-1.5 text-on-surface">
+                  <CheckSquare className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden="true" />
                   <span>Active Tasks ({openTasks.length})</span>
                 </h3>
                 <button
                   onClick={() => onNavigateToSection('tasks')}
-                  className="text-[11px] font-semibold hover:underline cursor-pointer"
-                  style={{ color: 'var(--color-text-secondary)' }}
+                  className="text-[11px] font-semibold text-on-surface-variant hover:text-on-surface hover:underline cursor-pointer focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none rounded-sm transition-colors duration-micro ease-emphasized motion-reduce:transition-none"
                   aria-label="View all tasks"
                 >
                   View all
@@ -218,14 +212,13 @@ export function ProjectOverview({
                 {openTasks.slice(0, 3).map((task) => (
                   <div
                     key={task.id}
-                    className="p-2 rounded-md text-xs flex items-center justify-between"
-                    style={{ background: 'var(--color-surface-hover)' }}
+                    className="p-2 rounded-md text-xs flex items-center justify-between bg-surface-container border border-transparent motion-reduce:transition-none"
                   >
                     <div className="truncate pr-2">
-                      <p className="font-medium truncate" style={{ color: 'var(--color-text)' }}>
+                      <p className="font-medium truncate text-on-surface">
                         {task.title}
                       </p>
-                      <span className="text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                      <span className="text-[10px] text-on-surface-variant">
                         {ownerName(task, members)}
                       </span>
                     </div>
@@ -238,7 +231,7 @@ export function ProjectOverview({
                   </div>
                 ))}
                 {openTasks.length === 0 && (
-                  <p className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                  <p className="text-[11px] text-on-surface-variant">
                     No active tasks — everything is done or cancelled.
                   </p>
                 )}
@@ -247,18 +240,16 @@ export function ProjectOverview({
 
             {/* Open Decisions Box */}
             <div
-              className="p-4 rounded-lg border space-y-2.5"
-              style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+              className="p-4 rounded-md border border-outline-variant bg-surface-container-low space-y-2.5 motion-reduce:transition-none"
             >
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-xs flex items-center gap-1.5" style={{ color: 'var(--color-text)' }}>
-                  <Bookmark className="w-3.5 h-3.5" style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />
+                <h3 className="font-bold text-xs flex items-center gap-1.5 text-on-surface">
+                  <Bookmark className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden="true" />
                   <span>Decisions ({openDecisions.length})</span>
                 </h3>
                 <button
                   onClick={() => onNavigateToSection('decisions')}
-                  className="text-[11px] font-semibold hover:underline cursor-pointer"
-                  style={{ color: 'var(--color-text-secondary)' }}
+                  className="text-[11px] font-semibold text-on-surface-variant hover:text-on-surface hover:underline cursor-pointer focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none rounded-sm transition-colors duration-micro ease-emphasized motion-reduce:transition-none"
                   aria-label="View all decisions"
                 >
                   View all
@@ -269,11 +260,10 @@ export function ProjectOverview({
                 {(openDecisions.length > 0 ? openDecisions : approvedDecisions).slice(0, 3).map((dec) => (
                   <div
                     key={dec.id}
-                    className="p-2 rounded-md text-xs"
-                    style={{ background: 'var(--color-surface-hover)' }}
+                    className="p-2 rounded-md text-xs bg-surface-container border border-transparent motion-reduce:transition-none"
                   >
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="font-bold truncate pr-2" style={{ color: 'var(--color-text)' }}>
+                      <span className="font-bold truncate pr-2 text-on-surface">
                         {decisionLabels.get(dec.id) ?? 'Decision'}: {dec.title}
                       </span>
                       <Badge variant={dec.status === 'APPROVED' ? 'success' : 'warning'} size="sm">
@@ -281,12 +271,12 @@ export function ProjectOverview({
                       </Badge>
                     </div>
                     {dec.rationale && (
-                      <p className="text-[11px] line-clamp-1" style={{ color: 'var(--color-text-secondary)' }}>{dec.rationale}</p>
+                      <p className="text-[11px] line-clamp-1 text-on-surface-variant">{dec.rationale}</p>
                     )}
                   </div>
                 ))}
                 {openDecisions.length === 0 && approvedDecisions.length === 0 && (
-                  <p className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                  <p className="text-[11px] text-on-surface-variant">
                     Nothing proposed yet — ask {aiName} to draft one.
                   </p>
                 )}
@@ -297,18 +287,16 @@ export function ProjectOverview({
           {/* Recent Artifacts Section (§83) */}
           {projectArtifacts.length > 0 && (
             <div
-              className="p-4 rounded-lg border space-y-2.5"
-              style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+              className="p-4 rounded-md border border-outline-variant bg-surface-container-low space-y-2.5 motion-reduce:transition-none"
             >
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-xs flex items-center gap-1.5" style={{ color: 'var(--color-text)' }}>
-                  <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />
+                <h3 className="font-bold text-xs flex items-center gap-1.5 text-on-surface">
+                  <Sparkles className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden="true" />
                   <span>Artifacts ({projectArtifacts.length})</span>
                 </h3>
                 <button
                   onClick={() => onNavigateToSection('garage')}
-                  className="text-[11px] font-semibold hover:underline cursor-pointer"
-                  style={{ color: 'var(--color-text-secondary)' }}
+                  className="text-[11px] font-semibold text-on-surface-variant hover:text-on-surface hover:underline cursor-pointer focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none rounded-sm transition-colors duration-micro ease-emphasized motion-reduce:transition-none"
                   aria-label="Open Garage"
                 >
                   Open Garage
@@ -321,14 +309,13 @@ export function ProjectOverview({
                     key={art.id}
                     type="button"
                     onClick={() => onNavigateToSection('garage')}
-                    className="p-2.5 rounded-md text-xs cursor-pointer transition-colors text-left w-full"
-                    style={{ background: 'var(--color-surface-hover)' }}
+                    className="p-2.5 rounded-md text-xs cursor-pointer transition-colors duration-micro ease-emphasized text-left w-full bg-surface-container border border-transparent hover:bg-surface-container-high focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none"
                     aria-label={`Open artifact: ${art.title}`}
                   >
-                    <span className="block font-semibold truncate mb-0.5" style={{ color: 'var(--color-text)' }}>
+                    <span className="block font-semibold truncate mb-0.5 text-on-surface">
                       {art.title}
                     </span>
-                    <span className="flex items-center justify-between text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                    <span className="flex items-center justify-between text-[10px] text-on-surface-variant">
                       <Badge variant="neutral" size="sm">{art.artifact_type}</Badge>
                       <span>v{art.current_version}</span>
                     </span>
@@ -344,12 +331,11 @@ export function ProjectOverview({
               {githubSummary && (
                 <button
                   onClick={() => onNavigateToSection('github')}
-                  className="flex items-center justify-between p-3 rounded-lg border text-xs cursor-pointer transition-colors text-left"
-                  style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+                  className="flex items-center justify-between p-3 rounded-md border border-outline-variant bg-surface-container-low text-xs cursor-pointer transition-colors duration-micro ease-emphasized hover:bg-surface-container focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none text-left"
                   aria-label={`GitHub: ${githubSummary.repoFullName}`}
                 >
-                  <span className="flex items-center gap-2 font-semibold min-w-0" style={{ color: 'var(--color-text)' }}>
-                    <GitBranch className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />
+                  <span className="flex items-center gap-2 font-semibold min-w-0 text-on-surface">
+                    <GitBranch className="w-3.5 h-3.5 shrink-0 text-on-surface-variant" aria-hidden="true" />
                     <span className="truncate">{githubSummary.repoFullName}</span>
                   </span>
                   <Badge variant="neutral" size="sm">{githubSummary.statusLabel}</Badge>
@@ -357,14 +343,13 @@ export function ProjectOverview({
               )}
               {recentActivity.length > 0 && (
                 <div
-                  className="p-3 rounded-lg border text-xs space-y-1"
-                  style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+                  className="p-3 rounded-md border border-outline-variant bg-surface-container-low text-xs space-y-1 motion-reduce:transition-none"
                 >
-                  <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: 'var(--color-text-tertiary)' }}>
+                  <span className="text-[10px] font-bold uppercase tracking-wider block text-on-surface-variant">
                     Recent Activity
                   </span>
                   {recentActivity.map((n) => (
-                    <p key={n.id} className="truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                    <p key={n.id} className="truncate text-on-surface-variant">
                       · {n.title}
                     </p>
                   ))}

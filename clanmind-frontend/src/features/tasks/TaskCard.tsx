@@ -62,22 +62,18 @@ export function TaskCard({
     <div
       data-testid="task-card"
       className={cn(
-        'rounded-lg border transition-colors text-xs',
+        'rounded-md border transition-colors duration-micro ease-emphasized text-xs motion-reduce:transition-none',
         isTerminal
-          ? 'opacity-60'
-          : 'hover:border-[var(--color-border-strong)]',
-        overdue && 'border-[var(--color-warning)]',
+          ? 'opacity-60 border-outline-variant bg-surface-container-low'
+          : 'border-outline-variant bg-surface-container-low hover:bg-surface-container hover:border-outline-variant relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity before:duration-micro motion-reduce:before:transition-none',
+        overdue && 'border-warning bg-warning-container/20',
       )}
-      style={{
-        borderColor: 'var(--color-border)',
-        background: 'var(--color-surface-raised)',
-      }}
       role="article"
       aria-label={`Task: ${task.title}, Status: ${task.status}`}
     >
       {/* §53 compact card — click to expand */}
       <div
-        className="p-3 cursor-pointer"
+        className="p-3 cursor-pointer focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none rounded-md motion-reduce:transition-none"
         onClick={() => setIsExpanded((prev) => !prev)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -93,20 +89,19 @@ export function TaskCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1 space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
-              {/* §53 status badge */}
+              {/* §53 status badge — tonal container */}
               <Badge variant={statusVariant(task.status)} size="sm">
                 {task.status.replace('_', ' ')}
               </Badge>
               <span
                 className={cn(
-                  'font-semibold',
-                  isTerminal && 'line-through decoration-[var(--color-text-tertiary)]',
+                  'font-semibold text-on-surface',
+                  isTerminal && 'line-through decoration-outline',
                 )}
-                style={{ color: 'var(--color-text)' }}
               >
                 {task.title}
               </span>
-              {/* §53 priority indicator */}
+              {/* §53 priority indicator — tonal container */}
               <Badge
                 variant={
                   task.priority === 'URGENT' || task.priority === 'HIGH'
@@ -122,15 +117,14 @@ export function TaskCard({
             </div>
 
             {/* §53 assignee + due date row */}
-            <div className="flex items-center gap-3 flex-wrap pt-0.5 text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+            <div className="flex items-center gap-3 flex-wrap pt-0.5 text-[10px] text-on-surface-variant">
               {/* §119 owner — assignment via the compact select beside it */}
               <span className="flex items-center gap-1" data-testid="task-owner">
                 <UserIcon className="w-3 h-3" aria-hidden="true" /> {ownerName(task, members)}
               </span>
               {due && (
                 <span
-                  className={cn('flex items-center gap-1', overdue && 'font-semibold')}
-                  style={{ color: overdue ? 'var(--color-warning)' : undefined }}
+                  className={cn('flex items-center gap-1', overdue && 'font-semibold text-warning')}
                 >
                   <Calendar className="w-3 h-3" aria-hidden="true" /> {due}
                 </span>
@@ -142,8 +136,7 @@ export function TaskCard({
                     e.stopPropagation();
                     onNavigateToDecision?.(task.related_decision_id!);
                   }}
-                  className="flex items-center gap-1 font-medium hover:underline cursor-pointer"
-                  style={{ color: 'var(--color-text)' }}
+                  className="flex items-center gap-1 font-medium hover:underline cursor-pointer text-primary focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none rounded-sm transition-colors duration-micro ease-emphasized motion-reduce:transition-none"
                   data-testid="related-decision-link"
                   aria-label={`Related decision: ${relatedDecisionLabel}`}
                 >
@@ -155,7 +148,7 @@ export function TaskCard({
           </div>
 
           {/* §53 expand/collapse indicator */}
-          <span className="shrink-0 mt-1" style={{ color: 'var(--color-text-tertiary)' }} aria-hidden="true">
+          <span className="shrink-0 mt-1 text-on-surface-variant" aria-hidden="true">
             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </span>
         </div>
@@ -163,9 +156,9 @@ export function TaskCard({
 
       {/* §53 expanded details — description + compact interactions */}
       {isExpanded && (
-        <div className="px-3 pb-3 space-y-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="px-3 pb-3 space-y-2 border-t border-outline-variant bg-surface-container motion-reduce:transition-none">
           {task.description && (
-            <p className="pt-2 leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+            <p className="pt-2 leading-relaxed text-on-surface-variant">
               {task.description}
             </p>
           )}
@@ -182,8 +175,7 @@ export function TaskCard({
                   e.stopPropagation();
                   onSetStatus?.(task, 'IN_PROGRESS');
                 }}
-                className="p-1.5 rounded-md border transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                className="p-1.5 rounded-full border border-outline-variant bg-surface-container text-on-surface-variant transition-colors duration-micro ease-emphasized hover:bg-surface-container-high focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <svg viewBox="0 0 12 12" className="w-3 h-3" aria-hidden="true">
                   <circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -200,8 +192,7 @@ export function TaskCard({
                   e.stopPropagation();
                   onComplete?.(task);
                 }}
-                className="p-1.5 rounded-md border transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ borderColor: 'var(--color-border)', color: 'var(--color-success)' }}
+                className="p-1.5 rounded-full border border-outline-variant bg-success-container text-on-success-container transition-colors duration-micro ease-emphasized hover:opacity-90 focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Check className="w-3 h-3" aria-hidden="true" />
               </button>
@@ -215,8 +206,7 @@ export function TaskCard({
                 onSetStatus?.(task, e.target.value as Task['status']);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="px-2 py-1 rounded-md border text-[11px] font-semibold outline-none cursor-pointer disabled:opacity-50"
-              style={{ borderColor: 'var(--color-border-strong)', background: 'var(--color-surface-raised)', color: 'var(--color-text-secondary)' }}
+              className="px-2 py-1 rounded-md border border-outline bg-surface-container text-[11px] font-semibold outline-none cursor-pointer focus-visible:shadow-[var(--md-focus-ring)] disabled:opacity-50 text-on-surface-variant transition-colors duration-micro ease-emphasized motion-reduce:transition-none"
             >
               <option value="TODO">To Do</option>
               <option value="IN_PROGRESS">In Progress</option>
@@ -232,8 +222,7 @@ export function TaskCard({
                 onAssign?.(task, e.target.value === '' ? null : e.target.value);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="max-w-28 px-2 py-1 rounded-md border text-[11px] font-semibold outline-none cursor-pointer disabled:opacity-50"
-              style={{ borderColor: 'var(--color-border-strong)', background: 'var(--color-surface-raised)', color: 'var(--color-text-secondary)' }}
+              className="max-w-28 px-2 py-1 rounded-md border border-outline bg-surface-container text-[11px] font-semibold outline-none cursor-pointer focus-visible:shadow-[var(--md-focus-ring)] disabled:opacity-50 text-on-surface-variant transition-colors duration-micro ease-emphasized motion-reduce:transition-none"
             >
               <option value="">Unassigned</option>
               {members.map((m) => (

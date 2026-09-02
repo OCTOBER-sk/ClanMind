@@ -54,17 +54,16 @@ export function DecisionsView({
   }, [ordered]);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ background: 'var(--color-background)' }}>
+    <div className="flex flex-col h-full overflow-hidden bg-surface motion-reduce:transition-none">
       {/* Header */}
       <div
-        className="flex items-center justify-between gap-3 border-b px-6 py-4"
-        style={{ borderColor: 'var(--color-border)' }}
+        className="flex items-center justify-between gap-3 border-b border-outline-variant bg-surface px-6 py-4 motion-reduce:transition-none"
       >
         <div>
-          <h1 className="text-base font-bold" style={{ color: 'var(--color-text)' }}>
+          <h1 className="text-base font-bold text-on-surface">
             Decisions
           </h1>
-          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+          <p className="text-[11px] mt-0.5 text-on-surface-variant">
             The project&apos;s decision log — approved choices and open proposals.
           </p>
         </div>
@@ -83,23 +82,21 @@ export function DecisionsView({
       {error && (
         <div
           role="alert"
-          className="px-6 py-2.5 text-xs border-b"
-          style={{ color: 'var(--color-danger)', background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+          className="px-6 py-2.5 text-xs border-b border-outline-variant bg-error-container text-on-error-container motion-reduce:transition-none"
         >
           {error}
         </div>
       )}
 
       {/* Decisions List */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-3" aria-busy={isLoading}>
+      <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-surface motion-reduce:transition-none" aria-busy={isLoading}>
         {/* §64 — skeleton loading */}
         {isLoading && ordered.length === 0 ? (
           <div className="space-y-3">
             {Array.from({ length: 2 }).map((_, i) => (
               <div
                 key={i}
-                className="p-4 rounded-lg border space-y-2"
-                style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+                className="p-4 rounded-md border border-outline-variant bg-surface-container-low space-y-2 motion-reduce:transition-none"
               >
                 <div className="flex items-center gap-2">
                   <Skeleton variant="text" className="h-3.5 w-48" />

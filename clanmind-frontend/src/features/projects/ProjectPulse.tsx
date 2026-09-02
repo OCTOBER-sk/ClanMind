@@ -82,74 +82,69 @@ export function ProjectPulse({
 
   return (
     <div
-      className="p-4 rounded-lg border space-y-3"
-      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+      className="p-4 rounded-md border border-outline-variant bg-surface-container-low space-y-3 motion-reduce:transition-none"
     >
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-tertiary)' }}>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
           PROJECT PULSE
         </span>
-        <span className="text-xs font-mono font-bold" style={{ color: 'var(--color-text)' }}>
+        <span className="text-xs font-mono font-bold text-on-surface">
           {project.pulse_progress}%
         </span>
       </div>
 
-      {/* Progress Line with Single Spectral Sweep Animation (§85) */}
+      {/* Progress Line with Single Spectral Sweep Animation (§85) — animates ONCE on change, never continuously */}
       <div className="relative overflow-hidden rounded-full">
         <Progress value={project.pulse_progress} size="md" variant="neutral" />
         {animatePulse && (
-          <div className="absolute inset-0 spectral-active opacity-70 animate-pulse pointer-events-none" />
+          <div className="absolute inset-0 spectral-active opacity-70 pointer-events-none motion-reduce:opacity-0 motion-reduce:transition-none animate-[spectral-sweep_1.1s_ease-out_1] motion-reduce:animate-none" />
         )}
       </div>
 
-      {/* Status Grid — compact, semantic colors */}
+      {/* Status Grid — compact, tonal containers */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
         <div
-          className="p-2.5 rounded-md"
-          style={{ background: 'var(--color-surface-hover)' }}
+          className="p-2.5 rounded-md bg-surface-container border border-transparent motion-reduce:transition-none"
         >
-          <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
+          <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5 text-on-surface-variant">
             Focus
           </span>
-          <p className="font-semibold" style={{ color: 'var(--color-text)' }}>
+          <p className="font-semibold text-on-surface">
             {project.current_focus || 'Not set yet'}
           </p>
         </div>
 
         <div
-          className="p-2.5 rounded-md"
-          style={{ background: 'var(--color-surface-hover)' }}
+          className="p-2.5 rounded-md bg-surface-container border border-transparent motion-reduce:transition-none"
         >
-          <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
+          <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5 text-on-surface-variant">
             Blocked
           </span>
-          <p className="font-semibold" style={{ color: 'var(--color-text)' }}>
+          <p className="font-semibold text-on-surface">
             {project.blocked_reason || 'Nothing blocked'}
           </p>
         </div>
 
         <div
-          className="p-2.5 rounded-md"
-          style={{ background: 'var(--color-surface-hover)' }}
+          className="p-2.5 rounded-md bg-surface-container border border-transparent motion-reduce:transition-none"
         >
-          <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
+          <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5 text-on-surface-variant">
             Next
           </span>
-          <p className="font-semibold" style={{ color: 'var(--color-text)' }}>
+          <p className="font-semibold text-on-surface">
             {project.next_step || 'No next step captured'}
           </p>
         </div>
       </div>
 
       {/* §84 Odin notice — computed from the real decision log, never a
-          hardcoded count. Hidden entirely when nothing needs review. */}
+           hardcoded count. Hidden entirely when nothing needs review. */}
       {unresolvedDecisionCount > 0 && (
         <div
-          className="flex items-center justify-between p-2.5 rounded-md text-xs"
-          style={{ background: 'var(--color-surface-hover)' }}
+          className="flex items-center justify-between p-2.5 rounded-md text-xs bg-warning-container border border-transparent motion-reduce:transition-none"
         >
-          <div className="flex items-center gap-2" style={{ color: 'var(--color-text-secondary)' }}>
-            <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
+          <div className="flex items-center gap-2 text-on-warning-container">
+            <Sparkles className="w-3.5 h-3.5 shrink-0 text-on-warning-container" aria-hidden="true" />
             <span>
               {aiName}: {unresolvedDecisionCount} unresolved{' '}
               {unresolvedDecisionCount === 1 ? 'decision needs' : 'decisions need'} attention.
@@ -157,8 +152,7 @@ export function ProjectPulse({
           </div>
           <button
             onClick={onNavigateToDecisions}
-            className="font-semibold hover:underline flex items-center gap-1 cursor-pointer shrink-0"
-            style={{ color: 'var(--color-text)' }}
+            className="font-semibold hover:underline flex items-center gap-1 cursor-pointer shrink-0 text-on-warning-container focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none rounded-sm transition-colors duration-micro ease-emphasized motion-reduce:transition-none"
             aria-label="Review unresolved decisions"
           >
             Review <ArrowRight className="w-3 h-3" aria-hidden="true" />
@@ -170,7 +164,7 @@ export function ProjectPulse({
       {activityEvents.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-tertiary)' }}>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
               ACTIVITY
             </span>
             <div className="flex items-center gap-1" role="group" aria-label="Filter activity by actor">
@@ -180,10 +174,10 @@ export function ProjectPulse({
                   onClick={() => setActorFilter(f.key)}
                   aria-pressed={actorFilter === f.key}
                   className={cn(
-                    'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer',
+                    'flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors duration-micro ease-emphasized cursor-pointer focus-visible:shadow-[var(--md-focus-ring)] focus-visible:outline-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity motion-reduce:transition-none motion-reduce:before:transition-none',
                     actorFilter === f.key
-                      ? 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)]'
-                      : 'text-[var(--color-text-tertiary)] hover:bg-[var(--color-surface-hover)]',
+                      ? 'bg-secondary-container text-on-secondary-container'
+                      : 'text-on-surface-variant hover:bg-surface-container',
                   )}
                 >
                   {f.icon}
@@ -195,28 +189,26 @@ export function ProjectPulse({
 
           <div className="space-y-1 max-h-40 overflow-y-auto" role="feed" aria-label="Activity timeline">
             {filteredEvents.length === 0 ? (
-              <p className="text-[11px] py-2" style={{ color: 'var(--color-text-tertiary)' }}>
+              <p className="text-[11px] py-2 text-on-surface-variant">
                 No {actorFilter === 'all' ? '' : actorFilter.toLowerCase()} activity yet.
               </p>
             ) : (
               filteredEvents.slice(0, 8).map((event) => (
                 <div
                   key={event.id}
-                  className="flex items-start gap-2 py-1.5 px-2 rounded-md text-[11px]"
-                  style={{ background: 'var(--color-surface-hover)' }}
+                  className="flex items-start gap-2 py-1.5 px-2 rounded-md text-[11px] bg-surface-container border border-transparent motion-reduce:transition-none"
                   role="article"
                   aria-label={`${event.actor_type} activity: ${event.summary}`}
                 >
                   <span
-                    className="mt-0.5 shrink-0"
-                    style={{ color: event.actor_type === 'AI' ? 'var(--color-warning)' : 'var(--color-text-tertiary)' }}
+                    className="mt-0.5 shrink-0 text-on-surface-variant"
                   >
                     {actorIcon(event.actor_type)}
                   </span>
-                  <span className="flex-1 min-w-0" style={{ color: 'var(--color-text-secondary)' }}>
+                  <span className="flex-1 min-w-0 text-on-surface-variant">
                     {event.summary}
                   </span>
-                  <span className="text-[10px] shrink-0" style={{ color: 'var(--color-text-tertiary)' }}>
+                  <span className="text-[10px] shrink-0 text-on-surface-variant">
                     {relativeEventTime(event.occurred_at)}
                   </span>
                 </div>
