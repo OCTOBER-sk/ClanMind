@@ -9,14 +9,9 @@ import type { AiAction } from '@/types';
  * §161 GitHubActionCard — ONE specialization of the generic §164A
  * ApprovalCard shell (never a parallel implementation). Adds the GitHub-domain
  * summary (branch + changed-file markers + risk) and gates Approve behind the
- * §163 confirmation dialog listing exactly what will happen:
+ * §163 confirmation dialog listing exactly what will happen.
  *
- *   Approve this action?
- *   Create branch / Modify N files / Create commit / Open PR
- *   [Approve] [Reject]
- *
- * The actual approve still submits the exact displayed payload_hash +
- * payload_version through the generic onApprove binding (§164A.2).
+ * M3: same tonal shell as ApprovalCard; hash/version mono tokens.
  */
 
 export interface GitHubActionCardProps {
@@ -68,10 +63,10 @@ function ApprovalSteps({ action }: { action: AiAction }) {
   steps.push('Create commit');
   steps.push('Open PR');
   return (
-    <ul className="space-y-1.5 text-xs" style={{ color: 'var(--color-text)' }}>
+    <ul className="space-y-1.5 text-xs text-on-surface">
       {steps.map((s) => (
         <li key={s} className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--color-info)' }} aria-hidden="true" />
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-tertiary" aria-hidden="true" />
           {s}
         </li>
       ))}
@@ -98,8 +93,8 @@ export function GitHubActionCard({
 
   return (
     <>
-      {/* §161 example card anatomy: title, branch, changed-file summary, risk */}
-      <div data-testid="github-action-card">
+      {/* §161 example card anatomy: title, branch, changed-file summary, risk — M3 tonal wrapper */}
+      <div data-testid="github-action-card" className="space-y-1">
         <GitHubSummaryStrip action={action} />
         <ApprovalCard
           action={action}
@@ -114,6 +109,11 @@ export function GitHubActionCard({
           onReviewLatest={onReviewLatest}
           onViewDiff={onViewDiff}
         />
+        {/* Hash/version mono token footer for GitHub card — mirrors ApprovalCard footer but branch-scoped */}
+        <div className="flex items-center justify-between px-1 text-[10px] font-mono text-on-surface-variant">
+          <span>hash {action.payload_hash.slice(0, 8)}…</span>
+          <span>v{action.payload_version}</span>
+        </div>
       </div>
 
       <Dialog
@@ -151,16 +151,15 @@ export function GitHubActionCard({
         <div className="space-y-3">
           <ApprovalSteps action={action} />
           {files.length > 0 && (
-            <div className="font-mono text-[10px] space-y-0.5 pt-1 border-t" style={{ borderColor: 'var(--color-border)' }}>
+            <div className="font-mono text-[10px] space-y-0.5 pt-3 border-t border-outline-variant">
               {files.map((f) => {
                 const marker = fileMarker(f);
-                const color =
-                  marker === '+' ? 'var(--color-success)' : marker === '-' ? 'var(--color-danger)' : 'var(--color-warning)';
+                const colorClass = marker === '+' ? 'text-success' : marker === '-' ? 'text-error' : 'text-warning';
                 const Icon = marker === '+' ? FilePlus2 : marker === '-' ? FileMinus2 : FileEdit;
                 return (
                   <div key={f.path} className="flex items-center gap-1.5">
-                    <Icon className="w-3 h-3 shrink-0" style={{ color }} aria-hidden="true" />
-                    <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                    <Icon className={`w-3 h-3 shrink-0 ${colorClass}`} aria-hidden="true" />
+                    <span className="truncate text-on-surface-variant">
                       {marker} {f.path}
                     </span>
                   </div>
@@ -174,13 +173,13 @@ export function GitHubActionCard({
   );
 }
 
-/** Thin strip above the generic card carrying the §161 domain context. */
+/** Thin strip above the generic card carrying the §161 domain context — M3 mono tonal. */
 function GitHubSummaryStrip({ action }: { action: AiAction }) {
   const p = action.payload as Record<string, unknown>;
   const branch = typeof p.branch === 'string' ? p.branch : null;
   if (!branch) return null;
   return (
-    <p className="flex items-center gap-1.5 text-[11px] font-mono pb-1" style={{ color: 'var(--color-info)' }}>
+    <p className="flex items-center gap-1.5 text-[11px] font-mono pb-1 text-tertiary">
       <GitBranch className="w-3.5 h-3.5" aria-hidden="true" />
       {branch}
     </p>

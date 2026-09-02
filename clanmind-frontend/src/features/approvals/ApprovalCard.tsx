@@ -23,6 +23,9 @@ import type { AiAction } from '@/types';
  * §164A Generalized Approval UX — one ApprovalCard driven by the generic
  * ai_actions shape: action_kind, risk_level, payload (with hash/version).
  * GitHub is one specialization, not a parallel implementation.
+ *
+ * M3 calm card: surface-container tone + subtle outline/left-edge accent,
+ * NOT alarm fill. Buttons keep existing variants, state-layer safe.
  */
 
 export interface ApprovalCardProps {
@@ -112,13 +115,13 @@ function PayloadSummary({ action }: { action: AiAction }) {
     return (
       <div className="font-mono text-[11px] space-y-1">
         {typeof p.repo_full_name === 'string' && (
-          <div className="font-sans font-semibold text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-            Repo: <span className="font-mono" style={{ color: 'var(--color-text)' }}>{p.repo_full_name}</span>
+          <div className="font-sans font-semibold text-xs text-on-surface-variant">
+            Repo: <span className="font-mono text-on-surface">{p.repo_full_name}</span>
           </div>
         )}
         {typeof p.branch === 'string' && (
-          <div className="font-sans font-semibold text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-            Branch: <span className="font-mono" style={{ color: 'var(--color-info)' }}>{p.branch}</span>
+          <div className="font-sans font-semibold text-xs text-on-surface-variant">
+            Branch: <span className="font-mono text-tertiary">{p.branch}</span>
           </div>
         )}
         {files.map((f) => {
@@ -126,17 +129,15 @@ function PayloadSummary({ action }: { action: AiAction }) {
           const Icon = letter === 'A' ? FilePlus2 : letter === 'D' ? FileMinus2 : FileEdit;
           return (
             <div key={f.path} className="flex items-center gap-1.5">
-              <Icon className="w-3 h-3 shrink-0" style={{ color: letter === 'D' ? 'var(--color-danger)' : 'var(--color-success)' }} aria-hidden="true" />
-              <span className="truncate" style={{ color: 'var(--color-text)' }}>{f.path}</span>
-              <span className="ml-auto shrink-0" style={{ color: 'var(--color-success)' }}>+{f.additions}</span>
-              <span className="shrink-0" style={{ color: 'var(--color-danger)' }}>−{f.deletions}</span>
+              <Icon className={letter === 'D' ? 'w-3 h-3 shrink-0 text-error' : letter === 'A' ? 'w-3 h-3 shrink-0 text-success' : 'w-3 h-3 shrink-0 text-warning'} aria-hidden="true" />
+              <span className="truncate text-on-surface">{f.path}</span>
+              <span className="ml-auto shrink-0 font-mono text-success">+{f.additions}</span>
+              <span className="shrink-0 font-mono text-error">−{f.deletions}</span>
             </div>
           );
         })}
         {files.length === 0 && (
-          <pre className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
-            {JSON.stringify(action.payload, null, 2)}
-          </pre>
+          <pre className="text-[10px] font-mono text-on-surface-variant whitespace-pre-wrap break-all">{JSON.stringify(action.payload, null, 2)}</pre>
         )}
       </div>
     );
@@ -145,54 +146,42 @@ function PayloadSummary({ action }: { action: AiAction }) {
   if (kind.includes('delete') || kind.includes('purge')) {
     const items = (p.items as string[]) ?? [];
     return (
-      <div className="space-y-1" style={{ color: 'var(--color-text)' }}>
-        {typeof p.reason === 'string' && (
-          <p className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
-            Reason: {p.reason}
-          </p>
-        )}
+      <div className="space-y-1 text-on-surface">
+        {typeof p.reason === 'string' && <p className="text-[11px] text-on-surface-variant">Reason: {p.reason}</p>}
         {items.map((it, i) => (
           <p key={i}>• {it}</p>
         ))}
-        {items.length === 0 && (
-          <p>{String(p.count ?? 0)} items</p>
-        )}
+        {items.length === 0 && <p>{String(p.count ?? 0)} items</p>}
       </div>
     );
   }
 
   if (kind.includes('reassign')) {
     return (
-      <div className="space-y-1" style={{ color: 'var(--color-text)' }}>
+      <div className="space-y-1 text-on-surface">
         <p>
           From: <span className="font-semibold">{String(p.from_name ?? '—')}</span>
         </p>
         <p>
           To: <span className="font-semibold">{String(p.to_name ?? '—')}</span>
         </p>
-        {typeof p.count === 'number' && (
-          <p className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
-            {p.count} tasks affected
-          </p>
-        )}
+        {typeof p.count === 'number' && <p className="text-[11px] text-on-surface-variant">{p.count} tasks affected</p>}
       </div>
     );
   }
 
   return (
-    <pre className="font-mono text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
-      {JSON.stringify(action.payload, null, 2)}
-    </pre>
+    <pre className="font-mono text-[10px] text-on-surface-variant whitespace-pre-wrap break-all">{JSON.stringify(action.payload, null, 2)}</pre>
   );
 }
 
 function ActionIcon({ kind }: { kind: string }) {
   const k = kind.toLowerCase();
-  if (k.includes('github')) return <GitPullRequest className="w-4 h-4" style={{ color: 'var(--color-info)' }} aria-hidden="true" />;
-  if (k.includes('delete')) return <Trash2 className="w-4 h-4" style={{ color: 'var(--color-danger)' }} aria-hidden="true" />;
-  if (k.includes('reassign')) return <Users className="w-4 h-4" style={{ color: 'var(--color-info)' }} aria-hidden="true" />;
-  if (k.includes('memory')) return <BookOpen className="w-4 h-4" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />;
-  return <ShieldAlert className="w-4 h-4" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />;
+  if (k.includes('github')) return <GitPullRequest className="w-4 h-4 text-tertiary" aria-hidden="true" />;
+  if (k.includes('delete')) return <Trash2 className="w-4 h-4 text-error" aria-hidden="true" />;
+  if (k.includes('reassign')) return <Users className="w-4 h-4 text-tertiary" aria-hidden="true" />;
+  if (k.includes('memory')) return <BookOpen className="w-4 h-4 text-warning" aria-hidden="true" />;
+  return <ShieldAlert className="w-4 h-4 text-warning" aria-hidden="true" />;
 }
 
 function riskBadge(action: AiAction) {
@@ -229,17 +218,12 @@ export function ApprovalCard({
   // ─── §164A.4 EXPIRED: payload changed since the card was rendered ───
   if (action.status === 'EXPIRED') {
     return (
-      <div
-        className="p-4 rounded-xl border text-xs space-y-3"
-        style={{ borderColor: 'var(--color-warning)', background: 'var(--color-warning-bg)' }}
-      >
-        <div className="flex items-center gap-2 font-semibold" style={{ color: 'var(--color-warning)' }}>
+      <div className="p-4 rounded-md border border-outline-variant bg-surface-container border-l-[3px] border-l-warning text-xs space-y-3 motion-reduce:transition-none">
+        <div className="flex items-center gap-2 font-semibold text-warning">
           <Clock className="w-4 h-4" aria-hidden="true" />
           <span>This action changed since you last saw it.</span>
         </div>
-        <p style={{ color: 'var(--color-text-secondary)' }}>
-          Review the latest version before approving.
-        </p>
+        <p className="text-on-surface-variant">Review the latest version before approving.</p>
         <Button
           size="sm"
           variant="outline"
@@ -255,31 +239,21 @@ export function ApprovalCard({
   // ─── §164A.3 APPROVED (brief) / SUCCEEDED (collapsed result) ───
   if (action.status === 'APPROVED') {
     return (
-      <div
-        className="p-3.5 rounded-xl border text-xs flex items-center justify-between"
-        style={{ borderColor: 'var(--color-border)', background: 'var(--color-info-bg)' }}
-      >
-        <span className="font-semibold" style={{ color: 'var(--color-info)' }}>
-          Approved — starting…
-        </span>
-        <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+      <div className="p-3.5 rounded-md border border-outline-variant bg-surface-container border-l-[3px] border-l-tertiary text-xs flex items-center justify-between motion-reduce:transition-none">
+        <span className="font-semibold text-tertiary">Approved — starting…</span>
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-tertiary" aria-hidden="true" />
       </div>
     );
   }
 
   if (action.status === 'SUCCEEDED') {
     return (
-      <div
-        className="p-3.5 rounded-xl border text-xs flex items-center justify-between"
-        style={{ borderColor: 'var(--color-border)', background: 'var(--color-success-bg)' }}
-      >
-        <div className="flex items-center gap-2 font-semibold" style={{ color: 'var(--color-success)' }}>
+      <div className="p-3.5 rounded-md border border-outline-variant bg-surface-container border-l-[3px] border-l-success text-xs flex items-center justify-between motion-reduce:transition-none">
+        <div className="flex items-center gap-2 font-semibold text-success">
           <Check className="w-4 h-4" aria-hidden="true" />
           <span>Completed</span>
         </div>
-        <span className="text-[11px] font-mono" style={{ color: 'var(--color-text-tertiary)' }}>
-          hash: {action.payload_hash.slice(0, 8)}…
-        </span>
+        <span className="text-[11px] font-mono text-on-surface-variant">hash: {action.payload_hash.slice(0, 8)}…</span>
       </div>
     );
   }
@@ -287,14 +261,9 @@ export function ApprovalCard({
   // ─── §164A.3 REJECTED — collapsed, no further action ───
   if (action.status === 'REJECTED') {
     return (
-      <div
-        className="p-3.5 rounded-xl border text-xs flex items-center gap-2"
-        style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
-      >
-        <X className="w-4 h-4" style={{ color: 'var(--color-text-tertiary)' }} aria-hidden="true" />
-        <span style={{ color: 'var(--color-text-secondary)' }}>
-          Rejected by {action.rejected_by_name || 'Admin'}
-        </span>
+      <div className="p-3.5 rounded-md border border-outline-variant bg-surface-container-low text-xs flex items-center gap-2 motion-reduce:transition-none">
+        <X className="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
+        <span className="text-on-surface-variant">Rejected by {action.rejected_by_name || 'Admin'}</span>
       </div>
     );
   }
@@ -302,17 +271,12 @@ export function ApprovalCard({
   // ─── §164A.3 FAILED — error card with retry-eligibility note ───
   if (action.status === 'FAILED') {
     return (
-      <div
-        className="p-4 rounded-xl border text-xs space-y-2"
-        style={{ borderColor: 'var(--color-danger)', background: 'var(--color-danger-bg)' }}
-      >
-        <div className="flex items-center gap-2 font-semibold" style={{ color: 'var(--color-danger)' }}>
+      <div className="p-4 rounded-md border border-outline-variant bg-surface-container border-l-[3px] border-l-error text-xs space-y-2 motion-reduce:transition-none">
+        <div className="flex items-center gap-2 font-semibold text-error">
           <AlertCircle className="w-4 h-4" aria-hidden="true" />
           <span>This action failed to execute.</span>
         </div>
-        <p style={{ color: 'var(--color-text-secondary)' }}>
-          Retry eligibility depends on the backend response.
-        </p>
+        <p className="text-on-surface-variant">Retry eligibility depends on the backend response.</p>
         <Button size="sm" variant="outline" onClick={handleApprove}>
           Retry
         </Button>
@@ -323,17 +287,12 @@ export function ApprovalCard({
   // ─── §164A.3 EXECUTING — progress state, no Approve/Reject ───
   if (action.status === 'EXECUTING') {
     return (
-      <div
-        className="p-4 rounded-xl border text-xs"
-        style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
-      >
-        <div className="flex items-center gap-2 font-semibold" style={{ color: 'var(--color-text)' }}>
-          <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--color-info)' }} aria-hidden="true" />
+      <div className="p-4 rounded-md border border-outline-variant bg-surface-container text-xs motion-reduce:transition-none">
+        <div className="flex items-center gap-2 font-semibold text-on-surface">
+          <Loader2 className="w-4 h-4 animate-spin text-tertiary" aria-hidden="true" />
           Executing…
         </div>
-        <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-          {actionLabel(action.action_kind)}
-        </p>
+        <p className="mt-1 text-on-surface-variant">{actionLabel(action.action_kind)}</p>
       </div>
     );
   }
@@ -341,23 +300,25 @@ export function ApprovalCard({
   // ─── §164A.3 PROPOSED (rare/transient) & WAITING_APPROVAL (active card) ───
   const isActive = action.status === 'WAITING_APPROVAL';
 
-  // §164A.1 — risk-tiered border emphasis: CRITICAL/HIGH get a stronger
-  // border to communicate severity without making every approve button red.
-  const riskBorderColor =
-    action.risk_level === 'CRITICAL' ? 'var(--color-danger)' :
-    action.risk_level === 'HIGH' ? 'var(--color-warning)' :
-    'var(--color-border)';
+  // §164A.1 — subtle left-edge outline accent by risk (calm high-attention, NOT alarm fill)
+  const riskAccent =
+    action.risk_level === 'CRITICAL'
+      ? 'border-l-error'
+      : action.risk_level === 'HIGH'
+        ? 'border-l-warning'
+        : action.risk_level === 'MEDIUM'
+          ? 'border-l-outline'
+          : 'border-l-outline-variant';
 
   return (
     <div
-      className="p-4 rounded-xl border shadow-[var(--shadow-sm)] text-xs space-y-3"
-      style={{ borderColor: riskBorderColor, background: 'var(--color-surface-raised)' }}
+      className={`p-4 rounded-md border border-outline-variant bg-surface-container shadow-sm text-xs space-y-3 border-l-[3px] ${riskAccent} motion-reduce:transition-none`}
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <ActionIcon kind={action.action_kind} />
-          <span className="font-bold truncate" style={{ color: 'var(--color-text)' }}>
+          <span className="font-bold truncate text-on-surface">
             {action.status === 'PROPOSED' ? 'Odin is preparing this action' : actionLabel(action.action_kind)}
           </span>
         </div>
@@ -366,36 +327,30 @@ export function ApprovalCard({
         </Badge>
       </div>
 
-      {/* Payload summary (§164A.1) */}
-      <div
-        className="p-3 rounded-lg border space-y-1.5 text-xs"
-        style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
-      >
+      {/* Payload summary (§164A.1) — surface-container-lowest for depth */}
+      <div className="p-3 rounded-sm border border-outline-variant bg-surface-container-lowest space-y-1.5 text-xs motion-reduce:transition-none">
         <PayloadSummary action={action} />
       </div>
 
       {/* Request provenance + lifecycle timestamps (§164A.1) */}
-      <div className="space-y-0.5 text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+      <div className="space-y-0.5 text-[10px] text-on-surface-variant">
         {action.requested_by_run_id && (
           <p>
-            Requested via AI run{' '}
-            <span className="font-mono">{action.requested_by_run_id.slice(0, 8)}</span>
+            Requested via AI run <span className="font-mono text-on-surface">{action.requested_by_run_id.slice(0, 8)}</span>
             {action.requested_by_user_id ? ' · by a teammate request' : ''}
           </p>
         )}
         <p>Created {formatTimestamp(action.created_at)}</p>
-        {typeof action.expires_at === 'string' && (
-          <p>Approval window closes {formatTimestamp(action.expires_at)}</p>
-        )}
+        {typeof action.expires_at === 'string' && <p>Approval window closes {formatTimestamp(action.expires_at)}</p>}
       </div>
 
-      {/* Hash & Verification Footer — §164A.2 snapshot validity */}
-      <div className="flex items-center justify-between text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+      {/* Hash & Verification Footer — §164A.2 snapshot validity — mono token */}
+      <div className="flex items-center justify-between text-[10px] font-mono text-on-surface-variant">
         <span>Payload Hash: {action.payload_hash.slice(0, 12)}…</span>
         <span>Version: v{action.payload_version}</span>
       </div>
 
-      {/* Actions */}
+      {/* Actions — variants unchanged */}
       {isActive && (
         <div className="flex items-center gap-2 pt-1">
           {isGithubAction(action) && onViewDiff && (

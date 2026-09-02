@@ -21,11 +21,8 @@ import type { AiAction } from '@/types';
  * from the ai_actions payload (branch, changed_files, SHAs) — there are no
  * hard-coded demo fallbacks; an empty payload degrades honestly.
  *
- * §299 — before approval the viewer shows the exact files, base/target
- * branch context, additions/deletions and the high-level risk level.
- *
- * §164 — merging is high impact and asks via a real dialog:
- *   "Merge pull request / This changes the connected repository. [Cancel][Merge]"
+ * M3: diff rows surface-container-lowest, additions success state-layer,
+ * deletions error state-layer (subtle), sticky header tonal, motion-reduce.
  */
 
 export interface GitHubDiffViewerProps {
@@ -118,8 +115,8 @@ export function highlightLine(line: string): Span[] {
 }
 
 function diffLineColor(line: string): string | undefined {
-  if (line.startsWith('+')) return 'var(--color-success)';
-  if (line.startsWith('-')) return 'var(--color-danger)';
+  if (line.startsWith('+')) return 'var(--md-success)';
+  if (line.startsWith('-')) return 'var(--md-error)';
   return undefined;
 }
 
@@ -201,7 +198,7 @@ function DiffBody({
     const hunks = readHunksFor(payload, path);
     if (hunks.length === 0) {
       return (
-        <p className="px-3 py-2 border-t text-[10px]" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-tertiary)' }}>
+        <p className="px-3 py-2 border-t border-outline-variant text-[10px] text-on-surface-variant">
           Line-level changes not available for this file — stats above are authoritative.
         </p>
       );
@@ -211,36 +208,46 @@ function DiffBody({
     const folded = hunks.length > HUNK_COLLAPSE_THRESHOLD && !hunkExpandedPaths.has(path);
     const visible = folded ? hunks.slice(0, HUNK_COLLAPSE_THRESHOLD) : hunks;
     return (
-      <div className="px-3 py-2 space-y-0.5 border-t font-mono text-[11px]" style={{ borderColor: 'var(--color-border)' }}>
-        {visible.map((line, i) => (
-          <div key={i} className="flex gap-2">
-            <span className="select-none w-4 text-right shrink-0" style={{ color: 'var(--color-text-tertiary)' }}>
-              {i + 1}
-            </span>
-            <span className="whitespace-pre-wrap break-all">
-              {highlightLine(line).map((span, j) => (
-                <span
-                  key={j}
-                  style={{
-                    ...(span.color
-                      ? { color: span.color }
-                      : diffLineColor(line)
-                        ? { color: diffLineColor(line) }
-                        : {}),
-                    fontWeight: span.bold ? 600 : undefined,
-                  }}
-                >
-                  {span.text}
-                </span>
-              ))}
-            </span>
-          </div>
-        ))}
+      <div className="px-3 py-2 space-y-0.5 border-t border-outline-variant font-mono text-[11px] bg-surface-container-lowest">
+        {visible.map((line, i) => {
+          const isAdd = line.startsWith('+');
+          const isDel = line.startsWith('-');
+          return (
+            <div
+              key={i}
+              className={
+                isAdd
+                  ? 'flex gap-2 rounded-xs bg-[color-mix(in_srgb,var(--md-success)_8%,transparent)]'
+                  : isDel
+                    ? 'flex gap-2 rounded-xs bg-[color-mix(in_srgb,var(--md-error)_8%,transparent)]'
+                    : 'flex gap-2'
+              }
+            >
+              <span className="select-none w-4 text-right shrink-0 text-on-surface-variant">{i + 1}</span>
+              <span className="whitespace-pre-wrap break-all">
+                {highlightLine(line).map((span, j) => (
+                  <span
+                    key={j}
+                    style={{
+                      ...(span.color
+                        ? { color: span.color }
+                        : diffLineColor(line)
+                          ? { color: diffLineColor(line) }
+                          : { color: 'var(--md-on-surface)' }),
+                      fontWeight: span.bold ? 600 : undefined,
+                    }}
+                  >
+                    {span.text}
+                  </span>
+                ))}
+              </span>
+            </div>
+          );
+        })}
         {hunks.length > HUNK_COLLAPSE_THRESHOLD && (
           <button
             onClick={() => onToggleHunkCollapse(path)}
-            className="mt-1 text-[10px] font-semibold cursor-pointer hover:opacity-80"
-            style={{ color: 'var(--color-info)' }}
+            className="mt-1 text-[10px] font-semibold cursor-pointer hover:opacity-80 outline-none focus-visible:shadow-[var(--md-focus-ring)] rounded-full px-2 py-0.5 transition-colors duration-micro ease-emphasized motion-reduce:transition-none text-tertiary"
             aria-expanded={!folded}
           >
             {folded ? `Show ${hunks.length - HUNK_COLLAPSE_THRESHOLD} more lines` : 'Collapse lines'}
@@ -256,30 +263,17 @@ function DiffBody({
       <div
         key={file.path}
         data-testid="diff-file"
-        className="rounded-lg border overflow-hidden mb-1.5"
-        style={{ borderColor: 'var(--color-border)' }}
+        className="rounded-md border border-outline-variant overflow-hidden mb-1.5 bg-surface-container-lowest motion-reduce:transition-none"
       >
         <button
           onClick={() => onTogglePath(file.path)}
-          className="w-full flex items-center gap-1.5 px-2 py-1.5 text-left cursor-pointer hover:opacity-90"
-          style={{ background: 'var(--color-surface-raised)' }}
+          className="w-full flex items-center gap-1.5 px-2 py-1.5 text-left cursor-pointer outline-none focus-visible:shadow-[var(--md-focus-ring)] relative isolate overflow-hidden before:absolute before:inset-0 before:bg-[var(--md-on-surface)] before:opacity-0 hover:before:opacity-[0.08] active:before:opacity-[0.10] before:transition-opacity before:duration-micro motion-reduce:before:transition-none transition-colors duration-micro ease-emphasized bg-surface-container-lowest"
           aria-expanded={!collapsed}
         >
-          {collapsed ? (
-            <ChevronRight className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-          )}
-          <span className="font-mono text-[11px] truncate flex-1" style={{ color: 'var(--color-text)' }}>
-            {/* §162 hierarchical tree — leaf basename under its directory node */}
-            {file.path.split('/').pop()}
-          </span>
-          <span className="font-mono text-[10px]" style={{ color: 'var(--color-success)' }}>
-            +{file.additions}
-          </span>
-          <span className="font-mono text-[10px]" style={{ color: 'var(--color-danger)' }}>
-            −{file.deletions}
-          </span>
+          {collapsed ? <ChevronRight className="w-3.5 h-3.5 shrink-0 text-on-surface-variant relative" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0 text-on-surface-variant relative" aria-hidden="true" />}
+          <span className="font-mono text-[11px] truncate flex-1 text-on-surface relative">{file.path.split('/').pop()}</span>
+          <span className="font-mono text-[10px] text-success relative">+{file.additions}</span>
+          <span className="font-mono text-[10px] text-error relative">−{file.deletions}</span>
         </button>
         {!collapsed && renderHunks(file.path)}
       </div>
@@ -294,20 +288,11 @@ function DiffBody({
         <div key={`dir:${node.fullPath}`} className="mb-1.5">
           <button
             onClick={() => toggleDir(node.fullPath)}
-            className="flex items-center gap-1.5 w-full px-2 py-1 text-left cursor-pointer hover:opacity-90 rounded"
+            className="flex items-center gap-1.5 w-full px-2 py-1 text-left cursor-pointer hover:opacity-80 rounded outline-none focus-visible:shadow-[var(--md-focus-ring)] transition-colors duration-micro ease-emphasized motion-reduce:transition-none"
             aria-expanded={open}
           >
-            {open ? (
-              <ChevronDown className="w-3 h-3 shrink-0" aria-hidden="true" />
-            ) : (
-              <ChevronRight className="w-3 h-3 shrink-0" aria-hidden="true" />
-            )}
-            <span
-              className="font-mono text-[11px] font-semibold truncate"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              {node.name}/
-            </span>
+            {open ? <ChevronDown className="w-3 h-3 shrink-0 text-on-surface-variant" aria-hidden="true" /> : <ChevronRight className="w-3 h-3 shrink-0 text-on-surface-variant" aria-hidden="true" />}
+            <span className="font-mono text-[11px] font-semibold truncate text-on-surface-variant">{node.name}/</span>
           </button>
           {open && <div style={{ paddingLeft: 10 }}>{renderNodes(node.children)}</div>}
         </div>
@@ -394,22 +379,14 @@ export function GitHubDiffViewer({
   if (!action) return null;
 
   return (
-    <div
-      className="flex flex-col h-full border-l text-xs"
-      style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-    >
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-4 py-3 border-b"
-        style={{ borderColor: 'var(--color-border)' }}
-      >
+    <div className="flex flex-col h-full border-l border-outline-variant text-xs bg-surface motion-reduce:transition-none">
+      {/* Header — sticky tonal */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant bg-surface-container-high sticky top-0 z-10">
         <div className="flex items-center gap-2 min-w-0">
-          <GitPullRequest className="w-4 h-4 shrink-0" style={{ color: 'var(--color-info)' }} aria-hidden="true" />
+          <GitPullRequest className="w-4 h-4 shrink-0 text-tertiary" aria-hidden="true" />
           <div className="min-w-0">
-            <h3 className="font-bold truncate" style={{ color: 'var(--color-text)' }}>
-              {branch ? `PR: ${branch}` : 'Change review'}
-            </h3>
-            <p className="text-[10px] flex items-center gap-1" style={{ color: 'var(--color-text-tertiary)' }}>
+            <h3 className="font-bold truncate text-on-surface">{branch ? `PR: ${branch}` : 'Change review'}</h3>
+            <p className="text-[10px] flex items-center gap-1 font-mono text-on-surface-variant">
               <GitBranch className="w-2.5 h-2.5" aria-hidden="true" />
               {branch ?? '—'}
               {defaultBranch ? ` → ${defaultBranch}` : ''}
@@ -421,15 +398,14 @@ export function GitHubDiffViewer({
           <button
             onClick={onClose}
             aria-label="Close diff viewer"
-            className="p-1 cursor-pointer hover:opacity-80"
-            style={{ color: 'var(--color-text-tertiary)' }}
+            className="p-1.5 rounded-full cursor-pointer outline-none focus-visible:shadow-[var(--md-focus-ring)] relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] active:before:opacity-[0.10] before:transition-opacity before:duration-micro motion-reduce:before:transition-none text-on-surface-variant transition-colors duration-micro ease-emphasized"
           >
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-surface">
         {/* §299 diff preview before approval */}
         <div className="flex items-center gap-2">
           <Badge variant="success" size="sm">
@@ -438,28 +414,19 @@ export function GitHubDiffViewer({
           <Badge variant="danger" size="sm">
             −{totalDels}
           </Badge>
-          <span className="text-[10px] flex-1" style={{ color: 'var(--color-text-tertiary)' }}>
-            {files.length} file{files.length === 1 ? '' : 's'} changed
-          </span>
+          <span className="text-[10px] flex-1 font-mono text-on-surface-variant">{files.length} file{files.length === 1 ? '' : 's'} changed</span>
           <button
             onClick={() => void handleCopyDiff()}
-            className="inline-flex items-center gap-1 text-[10px] font-semibold cursor-pointer hover:opacity-80"
+            className="inline-flex items-center gap-1 text-[10px] font-semibold cursor-pointer hover:opacity-80 outline-none focus-visible:shadow-[var(--md-focus-ring)] rounded-full px-2 py-1 transition-colors duration-micro ease-emphasized motion-reduce:transition-none text-on-surface-variant"
             aria-label="Copy diff"
           >
-            {copied ? (
-              <Check className="w-3 h-3" style={{ color: 'var(--color-success)' }} aria-hidden="true" />
-            ) : (
-              <Copy className="w-3 h-3" aria-hidden="true" />
-            )}
+            {copied ? <Check className="w-3 h-3 text-success" aria-hidden="true" /> : <Copy className="w-3 h-3" aria-hidden="true" />}
             {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
 
         {files.length === 0 ? (
-          <p
-            className="text-[11px] p-3 rounded-lg border"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
-          >
+          <p className="text-[11px] p-3 rounded-md border border-outline-variant bg-surface-container-low text-on-surface-variant">
             No changed-file details are available for this action yet. The approval card stays authoritative.
           </p>
         ) : (
@@ -476,36 +443,22 @@ export function GitHubDiffViewer({
         {/* §162 PR preview — payload-driven title/description only */}
         <button
           onClick={() => setShowPrPreview((v) => !v)}
-          className="w-full flex items-center gap-1.5 text-xs font-semibold cursor-pointer hover:opacity-80"
-          style={{ color: 'var(--color-text-secondary)' }}
+          className="w-full flex items-center gap-1.5 text-xs font-semibold cursor-pointer hover:opacity-80 outline-none focus-visible:shadow-[var(--md-focus-ring)] rounded-md px-1 py-1 transition-colors duration-micro ease-emphasized motion-reduce:transition-none text-on-surface-variant"
           aria-expanded={showPrPreview}
         >
-          {showPrPreview ? (
-            <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
-          ) : (
-            <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
-          )}
+          {showPrPreview ? <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />}
           <GitCommitHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
           PR preview
         </button>
         {showPrPreview && (
-          <div
-            className="p-3 rounded-lg border space-y-2"
-            style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
-          >
-            <p className="font-bold" style={{ color: 'var(--color-text)' }}>
-              {typeof payload.pr_title === 'string' ? payload.pr_title : `PR: ${branch ?? 'branch'}`}
+          <div className="p-3 rounded-md border border-outline-variant bg-surface-container-low space-y-2 motion-reduce:transition-none">
+            <p className="font-bold text-on-surface">{typeof payload.pr_title === 'string' ? payload.pr_title : `PR: ${branch ?? 'branch'}`}</p>
+            <p className="text-[11px] text-on-surface-variant">
+              {typeof payload.pr_description === 'string' ? payload.pr_description : `${files.length} file${files.length === 1 ? '' : 's'} · +${totalAdds} −${totalDels}`}
             </p>
-            <p className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
-              {typeof payload.pr_description === 'string'
-                ? payload.pr_description
-                : `${files.length} file${files.length === 1 ? '' : 's'} · +${totalAdds} −${totalDels}`}
-            </p>
-            <p className="text-[10px] font-mono" style={{ color: 'var(--color-text-tertiary)' }}>
+            <p className="text-[10px] font-mono text-on-surface-variant">
               {typeof payload.base_sha === 'string' ? `base ${payload.base_sha.slice(0, 7)}` : ''}
-              {typeof payload.target_sha === 'string'
-                ? ` · head ${payload.target_sha.slice(0, 7)}`
-                : ''}
+              {typeof payload.target_sha === 'string' ? ` · head ${payload.target_sha.slice(0, 7)}` : ''}
             </p>
           </div>
         )}
@@ -543,15 +496,8 @@ export function GitHubDiffViewer({
           </>
         }
       >
-        <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-          This changes the connected repository.
-        </p>
-        {branch && (
-          <p className="text-[11px] font-mono mt-2" style={{ color: 'var(--color-text-tertiary)' }}>
-            {branch}
-            {defaultBranch ? ` → ${defaultBranch}` : ''}
-          </p>
-        )}
+        <p className="text-xs text-on-surface-variant">This changes the connected repository.</p>
+        {branch && <p className="text-[11px] font-mono mt-2 text-on-surface-variant">{branch}{defaultBranch ? ` → ${defaultBranch}` : ''}</p>}
       </Dialog>
     </div>
   );
