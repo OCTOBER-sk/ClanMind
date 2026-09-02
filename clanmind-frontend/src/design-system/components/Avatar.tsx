@@ -8,11 +8,8 @@ export interface AvatarProps {
   name: string;
   src?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  /** Show presence dot — §19 */
   presence?: PresenceState;
-  /** Is this the Odin AI avatar */
   isAi?: boolean;
-  /** Odin is currently working — adds subtle spectral ring */
   isAiActive?: boolean;
   className?: string;
 }
@@ -25,50 +22,28 @@ const sizeClasses = {
   xl: { root: 'w-12 h-12', fallback: 'text-base', presence: 'w-3 h-3' },
 };
 
-/** §19: Subtle presence states — no excessive colored dots */
-const presenceConfig: Record<
-  PresenceState,
-  { className: string; label: string } | null
-> = {
+const presenceConfig: Record<PresenceState, { className: string; label: string } | null> = {
   ONLINE: {
-    className: 'bg-[var(--color-success)] ring-2 ring-[var(--color-background)]',
+    className: 'bg-success ring-2 ring-background',
     label: 'Online',
   },
   IDLE: {
-    className: 'bg-[var(--color-warning)] ring-2 ring-[var(--color-background)]',
+    className: 'bg-warning ring-2 ring-background',
     label: 'Idle',
   },
   AWAY: {
-    className: 'bg-[var(--color-text-tertiary)] ring-2 ring-[var(--color-background)]',
+    className: 'bg-outline ring-2 ring-background',
     label: 'Away',
   },
-  OFFLINE: null, // Don't show a dot for offline — just absence of dot
+  OFFLINE: null,
 };
 
-/** Generate initials from name */
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {
     return `${parts[0]![0]}${parts[parts.length - 1]![0]}`.toUpperCase();
   }
   return name.slice(0, 2).toUpperCase();
-}
-
-/** §5.2: Monochrome first — neutral grays for human initials, no rainbow competition */
-function getAvatarColor(name: string): string {
-  const colors = [
-    'bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]',
-    'bg-[var(--color-surface-pressed)] text-[var(--color-text)]',
-    'bg-[var(--color-border)] text-[var(--color-text-secondary)]',
-    'bg-[var(--color-surface-raised)] text-[var(--color-text-tertiary)]',
-    'bg-[var(--color-surface-hover)] text-[var(--color-text-tertiary)]',
-    'bg-[var(--color-surface-pressed)] text-[var(--color-text-secondary)]',
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length]!;
 }
 
 export function Avatar({
@@ -88,15 +63,14 @@ export function Avatar({
       <RadixAvatar.Root
         className={cn(
           sz.root,
+          // §7 corner-full for avatars
           'rounded-full overflow-hidden inline-flex items-center justify-center select-none shrink-0',
-          // Odin active: subtle spectral ring — §130, §223, §48
-          isAi && isAiActive && 'ring-2 ring-offset-1 ring-offset-[var(--color-background)] spectral-border',
-          // AI base style
-          isAi && !isAiActive && 'ring-1 ring-[var(--color-border)]',
+          // Odin active: spectral ring while active (§10), else tertiary at rest
+          isAi && isAiActive && 'ring-2 ring-offset-1 ring-offset-background spectral-border',
+          isAi && !isAiActive && 'ring-1 ring-outline-variant',
         )}
       >
         {isAi ? (
-          // Odin identity — §129, §131, §275 — image when provided, fallback Sparkles
           src ? (
             <div
               className={cn(
@@ -105,26 +79,25 @@ export function Avatar({
               )}
               aria-label={`${name} (AI)`}
             >
-              <img
-                src={src}
-                alt={name}
-                className="w-full h-full object-cover dark:invert"
-              />
+              <img src={src} alt={name} className="w-full h-full object-cover" />
             </div>
           ) : (
             <div
               className={cn(
                 'w-full h-full flex items-center justify-center',
-                isAiActive
-                  ? 'odin-working'
-                  : 'bg-[var(--color-surface-hover)]',
+                // §12.1 Avatar initials fallback on secondary-container for M3
+                isAiActive ? 'odin-working' : 'bg-secondary-container text-on-secondary-container',
               )}
               aria-label={`${name} (AI)`}
             >
               <Bot
                 className={cn(
-                  sz.fallback === 'text-[9px]' ? 'w-3 h-3' : sz.fallback === 'text-[10px]' ? 'w-3.5 h-3.5' : 'w-4 h-4',
-                  isAiActive ? 'text-white' : 'text-[var(--color-text-tertiary)]',
+                  sz.fallback === 'text-[9px]'
+                    ? 'w-3 h-3'
+                    : sz.fallback === 'text-[10px]'
+                      ? 'w-3.5 h-3.5'
+                      : 'w-4 h-4',
+                  isAiActive ? 'text-white' : 'text-on-secondary-container',
                 )}
                 aria-hidden="true"
               />
@@ -132,17 +105,14 @@ export function Avatar({
           )
         ) : (
           <>
-            <RadixAvatar.Image
-              src={src}
-              alt={name}
-              className="w-full h-full object-cover"
-            />
+            <RadixAvatar.Image src={src} alt={name} className="w-full h-full object-cover" />
             <RadixAvatar.Fallback
               delayMs={300}
               className={cn(
-                'w-full h-full flex items-center justify-center font-semibold tracking-tight',
+                'w-full h-full flex items-center justify-center font-medium tracking-tight rounded-full',
                 sz.fallback,
-                getAvatarColor(name),
+                // §12.1 initials fallback on secondary-container
+                'bg-secondary-container text-on-secondary-container',
               )}
               aria-label={name}
             >
@@ -152,16 +122,11 @@ export function Avatar({
         )}
       </RadixAvatar.Root>
 
-      {/* Presence dot — §19: subtle, not overused */}
       {presenceDot && (
         <span
           aria-label={presenceDot.label}
           title={presenceDot.label}
-          className={cn(
-            'absolute bottom-0 right-0 rounded-full shrink-0',
-            sz.presence,
-            presenceDot.className,
-          )}
+          className={cn('absolute bottom-0 right-0 rounded-full shrink-0', sz.presence, presenceDot.className)}
         />
       )}
     </div>

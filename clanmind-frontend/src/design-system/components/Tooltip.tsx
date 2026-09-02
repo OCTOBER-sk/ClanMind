@@ -29,12 +29,15 @@ export function Tooltip({
             align={align}
             sideOffset={4}
             className={cn(
-              // §64: short, useful tooltips. Inverted surfaces via tokens (§4).
-              'z-50 overflow-hidden rounded-md bg-[var(--color-text)] px-2.5 py-1 text-xs text-[var(--color-background)] shadow-[var(--shadow-md)] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 max-w-xs select-none pointer-events-none'
+              // §12.1 Tooltip: inverse-surface bg, inverse-on-surface text, corner-xs (rounded-xs), body-small
+              'z-50 overflow-hidden rounded-xs bg-inverse-surface px-2.5 py-1 text-xs leading-none text-inverse-on-surface shadow-2',
+              'animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+              'data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1',
+              'max-w-xs select-none pointer-events-none',
             )}
           >
             {content}
-            <TooltipPrimitive.Arrow className="fill-[var(--color-text)]" />
+            <TooltipPrimitive.Arrow className="fill-inverse-surface" />
           </TooltipPrimitive.Content>
         </TooltipPrimitive.Portal>
       </TooltipPrimitive.Root>
