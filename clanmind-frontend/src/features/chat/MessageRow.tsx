@@ -110,13 +110,13 @@ function MessageRowInner({
   };
 
   if (message.deleted) {
-    // §32: soft delete — no empty vertical space
+    // §32: soft delete — human text, subtle, no loud color
     return (
       <div
-        className="group relative flex items-center px-4 py-1.5 text-xs italic pl-14"
-        style={{ color: 'var(--color-text-tertiary)' }}
+        className="group relative flex items-center px-4 py-1.5 text-[12px] italic pl-14 bg-surface motion-reduce:transition-none"
+        style={{ color: 'var(--md-on-surface-variant)' }}
       >
-        <span className="select-none">This message was deleted.</span>
+        <span className="select-none opacity-80">This message was deleted.</span>
       </div>
     );
   }
@@ -126,10 +126,11 @@ function MessageRowInner({
   return (
     <div
       className={cn(
-        'group relative flex gap-3 px-4 py-1.5 transition-colors duration-100',
+        'group relative flex gap-3 px-4 py-1.5 bg-surface transition-colors duration-micro ease-emphasized motion-reduce:transition-none outline-none focus-visible:shadow-[var(--md-focus-ring)]',
         !isConsecutive ? 'mt-2 pt-2' : 'mt-0.5',
-        message.pinned && 'bg-[var(--color-warning-bg)]/40',
-        'hover:bg-[var(--color-surface-hover)]/50 focus-visible:bg-[var(--color-surface-hover)]/50'
+        // M3 state layer on hover, not a card — subtle on-surface 8%
+        'hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] focus-visible:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)]',
+        message.pinned && 'bg-[color-mix(in_srgb,var(--md-warning-container)_28%,var(--md-surface))]',
       )}
       // §7 keyboard access — the row is the focus entry point that reveals
       // its §25 action toolbar via group-focus-within; without a stop here
@@ -159,7 +160,7 @@ function MessageRowInner({
         />
       )}
 
-      {/* Avatar column */}
+      {/* Avatar column — corner-full via Avatar, subtle state */}
       <div className="w-8 shrink-0 flex flex-col items-center pt-0.5">
         {!isConsecutive ? (
           <Avatar
@@ -171,70 +172,61 @@ function MessageRowInner({
           />
         ) : (
           <span
-            className="text-[10px] opacity-0 group-hover:opacity-60 transition-opacity duration-100 select-none pt-1.5 tabular-nums"
-            style={{ color: 'var(--color-text-tertiary)' }}
+            className="text-[10px] opacity-0 group-hover:opacity-60 group-focus-within:opacity-60 transition-opacity duration-micro ease-emphasized motion-reduce:transition-none select-none pt-1.5 tabular-nums text-on-surface-variant"
           >
             {formatTimestamp(message.created_at)}
           </span>
         )}
       </div>
 
-      {/* Message Content column */}
-      <div className="flex-1 min-w-0">
-        {/* Reply Quote Banner (§59) */}
+      {/* Message Content column — prose constrained ~720px, AI artifacts full */}
+      <div className={cn('flex-1 min-w-0', isAi ? 'w-full' : 'max-w-[720px]')}>
+        {/* Reply Quote Banner (§59) — subtle outline-variant */}
         {message.reply_to_preview && !isConsecutive && (
           <div
-            className="flex items-center gap-1.5 text-[11px] mb-0.5 pl-2 border-l-2"
-            style={{ color: 'var(--color-text-secondary)', borderColor: 'var(--color-border-strong)' }}
+            className="flex items-center gap-1.5 text-[11px] mb-1 pl-2 py-0.5 border-l-2 border-outline-variant text-on-surface-variant rounded-r-xs bg-surface-container-low/60"
           >
             <Reply className="w-3 h-3 rotate-180 shrink-0 opacity-60" aria-hidden="true" />
             <span className="truncate italic opacity-80">"{message.reply_to_preview}"</span>
           </div>
         )}
 
-        {/* Sender Name & Timestamp Header */}
+        {/* Sender Name & Timestamp Header — keeps grouping */}
         {!isConsecutive && (
           <div className="flex items-center gap-2 mb-0.5">
             <span
-              className="text-[13px] font-semibold flex items-center gap-1.5 leading-none"
-              style={{ color: 'var(--color-text)' }}
+              className="text-[13px] font-medium flex items-center gap-1.5 leading-none text-on-surface"
             >
               {message.sender_name}
               {isAi && (
                 <span
-                  className="inline-flex items-center gap-0.5 px-1 py-px rounded text-[10px] font-medium"
-                  style={{
-                    background: 'var(--color-surface-hover)',
-                    color: 'var(--color-text-tertiary)',
-                  }}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-surface-container-high text-on-surface-variant border border-outline-variant"
                 >
-                  <Bot className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
+                  <Bot className="w-2.5 h-2.5 text-tertiary" aria-hidden="true" />
                   AI
                 </span>
               )}
             </span>
-            <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-tertiary)' }}>
+            <span className="text-[11px] tabular-nums text-on-surface-variant">
               {formatTimestamp(message.created_at)}
             </span>
             {message.pinned && (
               <span
-                className="inline-flex items-center gap-0.5 text-[10px] font-medium"
-                style={{ color: 'var(--color-warning)' }}
+                className="inline-flex items-center gap-0.5 text-[10px] font-medium text-warning"
               >
                 <Pin className="w-2.5 h-2.5 fill-current" aria-hidden="true" />
                 Pinned
               </span>
             )}
             {message.edited && (
-              <span className="text-[10px] italic" style={{ color: 'var(--color-text-tertiary)' }}>
+              <span className="text-[10px] italic text-on-surface-variant">
                 (edited)
               </span>
             )}
-            {/* §184 pending / §245 failed indicators */}
+            {/* §184 pending / §245 failed — human text, no loud color */}
             {message.is_pending && !failed && (
               <span
-                className="inline-flex items-center gap-1 text-[10px] font-medium"
-                style={{ color: 'var(--color-text-secondary)' }}
+                className="inline-flex items-center gap-1 text-[10px] font-medium text-on-surface-variant"
               >
                 <Clock className="w-2.5 h-2.5 animate-pulse" aria-hidden="true" />
                 Sending…
@@ -242,16 +234,15 @@ function MessageRowInner({
             )}
             {failed && (
               <span
-                className="inline-flex items-center gap-1 text-[10px] font-semibold"
-                style={{ color: 'var(--color-danger)' }}
+                className="inline-flex items-center gap-1 text-[10px] font-medium text-on-surface-variant"
               >
-                Not sent
+                Not sent · Retry
               </span>
             )}
           </div>
         )}
 
-        {/* Message Body or Inline Editor (§31) */}
+        {/* Message Body or Inline Editor (§31) — body-large token */}
         {isEditing ? (
           <div className="mt-1 space-y-2">
             <textarea
@@ -266,12 +257,7 @@ function MessageRowInner({
                 }
               }}
               rows={3}
-              className="w-full text-[13px] p-2.5 rounded-lg border outline-none select-text leading-relaxed focus:ring-2 focus:ring-[var(--color-info)]/30"
-              style={{
-                borderColor: 'var(--color-border-strong)',
-                background: 'var(--color-surface-raised)',
-                color: 'var(--color-text)',
-              }}
+              className="w-full text-[16px] leading-6 tracking-[0.5px] p-2.5 rounded-xs border outline-none select-text bg-surface-container-high border-outline-variant text-on-surface focus-visible:shadow-[var(--md-focus-ring)] motion-reduce:transition-none"
               autoFocus
               aria-label="Edit message"
             />
@@ -282,7 +268,7 @@ function MessageRowInner({
               <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
                 Cancel
               </Button>
-              <span className="text-[10px] ml-auto" style={{ color: 'var(--color-text-tertiary)' }}>
+              <span className="text-[10px] ml-auto text-on-surface-variant">
                 Esc to cancel · Enter to save
               </span>
             </div>
@@ -290,29 +276,29 @@ function MessageRowInner({
         ) : (
           <div
             className={cn(
-              'text-[13px] leading-relaxed selectable-text',
+              'text-[16px] leading-6 tracking-[0.5px] font-normal selectable-text text-on-surface',
+              // M3 typography: body-large 16/24/0.5
               isStreaming && !displayBody && 'odin-working rounded-md px-1.5 py-0.5 -ml-1.5',
               isStreaming && displayBody && 'streaming-cursor'
             )}
-            style={{ color: 'var(--color-text)' }}
           >
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
                 a: SafeMarkdownLink,
-                p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                p: ({ children }) => <p className="mb-2 last:mb-0 leading-6">{children}</p>,
                 h1: ({ children }) => (
-                  <h1 className="text-base font-bold my-3 leading-tight" style={{ color: 'var(--color-text)' }}>
+                  <h1 className="text-base font-bold my-3 leading-tight text-on-surface">
                     {children}
                   </h1>
                 ),
                 h2: ({ children }) => (
-                  <h2 className="text-sm font-semibold my-2.5 leading-tight" style={{ color: 'var(--color-text)' }}>
+                  <h2 className="text-sm font-semibold my-2.5 leading-tight text-on-surface">
                     {children}
                   </h2>
                 ),
                 h3: ({ children }) => (
-                  <h3 className="text-[13px] font-semibold my-2 leading-tight" style={{ color: 'var(--color-text)' }}>
+                  <h3 className="text-[13px] font-semibold my-2 leading-tight text-on-surface">
                     {children}
                   </h3>
                 ),
@@ -321,8 +307,7 @@ function MessageRowInner({
                 li: ({ children }) => <li className="leading-relaxed">{children}</li>,
                 blockquote: ({ children }) => (
                   <blockquote
-                    className="border-l-2 pl-3 my-2 italic"
-                    style={{ borderColor: 'var(--color-border-strong)', color: 'var(--color-text-secondary)' }}
+                    className="border-l-2 pl-3 my-2 italic border-outline-variant text-on-surface-variant bg-surface-container-low/40 rounded-r-xs"
                   >
                     {children}
                   </blockquote>
@@ -336,28 +321,20 @@ function MessageRowInner({
                     const blockOffset = node?.position?.start.offset ?? 0;
                     return (
                       <div
-                        className="my-2.5 rounded-lg overflow-hidden border font-mono text-[12px] leading-relaxed"
-                        style={{
-                          borderColor: 'var(--color-border)',
-                          background: 'var(--color-surface-raised)',
-                        }}
+                        className="my-2.5 rounded-sm overflow-hidden border font-mono text-[13px] leading-5 bg-surface-container border-outline-variant"
                       >
                         <div
-                          className="flex items-center justify-between px-3 py-1.5 border-b"
-                          style={{
-                            borderColor: 'var(--color-border)',
-                            color: 'var(--color-text-tertiary)',
-                          }}
+                          className="flex items-center justify-between px-3 py-1.5 border-b border-outline-variant text-on-surface-variant bg-surface-container-high"
                         >
                           <span className="text-[11px] font-medium">{match ? match[1] : 'code'}</span>
                           <button
                             onClick={() => handleCopyCode(codeString, blockOffset)}
-                            className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity text-[11px]"
+                            className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity duration-micro ease-emphasized motion-reduce:transition-none text-[11px] rounded-full px-2 py-0.5 hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] focus-visible:shadow-[var(--md-focus-ring)] outline-none"
                             aria-label={`Copy ${match ? match[1] : 'code'} block`}
                           >
                             {copiedCodeIndex === blockOffset ? (
                               <>
-                                <Check className="w-3 h-3" style={{ color: 'var(--color-success)' }} aria-hidden="true" />
+                                <Check className="w-3 h-3 text-success" aria-hidden="true" />
                                 <span>Copied</span>
                               </>
                             ) : (
@@ -368,7 +345,7 @@ function MessageRowInner({
                             )}
                           </button>
                         </div>
-                        <pre className="p-3 overflow-x-auto">
+                        <pre className="p-3 overflow-x-auto text-on-surface">
                           <code>{children}</code>
                         </pre>
                       </div>
@@ -376,8 +353,7 @@ function MessageRowInner({
                   }
                   return (
                     <code
-                      className="px-1.5 py-0.5 rounded font-mono text-[12px]"
-                      style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
+                      className="px-1.5 py-0.5 rounded-xs font-mono text-[12px] bg-surface-container-high text-on-surface-variant border border-outline-variant"
                       {...props}
                     >
                       {children}
@@ -391,44 +367,35 @@ function MessageRowInner({
           </div>
         )}
 
-        {/* §23/§49 — attachments: compact chips, never huge cards.
-            Own uploads keep their local thumbnail URL; received files show
-            a typed glyph until the §84 signed-URL viewer lands (P6). */}
+        {/* §23/§49 — attachments: compact chips M3 */}
         {message.attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {message.attachments.map((file) => (
               <span
                 key={file.id}
-                className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 max-w-[240px] transition-colors hover:bg-[var(--color-surface-hover)]"
-                style={{
-                  borderColor: 'var(--color-border)',
-                  background: 'var(--color-surface)',
-                }}
+                className="inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 max-w-[240px] transition-colors duration-micro ease-emphasized motion-reduce:transition-none bg-surface-container border-outline-variant hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,var(--md-surface-container))]"
                 title={`${file.file_name} · ${formatBytes(file.file_size)}`}
               >
                 {file.file_url && file.mime_type.startsWith('image/') ? (
                   <img
                     src={file.file_url}
                     alt=""
-                    className="h-5 w-5 rounded object-cover shrink-0"
+                    className="h-5 w-5 rounded-xs object-cover shrink-0"
                     loading="lazy"
                   />
                 ) : (
                   <FileText
-                    className="h-3.5 w-3.5 shrink-0"
-                    style={{ color: 'var(--color-text-tertiary)' }}
+                    className="h-3.5 w-3.5 shrink-0 text-on-surface-variant"
                     aria-hidden="true"
                   />
                 )}
                 <span
-                  className="truncate text-[11px] font-medium"
-                  style={{ color: 'var(--color-text-secondary)' }}
+                  className="truncate text-[11px] font-medium text-on-surface-variant"
                 >
                   {file.file_name}
                 </span>
                 <span
-                  className="shrink-0 text-[10px] tabular-nums"
-                  style={{ color: 'var(--color-text-tertiary)' }}
+                  className="shrink-0 text-[10px] tabular-nums text-on-surface-variant"
                 >
                   {formatBytes(file.file_size)}
                 </span>
@@ -441,7 +408,7 @@ function MessageRowInner({
             Tool timeline renders DURING and AFTER the run (§133); terminal
             cards render only once the run has settled. */}
         {isAi && aiRun && (
-          <div className="mt-2 space-y-1.5">
+          <div className="mt-2 space-y-1.5 w-full">
             {/* §133 — live tool timeline; collapses after completion */}
             {aiRun.tool_calls && aiRun.tool_calls.length > 0 && (
               <AiToolTimeline toolCalls={aiRun.tool_calls} />
@@ -491,8 +458,7 @@ function MessageRowInner({
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium">
               {aiRun.sources && aiRun.sources.length > 0 && (
                 <span
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
-                  style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant border border-outline-variant"
                 >
                   <Globe className="w-2.5 h-2.5" aria-hidden="true" />
                   Web research · {aiRun.sources.length} sources
@@ -502,8 +468,7 @@ function MessageRowInner({
                   metadata; deliberately calm secondary color, never an alarm */}
               {aiRun.is_fallback && (
                 <span
-                  className="inline-flex items-center px-1.5 py-0.5 rounded"
-                  style={{ color: 'var(--color-text-tertiary)' }}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-on-surface-variant bg-surface-container-low border border-outline-variant"
                   title={`Served by fallback model${aiRun.model_used ? ` (${aiRun.model_used})` : ''}`}
                 >
                   {aiName} · fallback model
@@ -511,8 +476,7 @@ function MessageRowInner({
               )}
               {aiRun.is_byok && (
                 <span
-                  className="inline-flex items-center px-1.5 py-0.5 rounded"
-                  style={{ color: 'var(--color-text-tertiary)' }}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-on-surface-variant bg-surface-container-low border border-outline-variant"
                 >
                   {aiName} · BYOK
                 </span>
@@ -521,14 +485,14 @@ function MessageRowInner({
           </div>
         )}
 
-        {/* §245 failed message — never discard, keep text, offer Retry */}
+        {/* §245 failed message — never discard, keep text, offer Retry — subtle human text */}
         {!isAi && runFailed && onRetry && (
           <div className="mt-2 flex items-center gap-2">
             <Button size="sm" variant="ghost" onClick={() => onRetry(message.id)}>
               <RotateCcw className="w-3 h-3 mr-1" aria-hidden="true" />
               Retry
             </Button>
-            <span className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+            <span className="text-[11px] text-on-surface-variant">
               Your message is kept — resend when ready.
             </span>
           </div>
@@ -545,16 +509,11 @@ function MessageRowInner({
                   onClick={() => onReact(message.id, reaction.emoji)}
                   aria-pressed={hasReacted}
                   className={cn(
-                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] border transition-all duration-100 cursor-pointer select-none hover:scale-105 active:scale-95',
+                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] border transition-all duration-micro ease-emphasized motion-reduce:transition-none cursor-pointer select-none hover:scale-105 active:scale-95 outline-none focus-visible:shadow-[var(--md-focus-ring)]',
                     hasReacted
-                      ? 'border-[var(--color-info)]/40 font-medium'
-                      : 'hover:bg-[var(--color-surface-hover)]'
+                      ? 'bg-secondary-container text-on-secondary-container border-secondary-container font-medium'
+                      : 'bg-surface-container-low text-on-surface-variant border-outline-variant hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,var(--md-surface-container-low))]'
                   )}
-                  style={{
-                    borderColor: hasReacted ? 'var(--color-info)' : 'var(--color-border)',
-                    color: hasReacted ? 'var(--color-info)' : 'var(--color-text-secondary)',
-                    background: hasReacted ? 'var(--color-info-bg)' : 'transparent',
-                  }}
                 >
                   <span aria-hidden="true">{reaction.emoji}</span>
                   <span className="text-[11px] font-medium tabular-nums">{reaction.count}</span>
@@ -569,8 +528,7 @@ function MessageRowInner({
           <button
             onClick={() => onOpenThread?.(message)}
             aria-label={`Open thread with ${message.thread_count} ${message.thread_count === 1 ? 'reply' : 'replies'}`}
-            className="flex items-center gap-1.5 mt-1.5 text-[12px] font-medium cursor-pointer hover:underline transition-colors"
-            style={{ color: 'var(--color-info)' }}
+            className="flex items-center gap-1.5 mt-1.5 text-[12px] font-medium cursor-pointer hover:underline transition-colors duration-micro ease-emphasized motion-reduce:transition-none text-tertiary focus-visible:shadow-[var(--md-focus-ring)] outline-none rounded-full px-1 -ml-1"
           >
             <Reply className="w-3.5 h-3.5" aria-hidden="true" />
             <span>{message.thread_count} {message.thread_count === 1 ? 'reply' : 'replies'}</span>

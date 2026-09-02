@@ -319,18 +319,18 @@ export function MessageList({
 
     return (
       <>
-        {/* §39 unread divider */}
+        {/* §39 unread divider — M3 subtle outline-variant, label-small */}
         {index === unreadDividerIndex && (
           <div
             className="flex items-center gap-3 px-4 py-2 select-none"
             role="separator"
             aria-label="New messages start here"
           >
-            <span className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
-            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-info)' }}>
+            <span className="h-px flex-1 bg-outline-variant" />
+            <span className="text-[10px] font-medium uppercase tracking-widest text-on-surface-variant">
               New messages
             </span>
-            <span className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
+            <span className="h-px flex-1 bg-outline-variant" />
           </div>
         )}
         <MessageRow
@@ -362,9 +362,9 @@ export function MessageList({
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
+    <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col bg-surface">
       {/* §218 — lifecycle-only announcements (started/completed/failed);
-          mounted only while AI runs exist so the live region isn't noise */}
+           mounted only while AI runs exist so the live region isn't noise */}
       {aiRunCount > 0 && <AiStreamAnnouncer aiName={aiName} runsByMessage={aiRunsByMessage} />}
 
       <ChatHeader
@@ -384,17 +384,17 @@ export function MessageList({
         ref={containerRef}
         onScroll={handleScroll}
         data-virt-viewport="true"
-        className="flex-1 overflow-y-auto overflow-x-hidden pt-4 pb-2"
+        className="flex-1 overflow-y-auto overflow-x-hidden pt-4 pb-2 bg-surface"
         role="log"
         aria-label="Group conversation"
       >
         {/* §179/§78 group empty state */}
         {isEmpty && (
           <div className="h-full flex flex-col items-center justify-center gap-4 px-8 text-center">
-            <div className="text-xl font-bold" style={{ color: 'var(--color-text)' }}>
+            <div className="text-[22px] leading-7 font-normal text-on-surface" style={{ fontFamily: 'var(--font-brand)' }}>
               Your team is ready.
             </div>
-            <p className="text-[13px] max-w-md" style={{ color: 'var(--color-text-secondary)' }}>
+            <p className="text-[14px] leading-5 max-w-md text-on-surface-variant">
               Start talking, create a Project or ask {aiName} something.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
@@ -463,10 +463,9 @@ export function MessageList({
         {/* §289 older-page loading indicator at the head of the list */}
         {isLoadingOlder && !isEmpty && (
           <div
-            className="flex items-center justify-center gap-2 py-2 text-[11px]"
+            className="flex items-center justify-center gap-2 py-2 text-[11px] text-on-surface-variant"
             role="status"
             aria-label="Loading older messages"
-            style={{ color: 'var(--color-text-secondary)' }}
           >
             <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
             Loading earlier messages…
@@ -478,8 +477,7 @@ export function MessageList({
       {typingUsers.length > 0 && (
         <div
           role="status"
-          className="px-5 py-1.5 text-[11px] italic flex items-center gap-1.5 select-none"
-          style={{ color: 'var(--color-text-secondary)' }}
+          className="px-5 py-1.5 text-[11px] italic flex items-center gap-1.5 select-none bg-surface text-on-surface-variant border-t border-outline-variant"
         >
           <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
           <span>{renderTypingText()}</span>
@@ -499,12 +497,11 @@ export function MessageList({
           onClick={() => scrollToBottom(true)}
           aria-label={unreadNewCount > 0 ? `Jump to latest, ${unreadNewCount} new messages` : 'Jump to latest'}
           className={cn(
-            'absolute bottom-3 right-8 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold shadow-[var(--shadow-lg)] transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer z-30 border',
+            'absolute bottom-3 right-8 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium shadow-lg transition-all duration-150 ease-emphasized motion-reduce:transition-none hover:scale-105 active:scale-95 cursor-pointer z-30 border outline-none focus-visible:shadow-[var(--md-focus-ring)]',
             unreadNewCount > 0
-              ? 'bg-[var(--color-info)] text-white hover:opacity-90'
-              : 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90'
+              ? 'bg-tertiary text-on-tertiary border-outline-variant hover:bg-[color-mix(in_srgb,var(--md-tertiary)_92%,var(--md-on-tertiary)_8%)]'
+              : 'bg-primary text-on-primary border-outline-variant hover:opacity-90'
           )}
-          style={{ borderColor: 'var(--color-border)' }}
         >
           <ArrowDown className="w-3.5 h-3.5" aria-hidden="true" />
           <span>{unreadNewCount > 0 ? `${unreadNewCount} new` : 'Jump to latest'}</span>

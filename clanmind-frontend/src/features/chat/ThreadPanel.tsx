@@ -76,56 +76,52 @@ export function ThreadPanel({
       data-testid="thread-panel"
       role="complementary"
       aria-label="Thread panel"
-      className="flex flex-col h-full border-l text-[13px]"
-      style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+      className="flex flex-col h-full border-l border-outline-variant bg-surface-container-low rounded-l-lg overflow-hidden"
     >
-      {/* Thread Header */}
+      {/* Thread Header — M3 title-small, close icon button with state layer */}
       <div
-        className="flex items-center justify-between px-4 py-3 border-b"
-        style={{ borderColor: 'var(--color-border)' }}
+        className="flex items-center justify-between px-4 py-3 border-b border-outline-variant bg-surface-container-low shrink-0"
       >
         <div className="flex items-center gap-2">
-          <Reply className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} aria-hidden="true" />
-          <h3 className="text-[13px] font-bold" style={{ color: 'var(--color-text)' }}>
+          <Reply className="w-4 h-4 text-on-surface-variant" aria-hidden="true" />
+          <h3 className="text-[14px] font-medium leading-5 tracking-[0.1px] text-on-surface">
             Thread
           </h3>
-          <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-tertiary)' }}>
+          <span className="text-[11px] tabular-nums text-on-surface-variant">
             · {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
           </span>
         </div>
         <button
           onClick={onClose}
           aria-label="Close thread"
-          className="p-1 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors"
-          style={{ color: 'var(--color-text-tertiary)' }}
+          className="p-2 rounded-full cursor-pointer text-on-surface-variant transition-colors duration-micro ease-emphasized motion-reduce:transition-none hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] focus-visible:shadow-[var(--md-focus-ring)] outline-none"
         >
           <X className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
 
-      {/* Root Message Box */}
+      {/* Root Message Box — tonal elevation */}
       <div
-        className="p-4 border-b"
-        style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-hover)' }}
+        className="p-4 border-b border-outline-variant bg-surface-container shrink-0"
       >
         <div className="flex items-center gap-2 mb-1.5">
           <Avatar name={rootMessage.sender_name} size="sm" isAi={rootMessage.sender_type === 'AI'} />
-          <span className="font-semibold text-[13px]" style={{ color: 'var(--color-text)' }}>
+          <span className="font-medium text-[13px] text-on-surface">
             {rootMessage.sender_name}
           </span>
-          <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-tertiary)' }}>
+          <span className="text-[11px] tabular-nums text-on-surface-variant">
             {formatTime(rootMessage.created_at)}
           </span>
         </div>
-        <p className="text-[13px] leading-relaxed whitespace-pre-wrap" style={{ color: deletedRoot ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)', fontStyle: deletedRoot ? 'italic' : undefined }}>
+        <p className="text-[14px] leading-5 whitespace-pre-wrap text-on-surface-variant" style={{ fontStyle: deletedRoot ? 'italic' : undefined, opacity: deletedRoot ? 0.8 : 1 }}>
           {deletedRoot ? 'This message was deleted.' : rootMessage.body}
         </p>
       </div>
 
       {/* Replies List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3" role="log" aria-label="Thread replies">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-surface-container-low" role="log" aria-label="Thread replies">
         {replies.length === 0 && (
-          <div className="text-[12px] text-center py-6" style={{ color: 'var(--color-text-tertiary)' }}>
+          <div className="text-[12px] text-center py-6 text-on-surface-variant">
             No replies yet — start the thread.
           </div>
         )}
@@ -134,18 +130,18 @@ export function ThreadPanel({
             <Avatar name={reply.sender_name} size="sm" isAi={reply.sender_type === 'AI'} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-[13px]" style={{ color: 'var(--color-text)' }}>
+                <span className="font-medium text-[13px] text-on-surface">
                   {reply.sender_name}
                 </span>
-                <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-tertiary)' }}>
+                <span className="text-[11px] tabular-nums text-on-surface-variant">
                   {formatTime(reply.created_at)}
                 </span>
               </div>
               <p
-                className="text-[13px] mt-0.5 leading-relaxed whitespace-pre-wrap"
+                className="text-[14px] mt-0.5 leading-5 whitespace-pre-wrap text-on-surface-variant"
                 style={{
-                  color: reply.deleted ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)',
                   fontStyle: reply.deleted ? 'italic' : undefined,
+                  opacity: reply.deleted ? 0.8 : 1,
                 }}
               >
                 {reply.deleted ? 'This message was deleted.' : reply.body}
@@ -155,14 +151,12 @@ export function ThreadPanel({
         ))}
       </div>
 
-      {/* Reply Input */}
+      {/* Reply Input — M3 outlined field, corner-full, state layers */}
       <div
-        className="p-3 border-t"
-        style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-hover)' }}
+        className="p-3 border-t border-outline-variant bg-surface-container-low shrink-0"
       >
         <div
-          className="relative flex items-center border rounded-lg"
-          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}
+          className="relative flex items-center border rounded-full bg-surface-container-high border-outline-variant focus-within:border-primary focus-within:shadow-[var(--md-focus-ring)] transition-colors duration-micro ease-emphasized motion-reduce:transition-none"
         >
           <input
             ref={inputRef}
@@ -177,20 +171,18 @@ export function ThreadPanel({
             }}
             placeholder={`Reply to ${rootMessage.sender_name}…`}
             aria-label="Reply to thread"
-            className="w-full px-3 py-2 text-[13px] bg-transparent outline-none"
-            style={{ color: 'var(--color-text)' }}
+            className="w-full px-4 py-2 text-[14px] bg-transparent outline-none text-on-surface placeholder:text-on-surface-variant"
           />
           <button
             onClick={handleSend}
             disabled={!replyText.trim()}
             aria-label="Send reply"
-            className="p-1.5 mr-1 cursor-pointer disabled:opacity-30 transition-opacity"
-            style={{ color: 'var(--color-text-tertiary)' }}
+            className="p-2 mr-1 rounded-full cursor-pointer disabled:opacity-30 transition-colors duration-micro ease-emphasized motion-reduce:transition-none text-on-surface-variant hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] focus-visible:shadow-[var(--md-focus-ring)] outline-none disabled:cursor-not-allowed"
           >
             <Send className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
         </div>
-        <p className="mt-1 text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+        <p className="mt-1.5 text-[10px] text-on-surface-variant px-1">
           Enter to send · Esc closes the thread
         </p>
       </div>

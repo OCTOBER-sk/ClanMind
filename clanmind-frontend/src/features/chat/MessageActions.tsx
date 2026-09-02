@@ -110,27 +110,24 @@ export function MessageActions({
     },
   ];
 
-  const iconColor = { color: 'var(--color-text-tertiary)' };
-
   return (
     <div
       // §25 "Hover/Focus Actions" — the toolbar must surface for keyboard
       // users too: `hidden group-hover:flex` alone left Reply/React/Copy/More
       // unreachable (display:none removes them from the tab order).
-      className="absolute right-3 -top-3.5 hidden group-hover:flex group-focus-within:flex items-center rounded-lg shadow-[var(--shadow-md)] px-0.5 py-0.5 z-10 gap-0 border"
-      style={{ background: 'var(--color-surface-elevated)', borderColor: 'var(--color-border)' }}
+      className="absolute right-3 -top-3.5 hidden group-hover:flex group-focus-within:flex h-7 items-center rounded-full shadow-lg bg-surface-container-high border border-outline-variant px-1 py-0.5 z-10 gap-0.5"
     >
-      {/* Quick Reaction Popover (§28) */}
+      {/* Quick Reaction Popover (§28) — M3 icon buttons with state layers */}
       <Popover
         open={isEmojiPickerOpen}
         onOpenChange={setIsEmojiPickerOpen}
         trigger={
-          <IconButton aria-label="Add reaction" size="xs">
-            <Smile className="w-3.5 h-3.5" style={iconColor} />
+          <IconButton aria-label="Add reaction" size="xs" className="rounded-full hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] focus-visible:shadow-[var(--md-focus-ring)] motion-reduce:transition-none">
+            <Smile className="w-3.5 h-3.5 text-on-surface-variant" />
           </IconButton>
         }
       >
-        <div className="flex items-center gap-0.5 p-1">
+        <div className="flex items-center gap-0.5 p-1 bg-surface-container-high rounded-md border border-outline-variant shadow-lg">
           {QUICK_EMOJIS.map((emoji) => (
             <button
               key={emoji}
@@ -138,7 +135,7 @@ export function MessageActions({
                 onReact(emoji);
                 setIsEmojiPickerOpen(false);
               }}
-              className="text-base p-1.5 hover:bg-[var(--color-surface-hover)] rounded-md transition-all duration-100 hover:scale-105 active:scale-95 cursor-pointer"
+              className="text-base p-1.5 rounded-full transition-all duration-micro ease-emphasized motion-reduce:transition-none hover:scale-105 active:scale-95 cursor-pointer hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] focus-visible:shadow-[var(--md-focus-ring)] outline-none"
               aria-label={`React with ${emoji}`}
             >
               {emoji}
@@ -147,33 +144,34 @@ export function MessageActions({
         </div>
       </Popover>
 
-      {/* Reply */}
+      {/* Reply — M3 icon button */}
       <Tooltip content="Reply">
-        <IconButton aria-label="Reply in thread" size="xs" onClick={() => onReply(message)}>
-          <Reply className="w-3.5 h-3.5" style={iconColor} />
+        <IconButton aria-label="Reply in thread" size="xs" onClick={() => onReply(message)} className="rounded-full hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] focus-visible:shadow-[var(--md-focus-ring)] motion-reduce:transition-none">
+          <Reply className="w-3.5 h-3.5 text-on-surface-variant" />
         </IconButton>
       </Tooltip>
 
-      {/* Copy (§26) */}
+      {/* Copy (§26) — M3 icon button */}
       <Tooltip content={copied ? 'Copied' : 'Copy message'}>
         <IconButton
           aria-label={copied ? 'Copied' : 'Copy message'}
           size="xs"
           onClick={handleCopy}
+          className="rounded-full hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] focus-visible:shadow-[var(--md-focus-ring)] motion-reduce:transition-none"
         >
           {copied ? (
-            <Check className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />
+            <Check className="w-3.5 h-3.5 text-success" />
           ) : (
-            <Copy className="w-3.5 h-3.5" style={iconColor} />
+            <Copy className="w-3.5 h-3.5 text-on-surface-variant" />
           )}
         </IconButton>
       </Tooltip>
 
-      {/* More Actions Dropdown (§25 More menu) */}
+      {/* More Actions Dropdown (§25 More menu) — M3 icon button */}
       <Dropdown
         trigger={
-          <IconButton aria-label="More message actions" size="xs">
-            <MoreHorizontal className="w-3.5 h-3.5" style={iconColor} />
+          <IconButton aria-label="More message actions" size="xs" className="rounded-full hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] focus-visible:shadow-[var(--md-focus-ring)] motion-reduce:transition-none">
+            <MoreHorizontal className="w-3.5 h-3.5 text-on-surface-variant" />
           </IconButton>
         }
         items={moreMenuItems}
