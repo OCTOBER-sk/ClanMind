@@ -85,6 +85,66 @@ describe('§222 — semantic tokens stay readable on their -bg tints', () => {
   });
 });
 
+// ── §4.2 / §4.3 — M3 role pair WCAG AA (Phase 0-B) ─────────────────────────
+// Every text/bg role from spec §4.2 (dark, base #000000) and §4.3 (light,
+// base #FFFFFF) must meet WCAG 2.2 AA. Normal text ≥4.5:1, large/UI ≥3:1.
+// Parsed directly from src/index.css --md-* values per theme.
+
+const M3_PAIRS: Array<[string, string, number]> = [
+  // core surfaces
+  ['md-on-background', 'md-background', 4.5],
+  ['md-on-surface', 'md-surface', 4.5],
+  ['md-on-surface-variant', 'md-surface-variant', 4.5],
+  // primary
+  ['md-on-primary', 'md-primary', 4.5],
+  ['md-on-primary-container', 'md-primary-container', 4.5],
+  // secondary
+  ['md-on-secondary', 'md-secondary', 4.5],
+  ['md-on-secondary-container', 'md-secondary-container', 4.5],
+  // tertiary
+  ['md-on-tertiary', 'md-tertiary', 4.5],
+  ['md-on-tertiary-container', 'md-tertiary-container', 4.5],
+  // error
+  ['md-on-error', 'md-error', 4.5],
+  ['md-on-error-container', 'md-error-container', 4.5],
+  // extended
+  ['md-on-success', 'md-success', 4.5],
+  ['md-on-success-container', 'md-success-container', 4.5],
+  ['md-on-warning', 'md-warning', 4.5],
+  ['md-on-warning-container', 'md-warning-container', 4.5],
+  ['md-on-info', 'md-info', 4.5],
+  ['md-on-info-container', 'md-info-container', 4.5],
+  // inverse
+  ['md-inverse-on-surface', 'md-inverse-surface', 4.5],
+  // surface-container tiers — on-surface text on each tier
+  ['md-on-surface', 'md-surface-container-lowest', 4.5],
+  ['md-on-surface', 'md-surface-container-low', 4.5],
+  ['md-on-surface', 'md-surface-container', 4.5],
+  ['md-on-surface', 'md-surface-container-high', 4.5],
+  ['md-on-surface', 'md-surface-container-highest', 4.5],
+  ['md-on-surface', 'md-surface-dim', 4.5],
+  ['md-on-surface', 'md-surface-bright', 4.5],
+  // outline as UI edge (≥3:1 large/component per WCAG 1.4.11)
+  ['md-outline', 'md-surface', 3],
+  ['md-outline', 'md-background', 3],
+  ['md-outline', 'md-surface-container', 3],
+] as const;
+
+describe.each([
+  ['light', lightVars],
+  ['dark', darkVars],
+] as const)('Phase 0-B §4 — %s M3 role pairs meet WCAG AA', (theme, vars) => {
+  it.each(M3_PAIRS)(`--%s on --%s ≥ %s:1 (${theme})`, (fgVar, bgVar, minRatio) => {
+    const fg = vars[fgVar];
+    const bg = vars[bgVar];
+    expect(fg, `--${fgVar} missing in ${theme} theme`).toBeDefined();
+    expect(bg, `--${bgVar} missing in ${theme} theme`).toBeDefined();
+    if (!fg || !bg) return;
+    const ratio = contrast(fg, bg);
+    expect(ratio, `--${fgVar} (${fg}) on --${bgVar} (${bg}) is ${ratio.toFixed(2)}:1 in ${theme} (need ≥${minRatio}:1)`).toBeGreaterThanOrEqual(minRatio);
+  });
+});
+
 // ── §6 reduced-motion contract ──────────────────────────────────────────────
 function reducedBlock(): string {
   const start = css.indexOf('@media (prefers-reduced-motion: reduce)');

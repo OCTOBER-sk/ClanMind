@@ -1,4 +1,38 @@
 @import "tailwindcss";
+@import "@fontsource/roboto-flex/latin-400.css";
+@import "@fontsource/roboto-mono/latin-400.css";
+@import "@material-symbols/font-400/rounded.css";
+
+/* ============================================================
+   Local Font Bundling — Tauri offline (spec §6)
+   Roboto Flex 400 (latin) + Roboto Mono 400 (latin) via @fontsource.
+   Google Sans Text has no redistributable offline woff2; brand stack
+   falls back to Inter / Roboto per --font-brand (spec §6 fallback allowed).
+   Material Symbols Rounded 400 is bundled via @material-symbols/font-400.
+   Vite inlines woff2 assets for offline Tauri builds.
+   ============================================================ */
+
+/* Explicit Material Symbols Rounded class (spec Phase 0-B #4) — also
+   covered by rounded.css import above; this ensures the class exists
+   even if import order changes and documents the opsz/wght axes. */
+.material-symbols-rounded {
+  font-family: "Material Symbols Rounded";
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "liga";
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
 
 /* ============================================================
    ClanMind M3 Design Tokens — §11 Token Wiring
