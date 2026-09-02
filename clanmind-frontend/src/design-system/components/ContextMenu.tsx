@@ -1,8 +1,8 @@
 import React from 'react';
-import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
+import * as ContextMenuPrimitive from '@radix-ui/react-context-menu';
 import { cn } from '../utils';
 
-export interface DropdownMenuItem {
+export interface ContextMenuItem {
   id: string;
   label: React.ReactNode;
   icon?: React.ReactNode;
@@ -11,51 +11,42 @@ export interface DropdownMenuItem {
   destructive?: boolean;
   selected?: boolean;
   onClick?: () => void;
-  divider?: boolean;
 }
 
-export interface DropdownProps {
+export interface ContextMenuProps {
   trigger: React.ReactNode;
-  items: (DropdownMenuItem | { divider: true; id: string })[];
-  align?: 'start' | 'center' | 'end';
-  side?: 'top' | 'right' | 'bottom' | 'left';
+  items: (ContextMenuItem | { divider: true; id: string })[];
   className?: string;
 }
 
-// §12.1 Dropdown — M3 menu: surface-container-high, shadow-2, corner-xs container,
-// 40px items with leading icon slot + trailing shortcut, state-layer rows, selected = secondary-container.
+// §12.1 ContextMenu — M3 menu mirror of Dropdown: surface-container-high, shadow-2, corner-xs, 40px items, state-layer rows.
 
-export function Dropdown({ trigger, items, align = 'end', side = 'bottom', className }: DropdownProps) {
+export function ContextMenu({ trigger, items, className }: ContextMenuProps) {
   return (
-    <DropdownMenuPrimitive.Root>
-      <DropdownMenuPrimitive.Trigger asChild>{trigger}</DropdownMenuPrimitive.Trigger>
-      <DropdownMenuPrimitive.Portal>
-        <DropdownMenuPrimitive.Content
-          align={align}
-          side={side}
-          sideOffset={5}
+    <ContextMenuPrimitive.Root>
+      <ContextMenuPrimitive.Trigger asChild>{trigger}</ContextMenuPrimitive.Trigger>
+      <ContextMenuPrimitive.Portal>
+        <ContextMenuPrimitive.Content
           className={cn(
             'z-50 min-w-[180px] overflow-hidden rounded-xs border border-outline-variant bg-surface-container-high p-1 shadow-2 animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
             className,
           )}
         >
           {items.map((item) => {
-            if ('divider' in item && item.divider && !('label' in item)) {
+            if ('divider' in item && (item as { divider: true }).divider && !('label' in item)) {
               return (
-                <DropdownMenuPrimitive.Separator
-                  key={item.id}
+                <ContextMenuPrimitive.Separator
+                  key={(item as { id: string }).id}
                   className="my-1 h-px bg-outline-variant"
                 />
               );
             }
-
-            const menuItem = item as DropdownMenuItem;
+            const menuItem = item as ContextMenuItem;
             return (
-              <DropdownMenuPrimitive.Item
+              <ContextMenuPrimitive.Item
                 key={menuItem.id}
                 disabled={menuItem.disabled}
                 onSelect={(e) => {
-                  // allow onClick to fire via Radix onSelect
                   e.preventDefault();
                   menuItem.onClick?.();
                 }}
@@ -78,11 +69,17 @@ export function Dropdown({ trigger, items, align = 'end', side = 'bottom', class
                     {menuItem.shortcut}
                   </span>
                 )}
-              </DropdownMenuPrimitive.Item>
+              </ContextMenuPrimitive.Item>
             );
           })}
-        </DropdownMenuPrimitive.Content>
-      </DropdownMenuPrimitive.Portal>
-    </DropdownMenuPrimitive.Root>
+        </ContextMenuPrimitive.Content>
+      </ContextMenuPrimitive.Portal>
+    </ContextMenuPrimitive.Root>
   );
 }
+
+// Re-export Radix primitives for advanced usage if needed
+export const ContextMenuRoot = ContextMenuPrimitive.Root;
+export const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
+export const ContextMenuContent = ContextMenuPrimitive.Content;
+export const ContextMenuItemPrimitive = ContextMenuPrimitive.Item;

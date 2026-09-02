@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useCallback, useMemo, useRef } from 'react';
 import * as RadixToast from '@radix-ui/react-toast';
-import { X, Check, AlertTriangle, Info, AlertCircle } from 'lucide-react';
+import { X } from 'lucide-react';
 import { cn } from '../utils';
 
 // ─── Toast types ───
@@ -11,7 +11,6 @@ export interface ToastOptions {
   title: string;
   description?: string;
   variant?: ToastVariant;
-  /** Auto-dismiss duration in ms. Default 3000. Use 0 to disable. */
   duration?: number;
   action?: {
     label: string;
@@ -22,8 +21,6 @@ export interface ToastOptions {
 interface ToastItem extends ToastOptions {
   id: string;
 }
-
-// ─── Context ───
 
 interface ToastContextValue {
   toast: (opts: ToastOptions) => void;
@@ -38,8 +35,6 @@ export function useToast() {
   return ctx;
 }
 
-// ─── Provider ───
-
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = React.useState<ToastItem[]>([]);
   const idRef = useRef(0);
@@ -53,22 +48,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // P14 §203/§288 — stable context identity: a toast firing (or any provider
-  // re-render) must not cascade into every useToast consumer app-wide
-  // (Composer, ArtifactPanel, settings…). Consumers re-render only on real
-  // state they hold themselves.
   const contextValue = useMemo(() => ({ toast, dismiss }), [toast, dismiss]);
 
   return (
     <ToastContext.Provider value={contextValue}>
       <RadixToast.Provider swipeDirection="right">
         {children}
-
-        {/* Toast list — positioned bottom-right, matches spec §65 */}
         {toasts.map((t) => (
           <ToastItem key={t.id} item={t} onDismiss={() => dismiss(t.id)} />
         ))}
-
         <RadixToast.Viewport
           className="fixed bottom-4 right-4 z-[200] flex flex-col gap-2 outline-none max-w-sm w-full"
           aria-label="Notifications"
@@ -78,84 +66,64 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Individual toast item ───
-
-const variantConfig: Record<
-  ToastVariant,
-  { icon: React.ReactNode; className: string }
-> = {
-  success: {
-    icon: <Check className="w-4 h-4 text-[var(--color-success)]" />,
-    className: 'border-l-4 border-l-[var(--color-success)]',
-  },
-  error: {
-    icon: <AlertCircle className="w-4 h-4 text-[var(--color-danger)]" />,
-    className: 'border-l-4 border-l-[var(--color-danger)]',
-  },
-  warning: {
-    icon: <AlertTriangle className="w-4 h-4 text-[var(--color-warning)]" />,
-    className: 'border-l-4 border-l-[var(--color-warning)]',
-  },
-  info: {
-    icon: <Info className="w-4 h-4 text-[var(--color-info)]" />,
-    className: 'border-l-4 border-l-[var(--color-info)]',
-  },
-  default: {
-    icon: null,
-    className: '',
-  },
-};
+// §12.1 Toast/Snackbar — M3: inverse-surface bg, inverse-on-surface text, single line + optional action, corner-xs (rounded-xs), shadow-3.
 
 function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) {
-  const { variant = 'default', title, description, duration = 3000, action } = item;
-  const config = variantConfig[variant];
+  const { variant = 'default', title, description, duration = 4000, action } = item;
+
+  // variant only affects optional icon/action tint; background stays inverse-surface per M3.
+  const actionColor =
+    variant === 'error'
+      ? 'text-inverse-primary'
+      : variant === 'success'
+        ? 'text-inverse-primary'
+        : 'text-inverse-primary';
 
   return (
     <RadixToast.Root
       duration={duration === 0 ? Infinity : duration}
-      onOpenChange={(open) => { if (!open) onDismiss(); }}
-      // §7 status announcements — errors announce assertively (role="alert");
-      // everything else is an explicit polite live region. Radix does not set
-      // a role on Toast.Root by default, so both are declared here.
+      onOpenChange={(open) => {
+        if (!open) onDismiss();
+      }}
       role={variant === 'error' ? 'alert' : 'status'}
       className={cn(
-        'flex items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-elevated)]',
-        'px-4 py-3 shadow-[var(--shadow-lg)]',
-        'data-[state=open]:animate-[toast-slide-in_200ms_ease-out]',
-        'data-[state=closed]:animate-[toast-slide-out_150ms_ease-in]',
-        config.className,
+        'flex items-center gap-3 rounded-xs bg-inverse-surface text-inverse-on-surface shadow-3 px-4 py-3',
+        'data-[state=open]:animate-[toast-slide-in_200ms_ease-out] data-[state=closed]:animate-[toast-slide-out_150ms_ease-in]',
+        'min-h-12 max-w-sm',
       )}
     >
-      {config.icon && (
-        <div className="shrink-0 mt-0.5">{config.icon}</div>
-      )}
-
-      <div className="flex-1 min-w-0">
-        <RadixToast.Title className="text-xs font-semibold text-[var(--color-text)] leading-snug">
-          {title}
-        </RadixToast.Title>
-        {description && (
-          <RadixToast.Description className="text-xs text-[var(--color-text-secondary)] mt-0.5 leading-relaxed">
-            {description}
-          </RadixToast.Description>
-        )}
-        {action && (
-          <RadixToast.Action asChild altText={action.label}>
-            <button
-              onClick={action.onClick}
-              className="mt-1.5 text-xs font-semibold text-[var(--color-info)] hover:underline cursor-pointer focus-ring rounded"
-            >
-              {action.label}
-            </button>
-          </RadixToast.Action>
-        )}
+      <div className="flex-1 min-w-0 flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <RadixToast.Title className="text-sm font-medium leading-none truncate">
+            {title}
+          </RadixToast.Title>
+          {description && (
+            <RadixToast.Description className="text-xs text-inverse-on-surface/80 mt-0.5 truncate">
+              {description}
+            </RadixToast.Description>
+          )}
+        </div>
       </div>
+
+      {action && (
+        <RadixToast.Action asChild altText={action.label}>
+          <button
+            onClick={action.onClick}
+            className={cn(
+              'shrink-0 text-xs font-medium uppercase tracking-wide hover:underline cursor-pointer focus-visible:shadow-[var(--md-focus-ring)] rounded-xs px-2 py-1',
+              actionColor,
+            )}
+          >
+            {action.label}
+          </button>
+        </RadixToast.Action>
+      )}
 
       <RadixToast.Close asChild>
         <button
           aria-label="Dismiss notification"
           onClick={onDismiss}
-          className="shrink-0 p-0.5 rounded text-[var(--color-text-tertiary)] hover:text-[var(--color-text)] cursor-pointer focus-ring"
+          className="shrink-0 p-1 rounded-full hover:bg-[color-mix(in_srgb,var(--md-inverse-on-surface)_10%,transparent)] text-inverse-on-surface/70 hover:text-inverse-on-surface cursor-pointer focus-visible:shadow-[var(--md-focus-ring)]"
         >
           <X className="w-3.5 h-3.5" />
         </button>

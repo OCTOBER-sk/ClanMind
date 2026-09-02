@@ -11,6 +11,7 @@ export * from './components/Tooltip';
 export * from './components/Dialog';
 export * from './components/Sheet';
 export * from './components/Dropdown';
+export * from './components/ContextMenu';
 export * from './components/Popover';
 export * from './components/Tabs';
 export * from './components/Switch';

@@ -12,15 +12,9 @@ export interface PopoverProps {
   className?: string;
 }
 
-export function Popover({
-  trigger,
-  children,
-  open,
-  onOpenChange,
-  align = 'center',
-  side = 'bottom',
-  className,
-}: PopoverProps) {
+// §12.1 Popover — M3: surface-container-high, corner-xs, shadow-2, border outline-variant.
+
+export function Popover({ trigger, children, open, onOpenChange, align = 'center', side = 'bottom', className }: PopoverProps) {
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <PopoverPrimitive.Trigger asChild>{trigger}</PopoverPrimitive.Trigger>
@@ -30,8 +24,10 @@ export function Popover({
           side={side}
           sideOffset={6}
           className={cn(
-            'z-50 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3 shadow-[var(--shadow-lg)] outline-none animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
-            className
+            'z-50 rounded-xs border border-outline-variant bg-surface-container-high p-3 shadow-2 outline-none',
+            'animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+            'focus-visible:shadow-[var(--md-focus-ring)]',
+            className,
           )}
         >
           {children}
