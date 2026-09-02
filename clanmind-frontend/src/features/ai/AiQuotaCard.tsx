@@ -1,5 +1,4 @@
-import React from 'react';
-import { AlertCircle, Settings } from 'lucide-react';
+import { Settings, Info } from 'lucide-react';
 import { Button } from '@/design-system/components/Button';
 import type { GroupRole } from '@/types';
 
@@ -22,15 +21,13 @@ export function AiQuotaCard({
   if (canContinueWithByok) {
     return (
       <div
-        className="my-2 px-3 py-1.5 rounded-lg text-[11px] flex items-center justify-between"
-        style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
+        className="my-2 px-3 py-2 rounded-full border border-outline-variant bg-surface-container-low text-on-surface-variant text-[11px] flex items-center justify-between gap-2 motion-reduce:transition-none"
       >
-        <span className="font-medium">
+        <span className="font-medium leading-none">
           Application AI quota reached for this Group. Continuing with your configured provider.
         </span>
         <span
-          className="font-mono font-bold shrink-0 ml-2"
-          style={{ color: 'var(--color-text-tertiary)' }}
+          className="font-mono font-bold shrink-0 ml-2 px-2 py-0.5 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant text-[10px] leading-none"
           title="Running via configured BYOK provider"
         >
           {aiName} · BYOK
@@ -41,19 +38,15 @@ export function AiQuotaCard({
 
   return (
     <div
-      className="my-2 p-4 rounded-lg border text-xs space-y-3"
+      className="my-2 p-4 rounded-md border border-outline-variant bg-surface-container-high border-l-[3px] border-l-tertiary space-y-3 text-xs motion-reduce:transition-none overflow-hidden"
       role="alert"
-      style={{
-        borderColor: 'var(--color-warning)',
-        background: 'var(--color-warning-bg)',
-      }}
     >
-      <div className="flex items-center gap-2 font-bold" style={{ color: 'var(--color-warning)' }}>
-        <AlertCircle className="w-4 h-4" aria-hidden="true" />
+      <div className="flex items-center gap-2 font-semibold text-tertiary">
+        <Info className="w-4 h-4 shrink-0" aria-hidden="true" />
         <span>Application AI Quota Reached</span>
       </div>
 
-      <p className="leading-relaxed" style={{ color: 'var(--color-text)' }}>
+      <p className="leading-relaxed text-on-surface-variant">
         {isAdminOrOwner
           ? 'Application AI quota reached. You can configure Bring Your Own Key (BYOK) in AI Settings to continue immediately.'
           : 'Application AI quota reached. An administrator can configure BYOK to continue.'}
@@ -62,7 +55,7 @@ export function AiQuotaCard({
       {isAdminOrOwner && (
         <Button
           size="sm"
-          variant="outline"
+          variant="tonal"
           leftIcon={<Settings className="w-3.5 h-3.5" />}
           onClick={onOpenSettings}
           aria-label="Open AI Settings to configure BYOK"

@@ -4,6 +4,9 @@
  * recovery actions. §137's CANCELLED state renders as a quieter sibling
  * strip: partial content is kept and Retry offered.
  *
+ * M3 calm card: surface-container tone + error-tonal accent edge (3px), NOT
+ * scary full-red fill. Buttons keep existing variants, state-layer safe.
+ *
  * NOT rendered for APPLICATION_AI_QUOTA_EXHAUSTED — that code has its own
  * contract card (FE §141) and collapsing them would hide an admin action.
  */
@@ -63,18 +66,14 @@ export function AiErrorCard({
 }: AiErrorCardProps) {
   return (
     <div
-      className="my-2 p-3 rounded-lg border text-xs space-y-2 max-w-lg"
+      className="my-2 max-w-lg rounded-md border border-outline-variant bg-surface-container-low border-l-[3px] border-l-error overflow-hidden p-3 text-xs space-y-2 motion-reduce:transition-none"
       role="alert"
-      style={{
-        borderColor: 'var(--color-border-strong)',
-        background: 'var(--color-surface-raised)',
-      }}
     >
-      <div className="flex items-start gap-2 font-semibold" style={{ color: 'var(--color-danger)' }}>
+      <div className="flex items-start gap-2 font-semibold text-error">
         <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
         <span>{aiName} couldn&apos;t complete this response.</span>
       </div>
-      <p className="leading-relaxed pl-[1.375rem]" style={{ color: 'var(--color-text-secondary)' }}>
+      <p className="leading-relaxed pl-[1.375rem] text-on-surface-variant">
         {providerReasonOf(errorCode, errorMessage)}
       </p>
       {(onRetry || onTryFallback) && (
@@ -113,16 +112,15 @@ export function AiStoppedStrip({
 }) {
   return (
     <div
-      className="my-1.5 flex items-center gap-2 text-[11px]"
+      className="my-1.5 inline-flex flex-wrap items-center gap-2 rounded-full border border-outline-variant bg-surface-container-high px-2.5 py-1 text-[11px] leading-none text-on-surface-variant motion-reduce:transition-none"
       role="status"
-      style={{ color: 'var(--color-text-secondary)' }}
     >
       <span className="font-medium">Response stopped.{hasPartial ? ' Partial output kept.' : ''}</span>
       {onRetry && (
         <button
           onClick={onRetry}
-          className="inline-flex items-center gap-1 font-semibold cursor-pointer hover:underline"
-          style={{ color: 'var(--color-info)' }}
+          className="inline-flex items-center gap-1 font-semibold cursor-pointer outline-none focus-visible:shadow-[var(--md-focus-ring)] rounded-full px-2 py-0.5 -my-0.5 relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] active:before:opacity-[0.10] before:transition-opacity before:duration-micro motion-reduce:before:transition-none motion-reduce:transition-none transition-colors duration-micro ease-emphasized text-tertiary hover:text-tertiary"
+          style={{ color: 'var(--md-tertiary)' }}
         >
           <RotateCcw className="w-3 h-3" aria-hidden="true" />
           Ask again

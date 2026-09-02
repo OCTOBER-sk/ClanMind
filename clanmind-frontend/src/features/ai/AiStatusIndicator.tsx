@@ -5,8 +5,8 @@
  * Seven states: Available, Working, Researching, Building, Waiting for approval,
  * Limited (quota), Offline.
  *
- * Uses the spectral gradient ONLY for Odin-active states, per §3.2.
- * Fully supports prefers-reduced-motion via CSS (§6).
+ * M3 restyle: tonal containers, spectral only while active, subdued tonal when
+ * idle/terminal, state-layer safe, motion-reduce aware.
  */
 import React, { memo } from 'react';
 import {
@@ -91,49 +91,49 @@ interface StatusConfig {
 const STATUS_CONFIG: Record<AiStatusKind, StatusConfig> = {
   available: {
     label: 'Available',
-    colorVar: 'var(--color-success)',
+    colorVar: 'var(--md-success)',
     spectral: false,
     spin: false,
     Icon: Circle,
   },
   working: {
     label: 'Working\u2026',
-    colorVar: 'var(--color-warning)',
+    colorVar: 'var(--md-tertiary)',
     spectral: true,
     spin: true,
     Icon: Loader2,
   },
   researching: {
     label: 'Researching\u2026',
-    colorVar: 'var(--color-info)',
+    colorVar: 'var(--md-tertiary)',
     spectral: true,
     spin: false,
     Icon: Globe,
   },
   building: {
     label: 'Building\u2026',
-    colorVar: 'var(--color-warning)',
+    colorVar: 'var(--md-tertiary)',
     spectral: true,
     spin: false,
     Icon: Hammer,
   },
   waiting_approval: {
     label: 'Waiting for approval',
-    colorVar: 'var(--color-warning)',
+    colorVar: 'var(--md-warning)',
     spectral: false,
     spin: false,
     Icon: ShieldAlert,
   },
   limited: {
     label: 'Limited',
-    colorVar: 'var(--color-warning)',
+    colorVar: 'var(--md-warning)',
     spectral: false,
     spin: false,
     Icon: AlertTriangle,
   },
   offline: {
     label: 'Offline',
-    colorVar: 'var(--color-text-tertiary)',
+    colorVar: 'var(--md-outline)',
     spectral: false,
     spin: false,
     Icon: WifiOff,
@@ -166,15 +166,14 @@ export const AiStatusIndicator = memo(function AiStatusIndicator({
         <span
           aria-hidden="true"
           className={cn(
-            'w-2 h-2 rounded-full inline-block',
-            // spectral-active uses CSS animation that gets disabled by prefers-reduced-motion
-            spectral ? 'odin-working' : '',
-            !spectral && status === 'available' ? 'animate-pulse' : '',
+            'w-2 h-2 rounded-full inline-block transition-colors duration-micro ease-emphasized motion-reduce:transition-none',
+            spectral ? 'odin-working motion-reduce:animate-none' : '',
+            !spectral && status === 'available' ? 'animate-pulse motion-reduce:animate-none' : '',
           )}
           style={
             !spectral
               ? { backgroundColor: colorVar }
-              : { background: 'var(--spectral-gradient)', backgroundSize: '200% 200%' }
+              : { background: 'var(--md-spectral-gradient)', backgroundSize: '200% 200%' }
           }
         />
       </span>
@@ -185,56 +184,63 @@ export const AiStatusIndicator = memo(function AiStatusIndicator({
     <div
       role="status"
       aria-label={`${aiName} \u00b7 ${displayLabel}`}
-      className={cn('inline-flex items-center gap-1.5 select-none', className)}
+      className={cn(
+        'inline-flex items-center gap-1.5 select-none rounded-full border px-2.5 py-1 text-[11px] font-medium leading-none transition-colors duration-micro ease-emphasized motion-reduce:transition-none focus-visible:shadow-[var(--md-focus-ring)] outline-none',
+        isActive
+          ? 'bg-tertiary-container border-transparent text-on-tertiary-container'
+          : status === 'available'
+            ? 'bg-success-container border-transparent text-on-success-container'
+            : status === 'offline'
+              ? 'bg-surface-container-high border-outline-variant text-on-surface-variant'
+              : 'bg-warning-container border-transparent text-on-warning-container',
+        className,
+      )}
     >
-      {/* AI avatar — initial-based, rounded */} 
+      {/* AI avatar — tonal, corner-full */}
       <span
-        className="w-4 h-4 rounded-full shrink-0 flex items-center justify-center text-[9px] font-bold"
-        style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
+        className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold border border-outline-variant bg-surface-container-highest text-on-surface-variant"
         aria-hidden="true"
       >
         {aiName.charAt(0).toUpperCase()}
       </span>
 
-      {/* Status icon — spectral for active states */}
+      {/* Status icon — spectral for active states only */}
       <span className="inline-flex shrink-0" style={{ color: spectral ? undefined : colorVar }}>
         {spectral ? (
           <span
             className="inline-flex"
             style={{
-              background: 'var(--spectral-gradient)',
+              background: 'var(--md-spectral-gradient)',
               backgroundSize: '200% 200%',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
             }}
           >
-            <Icon className={cn('w-3.5 h-3.5', spin && 'animate-spin')} />
+            <Icon className={cn('w-3.5 h-3.5', spin && 'animate-spin motion-reduce:animate-none')} />
           </span>
         ) : (
-          <Icon className="w-3.5 h-3.5" />
+          <Icon className={cn('w-3.5 h-3.5', spin && 'animate-spin motion-reduce:animate-none')} />
         )}
       </span>
 
       {/* Labels: "Odin · Working…" */}
-      <span
-        className="text-[11px] font-medium leading-none"
-        style={{ color: 'var(--color-text-secondary)' }}
-      >
-        <span style={{ color: 'var(--color-text-tertiary)' }}>{aiName}</span>
+      <span className="inline-flex items-center gap-0.5 font-medium leading-none">
+        <span className="opacity-80">{aiName}</span>
         <span aria-hidden="true"> \u00b7 </span>
-        {/* spectral-text animation is suppressed by prefers-reduced-motion CSS */}
-        <span className={isActive ? 'spectral-text' : undefined} style={!isActive ? { color: colorVar } : undefined}>
+        <span
+          className={cn(isActive ? 'spectral-text motion-reduce:animate-none' : undefined)}
+          style={!isActive ? { color: colorVar } : undefined}
+        >
           {displayLabel}
         </span>
       </span>
 
-      {/* Available: subtle living dot */}
+      {/* Available: subtle living dot - tonal success */}
       {status === 'available' && (
         <span
           aria-hidden="true"
-          className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0"
-          style={{ backgroundColor: 'var(--color-success)' }}
+          className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0 bg-success motion-reduce:animate-none"
         />
       )}
     </div>

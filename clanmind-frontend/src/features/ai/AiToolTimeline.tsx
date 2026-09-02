@@ -8,6 +8,7 @@ import {
   XCircle,
   Clock,
 } from 'lucide-react';
+import { cn } from '@/design-system/utils';
 import { Badge } from '@/design-system/components/Badge';
 import type { AiToolCall, AiToolCallStatus } from '@/types';
 
@@ -45,23 +46,30 @@ export function AiToolTimeline({
   const renderStatusIcon = (status: AiToolCallStatus) => {
     switch (status) {
       case 'PENDING':
-        return <Clock className="w-3.5 h-3.5" style={{ color: 'var(--color-text-tertiary)' }} />;
+        return <Clock className="w-3.5 h-3.5" style={{ color: 'var(--md-outline)' }} />;
       case 'APPROVED':
-        return <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-info)' }} />;
+        return <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--md-tertiary)' }} />;
       case 'EXECUTING':
-        return <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--color-warning)' }} />;
+        return <Loader2 className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none" style={{ color: 'var(--md-tertiary)' }} />;
       case 'SUCCEEDED':
-        return <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} />;
+        return <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--md-success)' }} />;
       case 'FAILED':
-        return <AlertCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-danger)' }} />;
+        return <AlertCircle className="w-3.5 h-3.5" style={{ color: 'var(--md-error)' }} />;
       case 'DENIED':
-        return <XCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-text-tertiary)' }} />;
+        return <XCircle className="w-3.5 h-3.5" style={{ color: 'var(--md-outline)' }} />;
     }
   };
 
   return (
-    <div className="my-2 rounded-lg border overflow-hidden text-xs" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-raised)' }}>
-      {/* Collapsible Header */}
+    <div
+      className={cn(
+        'my-2 rounded-md border overflow-hidden motion-reduce:transition-none',
+        isAllDone && !isExpanded
+          ? 'bg-success-container border-transparent'
+          : 'bg-surface-container-low border-outline-variant',
+      )}
+    >
+      {/* Collapsible Header — tonal container, state-layer hover */}
       <button
         onClick={() => {
           userToggledRef.current = true;
@@ -69,37 +77,45 @@ export function AiToolTimeline({
         }}
         aria-expanded={isExpanded}
         aria-label={`${aiName} tool activity — ${completedCount} of ${toolCalls.length} complete`}
-        className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer select-none"
+        className={cn(
+          'w-full flex items-center justify-between px-3 py-2 text-left cursor-pointer select-none outline-none transition-colors duration-micro ease-emphasized motion-reduce:transition-none focus-visible:shadow-[var(--md-focus-ring)] relative isolate overflow-hidden before:absolute before:inset-0 before:opacity-0 hover:before:opacity-[0.08] active:before:opacity-[0.10] before:transition-opacity before:duration-micro motion-reduce:before:transition-none',
+          isAllDone && !isExpanded
+            ? 'before:bg-[var(--md-on-success-container)] text-on-success-container'
+            : 'before:bg-[var(--md-on-surface)] text-on-surface-variant',
+        )}
       >
-        <div className="flex items-center gap-2 font-semibold text-[var(--color-text-secondary)] text-[11px]">
-          {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" /> : <ChevronRight className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" />}
-          <span>{aiName} Tool Activity</span>
+        <div className="flex items-center gap-2 font-medium text-[11px] tracking-[0.1px]">
+          {isExpanded ? (
+            <ChevronDown className="w-3.5 h-3.5 text-on-surface-variant shrink-0" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 text-on-surface-variant shrink-0" />
+          )}
+          <span className={cn(isAllDone && !isExpanded ? 'text-on-success-container' : 'text-on-surface-variant')}>
+            {aiName} Tool Activity
+          </span>
           <Badge variant={isAllDone ? 'neutral' : 'warning'} size="sm">
             {completedCount}/{toolCalls.length} Complete
           </Badge>
         </div>
-        <span className="text-[10px] text-[var(--color-text-tertiary)]">
+        <span className={cn('text-[10px]', isAllDone && !isExpanded ? 'text-on-success-container opacity-80' : 'text-on-surface-variant')}>
           {isExpanded ? 'Hide activity' : 'Show details'}
         </span>
       </button>
 
-      {/* Expanded Timeline Items */}
+      {/* Expanded Timeline Items — rows with state-layer hover */}
       {isExpanded && (
-        <div className="p-3 pt-1 border-t space-y-2 font-mono text-[11px]" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="p-2.5 pt-1 border-t space-y-1.5 font-mono text-[11px] bg-surface-container border-outline-variant">
           {toolCalls.map((call) => (
             <div
               key={call.id}
-              className="flex items-start justify-between p-2 rounded-md"
-              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+              className="flex items-start justify-between p-2 rounded-sm border bg-surface-container-high border-outline-variant relative isolate overflow-hidden before:absolute before:inset-0 before:bg-[var(--md-on-surface)] before:opacity-0 hover:before:opacity-[0.08] active:before:opacity-[0.10] before:transition-opacity before:duration-micro motion-reduce:before:transition-none before:rounded-sm transition-colors duration-micro ease-emphasized motion-reduce:transition-none outline-none focus-within:shadow-[var(--md-focus-ring)]"
             >
-              <div className="flex items-start gap-2 min-w-0">
+              <div className="flex items-start gap-2 min-w-0 relative z-10">
                 <span className="mt-0.5 shrink-0">{renderStatusIcon(call.status)}</span>
-                <div>
-                  <p className="font-semibold text-[var(--color-text)]">
-                    {call.tool_name}
-                  </p>
+                <div className="min-w-0">
+                  <p className="font-semibold text-on-surface text-xs leading-none font-sans">{call.tool_name}</p>
                   {call.input && (
-                    <p className="text-[10px] text-[var(--color-text-secondary)] font-sans truncate max-w-sm">
+                    <p className="text-[10px] text-on-surface-variant font-sans truncate max-w-sm mt-0.5">
                       {JSON.stringify(call.input)}
                     </p>
                   )}
@@ -108,19 +124,17 @@ export function AiToolTimeline({
 
               {/* Approval Gating for HIGH-risk tools (§134A.1, §164A) */}
               {call.status === 'PENDING' && (
-                <div className="flex items-center gap-1.5 shrink-0 ml-2 font-sans">
+                <div className="flex items-center gap-1.5 shrink-0 ml-2 font-sans relative z-10">
                   <button
                     onClick={() => onDenyTool?.(call.id)}
-                    className="px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer"
-                    style={{ color: 'var(--color-text-secondary)' }}
+                    className="px-2.5 py-1 rounded-full text-[10px] font-medium cursor-pointer outline-none focus-visible:shadow-[var(--md-focus-ring)] relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] active:before:opacity-[0.10] before:transition-opacity before:duration-micro motion-reduce:transition-none motion-reduce:before:transition-none transition-colors duration-micro ease-emphasized text-on-surface-variant border border-transparent"
                     aria-label={`Deny ${call.tool_name}`}
                   >
                     Deny
                   </button>
                   <button
                     onClick={() => onApproveTool?.(call.id)}
-                    className="px-2 py-0.5 rounded text-[10px] font-semibold cursor-pointer"
-                    style={{ background: 'var(--color-primary)', color: 'var(--color-primary-foreground)' }}
+                    className="px-2.5 py-1 rounded-full text-[10px] font-semibold cursor-pointer outline-none focus-visible:shadow-[var(--md-focus-ring)] bg-primary text-on-primary relative isolate overflow-hidden before:absolute before:inset-0 before:bg-[var(--md-on-primary)] before:opacity-0 hover:before:opacity-[0.08] active:before:opacity-[0.10] before:transition-opacity before:duration-micro motion-reduce:before:transition-none motion-reduce:transition-none transition-colors duration-micro ease-emphasized"
                     aria-label={`Approve ${call.tool_name}`}
                   >
                     Approve Tool

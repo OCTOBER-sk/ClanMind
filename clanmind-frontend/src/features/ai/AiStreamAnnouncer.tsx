@@ -5,6 +5,9 @@
  * stopped, a meaningful aggregate state per §217). Never per-token text:
  * streamed content renders with no aria-live semantics anywhere near it.
  *
+ * M3: visually hidden live-region — no color, no surface, motion-reduce safe.
+ * Keep strictly non-visual so no tonal or spectral leak occurs.
+ *
  * The announcement is synced from run state in an effect — the canonical
  * live-region pattern (each run+status pair announced once; the message
  * persists until the next lifecycle transition).
@@ -71,7 +74,7 @@ export function AiStreamAnnouncer({ aiName = 'AI', runsByMessage }: AiStreamAnno
   }, [runsByMessage, aiName]);
 
   return (
-    <span className="sr-only" role="status" aria-live="polite">
+    <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
       {announcement}
     </span>
   );
