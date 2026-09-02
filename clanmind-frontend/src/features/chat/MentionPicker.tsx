@@ -75,7 +75,7 @@ export const MentionPicker = forwardRef<MentionPickerHandle, MentionPickerProps>
         role="listbox"
         aria-label="Mention a teammate"
         className={cn(
-          'z-50 w-72 rounded-xl border p-1 shadow-[var(--shadow-xl)] max-h-56 overflow-y-auto',
+          'z-50 w-72 rounded-md border p-1 shadow-2 max-h-56 overflow-y-auto motion-reduce:transition-none',
           placement ? 'fixed' : 'absolute bottom-full left-4 mb-2'
         )}
         style={
@@ -83,21 +83,21 @@ export const MentionPicker = forwardRef<MentionPickerHandle, MentionPickerProps>
             ? {
                 left: placement.left,
                 top: placement.top,
-                borderColor: 'var(--color-border)',
-                background: 'var(--color-surface-elevated)',
+                borderColor: 'var(--md-outline-variant)',
+                background: 'var(--md-surface-container-low)',
               }
-            : { borderColor: 'var(--color-border)', background: 'var(--color-surface-elevated)' }
+            : { borderColor: 'var(--md-outline-variant)', background: 'var(--md-surface-container-low)' }
         }
       >
         <div
           className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider"
-          style={{ color: 'var(--color-text-tertiary)' }}
+          style={{ color: 'var(--md-on-surface-variant)' }}
         >
           Mention Teammate
         </div>
         {filtered.length === 0 ? (
           // §234 mention no results
-          <div className="px-2.5 py-3 text-[12px] text-center" style={{ color: 'var(--color-text-tertiary)' }}>
+          <div className="px-2.5 py-3 text-[12px] text-center" style={{ color: 'var(--md-on-surface-variant)' }}>
             No teammate found.
           </div>
         ) : (
@@ -113,10 +113,10 @@ export const MentionPicker = forwardRef<MentionPickerHandle, MentionPickerProps>
                 onClose();
               }}
               className={cn(
-                'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors duration-75 text-left cursor-pointer',
-                i === clampedIndex && 'bg-[var(--color-surface-hover)]'
+                'relative isolate overflow-hidden w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-sm text-[12px] font-medium text-left cursor-pointer transition-colors duration-150 motion-reduce:transition-none before:absolute before:inset-0 before:bg-[var(--md-on-surface)] before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)]',
+                i === clampedIndex && 'bg-[var(--md-secondary-container)] text-[var(--md-on-secondary-container)] before:opacity-0'
               )}
-              style={{ color: 'var(--color-text)' }}
+              style={i === clampedIndex ? undefined : { color: 'var(--md-on-surface)' }}
             >
               {item.isAi ? (
                 <Avatar name={item.name} size="sm" isAi={true} />
@@ -127,11 +127,11 @@ export const MentionPicker = forwardRef<MentionPickerHandle, MentionPickerProps>
                 <p className="truncate font-semibold flex items-center gap-1">
                   {item.name}
                   {item.isAi && (
-                    <Bot className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
+                    <Bot className="w-2.5 h-2.5" style={{ color: 'var(--md-on-surface-variant)' }} aria-hidden="true" />
                   )}
                 </p>
                 {item.role && (
-                  <p className="truncate text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                  <p className="truncate text-[10px]" style={{ color: 'var(--md-on-surface-variant)' }}>
                     {item.role}
                   </p>
                 )}

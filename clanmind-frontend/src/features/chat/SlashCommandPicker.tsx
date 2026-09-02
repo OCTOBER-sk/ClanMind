@@ -37,42 +37,42 @@ const BASE_COMMANDS: SlashCommand[] = [
     command: '/odin',
     name: 'Ask Odin',
     description: 'Ask the shared AI teammate a question or request an artifact',
-    icon: <Bot className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />,
+    icon: <Bot className="w-4 h-4" style={{ color: 'var(--md-primary)' }} />,
   },
   {
     id: 'cmd_private',
     command: '/private',
     name: 'Private',
     description: 'Start private scoped chat with teammate or Odin',
-    icon: <Lock className="w-4 h-4" style={{ color: 'var(--color-info)' }} />,
+    icon: <Lock className="w-4 h-4" style={{ color: 'var(--md-primary)' }} />,
   },
   {
     id: 'cmd_meeting',
     command: '/meeting',
     name: 'Meeting',
     description: 'Start first-class Meeting Mode with live notes and candidate tracking',
-    icon: <Video className="w-4 h-4" style={{ color: 'var(--color-danger)' }} />,
+    icon: <Video className="w-4 h-4" style={{ color: 'var(--md-primary)' }} />,
   },
   {
     id: 'cmd_research',
     command: '/research',
     name: 'Deep Research',
     description: 'Trigger multi-step web research with citations and project impact',
-    icon: <Search className="w-4 h-4" style={{ color: 'var(--color-success)' }} />,
+    icon: <Search className="w-4 h-4" style={{ color: 'var(--md-primary)' }} />,
   },
   {
     id: 'cmd_memory',
     command: '/memory',
     name: 'Memory',
     description: 'Explicitly store a project decision, constraint, or convention',
-    icon: <Bookmark className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />,
+    icon: <Bookmark className="w-4 h-4" style={{ color: 'var(--md-primary)' }} />,
   },
   {
     id: 'cmd_project',
     command: '/project',
     name: 'Project',
     description: 'Switch working project context chip',
-    icon: <FolderKanban className="w-4 h-4" style={{ color: 'var(--color-info)' }} />,
+    icon: <FolderKanban className="w-4 h-4" style={{ color: 'var(--md-primary)' }} />,
   },
 ];
 
@@ -122,17 +122,17 @@ export const SlashCommandPickerWithKeyboard = forwardRef<
       ref={listRef}
       role="listbox"
       aria-label="Slash commands"
-      className="absolute bottom-full left-4 mb-2 z-50 w-80 rounded-xl border p-1 shadow-[var(--shadow-xl)] max-h-64 overflow-y-auto"
-      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-elevated)' }}
+      className="absolute bottom-full left-4 mb-2 z-50 w-80 rounded-md border p-1 shadow-2 max-h-64 overflow-y-auto motion-reduce:transition-none"
+      style={{ borderColor: 'var(--md-outline-variant)', background: 'var(--md-surface-container-low)' }}
     >
       <div
         className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider"
-        style={{ color: 'var(--color-text-tertiary)' }}
+        style={{ color: 'var(--md-on-surface-variant)' }}
       >
         Slash Commands
       </div>
       {filtered.length === 0 ? (
-        <div className="px-2.5 py-3 text-[12px] text-center" style={{ color: 'var(--color-text-tertiary)' }}>
+        <div className="px-2.5 py-3 text-[12px] text-center" style={{ color: 'var(--md-on-surface-variant)' }}>
           No commands found.
         </div>
       ) : (
@@ -148,22 +148,22 @@ export const SlashCommandPickerWithKeyboard = forwardRef<
               onClose();
             }}
             className={cn(
-              'w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-[12px] font-medium text-left cursor-pointer transition-colors duration-75',
-              i === clampedIndex && 'bg-[var(--color-surface-hover)]'
+              'relative isolate overflow-hidden w-full flex items-center gap-3 px-2.5 py-2 rounded-sm text-[12px] font-medium text-left cursor-pointer transition-colors duration-150 motion-reduce:transition-none before:absolute before:inset-0 before:bg-[var(--md-on-surface)] before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)]',
+              i === clampedIndex && 'bg-[var(--md-secondary-container)] text-[var(--md-on-secondary-container)] before:opacity-0'
             )}
-            style={{ color: 'var(--color-text)' }}
+            style={i === clampedIndex ? undefined : { color: 'var(--md-on-surface)' }}
           >
-            <div className="p-1.5 rounded-md shrink-0" style={{ background: 'var(--color-surface-hover)' }}>
+            <div className="p-1.5 rounded-sm shrink-0" style={{ background: 'var(--md-surface-container-high)' }}>
               {cmd.icon}
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold flex items-center justify-between">
                 <span>{cmd.name}</span>
-                <span className="text-[11px] font-mono font-normal" style={{ color: 'var(--color-text-tertiary)' }}>
+                <span className="text-[11px] font-mono font-normal" style={{ color: 'var(--md-on-surface-variant)' }}>
                   {cmd.command}
                 </span>
               </p>
-              <p className="truncate text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
+              <p className="truncate text-[11px]" style={{ color: 'var(--md-on-surface-variant)' }}>
                 {cmd.description}
               </p>
             </div>

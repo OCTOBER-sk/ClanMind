@@ -63,12 +63,12 @@ export const PrivateRecipientChooser = forwardRef<
       data-testid="private-recipient-chooser"
       role="listbox"
       aria-label="Choose a private recipient"
-      className="absolute bottom-full left-4 mb-2 z-50 w-72 rounded-xl border p-1 shadow-[var(--shadow-xl)] max-h-56 overflow-y-auto"
-      style={{ borderColor: 'var(--color-info)', background: 'var(--color-surface-elevated)' }}
+      className="absolute bottom-full left-4 mb-2 z-50 w-72 rounded-md border p-1 shadow-2 max-h-56 overflow-y-auto motion-reduce:transition-none"
+      style={{ borderColor: 'var(--md-outline-variant)', background: 'var(--md-surface-container-low)' }}
     >
       <div
         className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider"
-        style={{ color: 'var(--color-info)' }}
+        style={{ color: 'var(--md-on-surface-variant)' }}
       >
         <Lock className="w-3 h-3" aria-hidden="true" />
         Choose recipient — this conversation will be private
@@ -85,10 +85,10 @@ export const PrivateRecipientChooser = forwardRef<
             onClose();
           }}
           className={cn(
-            'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors duration-75 text-left cursor-pointer',
-            i === clampedIndex && 'bg-[var(--color-surface-hover)]'
+            'relative isolate overflow-hidden w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-sm text-[12px] font-medium text-left cursor-pointer transition-colors duration-150 motion-reduce:transition-none before:absolute before:inset-0 before:bg-[var(--md-on-surface)] before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)]',
+            i === clampedIndex && 'bg-[var(--md-secondary-container)] text-[var(--md-on-secondary-container)] before:opacity-0'
           )}
-          style={{ color: 'var(--color-text)' }}
+          style={i === clampedIndex ? undefined : { color: 'var(--md-on-surface)' }}
         >
           {item.isAi ? (
             <Avatar name={item.name} size="sm" isAi={true} />
@@ -99,11 +99,11 @@ export const PrivateRecipientChooser = forwardRef<
             <p className="truncate font-semibold flex items-center gap-1">
               {item.name}
               {item.isAi && (
-                <Bot className="w-2.5 h-2.5" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
+                <Bot className="w-2.5 h-2.5" style={{ color: 'var(--md-on-surface-variant)' }} aria-hidden="true" />
               )}
             </p>
             {item.role && (
-              <p className="truncate text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+              <p className="truncate text-[10px]" style={{ color: 'var(--md-on-surface-variant)' }}>
                 {item.role}
               </p>
             )}

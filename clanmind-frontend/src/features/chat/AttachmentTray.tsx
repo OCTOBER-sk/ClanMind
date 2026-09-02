@@ -40,19 +40,19 @@ function Thumb({ attachment }: { attachment: Attachment }) {
       <img
         src={attachment.file_url}
         alt=""
-        className="h-7 w-7 shrink-0 rounded border object-cover"
-        style={{ borderColor: 'var(--color-border)' }}
+        className="h-7 w-7 shrink-0 rounded-sm border object-cover"
+        style={{ borderColor: 'var(--md-outline-variant)' }}
         loading="lazy"
       />
     );
   }
   return (
     <span
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded border"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border"
       style={{
-        borderColor: 'var(--color-border)',
-        color: 'var(--color-text-tertiary)',
-        background: 'var(--color-surface)',
+        borderColor: 'var(--md-outline-variant)',
+        color: 'var(--md-on-surface-variant)',
+        background: 'var(--md-surface-container-high)',
       }}
       aria-hidden="true"
     >
@@ -77,8 +77,8 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
       role="list"
       aria-label="Attached files"
       data-testid="attachment-tray"
-      className="flex flex-wrap items-center gap-2 p-2 border-b rounded-t-xl"
-      style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+      className="flex flex-wrap items-center gap-2 p-2 border-b rounded-t-md"
+      style={{ background: 'var(--md-surface-container)', borderColor: 'var(--md-outline-variant)' }}
     >
       {attachments.map((file) => {
         const isUploading = file.upload_state === 'uploading';
@@ -109,11 +109,11 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
             data-upload-state={isFailed ? 'failed' : isUploading ? 'uploading' : file.upload_state}
             aria-label={`${file.file_name}, ${statusText}`}
             className={cn(
-              'relative flex items-center gap-2 overflow-hidden rounded-lg border px-2 py-1.5 pr-1.5 text-[12px] max-w-[240px] transition-colors',
+              'relative flex items-center gap-2 overflow-hidden rounded-sm border px-2 py-1.5 pr-1.5 text-[12px] max-w-[240px] transition-colors duration-150 motion-reduce:transition-none',
             )}
             style={{
-              background: 'var(--color-surface-raised)',
-              borderColor: isFailed ? 'var(--color-danger)' : 'var(--color-border)',
+              background: 'var(--md-surface-container-high)',
+              borderColor: isFailed ? 'var(--md-outline)' : 'var(--md-outline-variant)',
             }}
           >
             <Thumb attachment={file} />
@@ -121,7 +121,7 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
             <div className="min-w-0 flex-1">
               <p
                 className="truncate text-[12px] font-medium leading-tight"
-                style={{ color: 'var(--color-text)' }}
+                style={{ color: 'var(--md-on-surface)' }}
                 title={file.file_name}
               >
                 {file.file_name}
@@ -129,13 +129,7 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
               <span
                 className="mt-0.5 flex items-center gap-1 text-[10px] leading-tight"
                 style={{
-                  color: isFailed
-                    ? 'var(--color-danger)'
-                    : isUploading
-                      ? 'var(--color-info)'
-                      : file.upload_state === 'uploaded'
-                        ? 'var(--color-success)'
-                        : 'var(--color-text-tertiary)',
+                  color: 'var(--md-on-surface-variant)',
                 }}
               >
                 {isUploading && (
@@ -154,8 +148,8 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
                 <button
                   type="button"
                   onClick={() => onCancel(file.id)}
-                  className="shrink-0 cursor-pointer rounded px-1 py-0.5 text-[10px] font-semibold hover:bg-[var(--color-surface-hover)] transition-colors"
-                  style={{ color: 'var(--color-text-secondary)' }}
+                  className="relative isolate overflow-hidden shrink-0 cursor-pointer rounded-full px-1 py-0.5 text-[10px] font-semibold transition-colors duration-150 motion-reduce:transition-none before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)]"
+                  style={{ color: 'var(--md-on-surface-variant)' }}
                   aria-label={`Cancel upload of ${file.file_name}`}
                 >
                   Cancel
@@ -167,8 +161,8 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
                   <button
                     type="button"
                     onClick={() => onRetry(file.id)}
-                    className="shrink-0 cursor-pointer rounded px-1 py-0.5 text-[10px] font-semibold hover:underline"
-                    style={{ color: 'var(--color-info)' }}
+                    className="relative isolate overflow-hidden shrink-0 cursor-pointer rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition-colors duration-150 motion-reduce:transition-none before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)]"
+                    style={{ color: 'var(--md-on-surface-variant)' }}
                     aria-label={`Retry upload of ${file.file_name}`}
                   >
                     Retry
@@ -177,8 +171,8 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
                 <button
                   type="button"
                   onClick={() => onRemove(file.id)}
-                  className="shrink-0 cursor-pointer rounded px-1 py-0.5 text-[10px] font-semibold hover:underline"
-                  style={{ color: 'var(--color-danger)' }}
+                  className="relative isolate overflow-hidden shrink-0 cursor-pointer rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition-colors duration-150 motion-reduce:transition-none before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)]"
+                  style={{ color: 'var(--md-on-surface-variant)' }}
                   aria-label={`Remove ${file.file_name}`}
                 >
                   Remove
@@ -189,8 +183,8 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
                 type="button"
                 onClick={() => onRemove(file.id)}
                 aria-label={`Remove ${file.file_name}`}
-                className="shrink-0 cursor-pointer rounded p-0.5 hover:bg-[var(--color-surface-hover)] transition-colors"
-                style={{ color: 'var(--color-text-tertiary)' }}
+                className="relative isolate overflow-hidden shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-150 motion-reduce:transition-none before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)]"
+                style={{ color: 'var(--md-on-surface-variant)' }}
               >
                 <X className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
@@ -203,7 +197,7 @@ export function AttachmentTray({ attachments, onRemove, onRetry, onCancel }: Att
                 className="absolute bottom-0 left-0 h-0.5 transition-[width] duration-200"
                 style={{
                   width: `${file.upload_progress ?? 0}%`,
-                  background: 'var(--color-info)',
+                  background: 'var(--md-primary)',
                 }}
               />
             )}

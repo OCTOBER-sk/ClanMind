@@ -439,22 +439,21 @@ export function Composer({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        'relative border rounded-xl transition-all duration-150 mx-4 mb-4',
+        'relative border rounded-md mx-4 mb-4 transition-colors duration-150 motion-reduce:transition-none',
+        'bg-[var(--md-surface-container-low)]',
         isDragOver
-          ? 'border-[var(--color-info)] shadow-[0_0_0_1px_var(--color-info)]'
+          ? 'border-[var(--md-primary)] shadow-[0_0_0_1px_var(--md-primary)]'
           : visibility !== 'GROUP'
-            ? 'border-[var(--color-info)] shadow-[0_0_0_1px_var(--color-info)]'
-            : 'border-[var(--color-border)] focus-within:border-[var(--color-border-strong)] focus-within:shadow-[0_0_0_1px_var(--color-border-strong)]'
+            ? 'border-[var(--md-outline)] shadow-sm'
+            : 'border-[var(--md-outline-variant)] focus-within:border-[var(--md-outline)] focus-within:shadow-[var(--md-focus-ring)]'
       )}
-      style={{
-        background: 'var(--color-surface-raised)',
-      }}
+      // M3 tonal surface-container-low drives bg via className
     >
       {/* §52 Drag and Drop overlay */}
       {isDragOver && (
         <div
-          className="absolute inset-0 z-40 rounded-xl flex items-center justify-center text-[13px] font-semibold pointer-events-none"
-          style={{ background: 'var(--color-info-bg)', color: 'var(--color-info)' }}
+          className="absolute inset-0 z-40 rounded-md flex items-center justify-center text-[13px] font-semibold pointer-events-none border border-[var(--md-primary)]"
+          style={{ background: 'color-mix(in srgb, var(--md-tertiary-container) 92%, transparent)', color: 'var(--md-on-tertiary-container)' }}
         >
           Drop files to attach
         </div>
@@ -497,11 +496,11 @@ export function Composer({
       {/* §59 Reply Preview Header */}
       {replyTarget && (
         <div
-          className="flex items-center justify-between px-3 py-2 border-b rounded-t-xl text-[12px]"
+          className="flex items-center justify-between px-3 py-2 border-b rounded-t-md text-[12px]"
           style={{
-            background: 'var(--color-surface)',
-            borderColor: 'var(--color-border)',
-            color: 'var(--color-text-secondary)',
+            background: 'var(--md-surface-container-high)',
+            borderColor: 'var(--md-outline-variant)',
+            color: 'var(--md-on-surface-variant)',
           }}
         >
           <span className="truncate">
@@ -511,8 +510,8 @@ export function Composer({
           <button
             onClick={onClearReplyTarget}
             aria-label="Cancel reply"
-            className="p-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity ml-2 shrink-0"
-            style={{ color: 'var(--color-text-tertiary)' }}
+            className="relative isolate overflow-hidden p-0.5 rounded-full cursor-pointer transition-colors duration-150 motion-reduce:transition-none before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)] ml-2 shrink-0"
+            style={{ color: 'var(--md-on-surface-variant)' }}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -525,11 +524,11 @@ export function Composer({
         <div
           data-testid="privacy-header"
           role="status"
-          className="flex items-center justify-between px-3 py-2 border-b rounded-t-xl text-[12px] font-semibold"
+          className="flex items-center justify-between px-3 py-2 border-b rounded-t-md text-[12px] font-semibold border-l-4 border-[var(--md-tertiary)]"
           style={{
-            background: 'var(--color-info-bg)',
-            borderColor: 'var(--color-border)',
-            color: 'var(--color-info)',
+            background: 'var(--md-tertiary-container)',
+            borderColor: 'var(--md-outline-variant)',
+            color: 'var(--md-on-tertiary-container)',
           }}
         >
           <div className="flex items-center gap-1.5">
@@ -546,7 +545,7 @@ export function Composer({
           </div>
           <button
             onClick={onClearPrivateMode}
-            className="text-[11px] hover:underline cursor-pointer opacity-80 hover:opacity-100 transition-opacity shrink-0 ml-2"
+            className="relative isolate overflow-hidden text-[11px] cursor-pointer rounded-full px-2 py-1 transition-colors duration-150 motion-reduce:transition-none before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)] shrink-0 ml-2 underline decoration-dotted underline-offset-2"
           >
             Switch to Public Group
           </button>
@@ -589,16 +588,16 @@ export function Composer({
                 : 'Pick a private recipient first (/private)'
         }
         rows={1}
-        className="w-full px-3.5 py-3 text-[13px] bg-transparent outline-none resize-none select-text leading-relaxed placeholder:opacity-40"
-        style={{ color: 'var(--color-text)' }}
+        className="w-full px-3.5 py-3 text-[13px] bg-transparent outline-none resize-none select-text leading-relaxed placeholder:text-[var(--md-on-surface-variant)] placeholder:opacity-60 motion-reduce:transition-none"
+        style={{ color: 'var(--md-on-surface)' }}
       />
 
       {/* Bottom Composer Toolbar */}
       <div
         className="flex items-center justify-between px-2.5 py-2 border-t"
-        style={{ borderColor: 'var(--color-border)' }}
+        style={{ borderColor: 'var(--md-outline-variant)' }}
       >
-        <div className="flex items-center gap-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+        <div className="flex items-center gap-0.5" style={{ color: 'var(--md-on-surface-variant)' }}>
           <input
             type="file"
             ref={fileInputRef}
@@ -612,7 +611,7 @@ export function Composer({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors"
+              className="relative isolate overflow-hidden p-1.5 rounded-full cursor-pointer transition-colors duration-150 motion-reduce:transition-none before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)]"
               aria-label="Attach files"
             >
               <Paperclip className="w-4 h-4" aria-hidden="true" />
@@ -627,7 +626,7 @@ export function Composer({
                 setShowCommands(true);
                 setCommandQuery('');
               }}
-              className="p-1.5 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors text-[13px] font-mono font-bold"
+              className="relative isolate overflow-hidden p-1.5 rounded-full cursor-pointer transition-colors duration-150 motion-reduce:transition-none before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)] text-[13px] font-mono font-bold"
               aria-label="Commands"
             >
               /
@@ -642,7 +641,7 @@ export function Composer({
                 setMentionQuery('');
                 openMentionsAtCaret();
               }}
-              className="p-1.5 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors"
+              className="relative isolate overflow-hidden p-1.5 rounded-full cursor-pointer transition-colors duration-150 motion-reduce:transition-none before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)]"
               aria-label="Mention a teammate"
             >
               <AtSign className="w-4 h-4" aria-hidden="true" />
@@ -651,8 +650,8 @@ export function Composer({
 
           {/* §267 Project Context Chip */}
           <div
-            className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 ml-2 rounded-md text-[11px] font-medium"
-            style={{ background: 'var(--color-surface-hover)', color: 'var(--color-text-secondary)' }}
+            className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 ml-2 rounded-full text-[11px] font-medium border border-[var(--md-outline-variant)]"
+            style={{ background: 'var(--md-surface-container-high)', color: 'var(--md-on-surface-variant)' }}
           >
             <FolderKanban className="w-3 h-3" aria-hidden="true" />
             <span>{activeProjectName ? `Project: ${activeProjectName}` : 'Group chat'}</span>
@@ -665,7 +664,7 @@ export function Composer({
             <span
               data-testid="upload-send-hint"
               className="inline-flex items-center gap-1 text-[11px] font-medium"
-              style={{ color: 'var(--color-info)' }}
+              style={{ color: 'var(--md-on-surface-variant)' }}
             >
               <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
               Finishing upload…
@@ -675,7 +674,7 @@ export function Composer({
             <span
               data-testid="failed-upload-hint"
               className="inline-flex items-center gap-1 text-[11px] font-medium"
-              style={{ color: 'var(--color-danger)' }}
+              style={{ color: 'var(--md-on-surface-variant)' }}
             >
               <AlertCircle className="w-3 h-3" aria-hidden="true" />
               Resolve the failed file first
@@ -686,7 +685,7 @@ export function Composer({
           {isOffline && (
             <span
               className="inline-flex items-center gap-1 text-[11px] font-medium"
-              style={{ color: 'var(--color-text-secondary)' }}
+              style={{ color: 'var(--md-on-surface-variant)' }}
             >
               <WifiOff className="w-3 h-3" aria-hidden="true" />
               Queued · Offline
@@ -710,10 +709,10 @@ export function Composer({
               aria-label="Stop generating"
               title="Stop generating"
               className={cn(
-                'inline-flex items-center justify-center p-2 rounded-lg transition-all duration-100 select-none cursor-pointer',
-                'border bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)] active:scale-95'
+                'relative isolate overflow-hidden inline-flex items-center justify-center p-2 rounded-full transition-colors duration-150 motion-reduce:transition-none select-none cursor-pointer before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)] active:scale-[0.96]',
+                'border bg-[var(--md-surface-container-high)]'
               )}
-              style={{ borderColor: 'var(--color-border-strong)', color: 'var(--color-text)' }}
+              style={{ borderColor: 'var(--md-outline-variant)', color: 'var(--md-on-surface)' }}
             >
               <Square className="w-3.5 h-3.5 fill-current" aria-hidden="true" />
             </button>
@@ -733,12 +732,11 @@ export function Composer({
                       : undefined
               }
               className={cn(
-                'inline-flex items-center justify-center p-2 rounded-lg transition-all duration-100 select-none',
+                'relative isolate overflow-hidden inline-flex items-center justify-center p-2 rounded-full transition-colors duration-150 motion-reduce:transition-none select-none before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] focus-visible:shadow-[var(--md-focus-ring)] active:scale-[0.96]',
                 canSend
-                  ? 'bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 active:scale-95 cursor-pointer'
-                  : 'cursor-not-allowed opacity-40'
+                  ? 'bg-[var(--md-primary)] text-[var(--md-on-primary)] cursor-pointer'
+                  : 'bg-[var(--md-surface-container-high)] text-[var(--md-on-surface-variant)] cursor-not-allowed opacity-60'
               )}
-              style={!canSend ? { background: 'var(--color-surface-hover)' } : undefined}
             >
               <Send className="w-4 h-4" aria-hidden="true" />
             </button>
