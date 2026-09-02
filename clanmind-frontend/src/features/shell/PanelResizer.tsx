@@ -91,15 +91,14 @@ export function PanelResizer({
       }}
       // §221: invisible 24px-wide hit strip centered on the painted hairline.
       className={cn(
-        'group relative z-10 flex w-6 shrink-0 cursor-col-resize select-none touch-none items-stretch justify-center outline-none',
+        'group relative z-10 flex w-6 shrink-0 cursor-col-resize select-none touch-none items-stretch justify-center outline-none focus-visible:shadow-[var(--md-focus-ring)] rounded-full transition-colors duration-micro ease-emphasized motion-reduce:transition-none',
         '-mx-[10px]',
         className,
       )}
     >
       <div
         aria-hidden="true"
-        className="h-full w-0.5 transition-colors group-hover:bg-[var(--color-text-tertiary)] group-focus-visible:bg-[var(--color-text-secondary)]"
-        style={{ background: 'var(--color-border)' }}
+        className="h-full w-px bg-outline-variant rounded-full transition-all duration-micro ease-emphasized motion-reduce:transition-none group-hover:w-[3px] group-hover:bg-primary group-focus-visible:w-[3px] group-focus-visible:bg-primary group-active:bg-primary"
       />
     </div>
   );

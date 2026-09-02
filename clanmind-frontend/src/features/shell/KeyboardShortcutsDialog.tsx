@@ -19,24 +19,16 @@ export interface KeyboardShortcutsDialogProps {
 export function KeyboardShortcutsDialog({ open, onOpenChange }: KeyboardShortcutsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title="Keyboard shortcuts" maxWidth="sm">
-      <div className="space-y-2">
+      <div className="space-y-1">
         {SHORTCUTS.map((s) => (
           <div
             key={s.keys}
-            className="flex items-center justify-between py-1.5 border-b last:border-0"
-            style={{ borderColor: 'var(--color-border)' }}
+            className="flex items-center justify-between py-2 border-b border-outline-variant last:border-0"
           >
-            <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+            <span className="text-label-medium text-on-surface-variant">
               {s.label}
             </span>
-            <kbd
-              className="text-[10px] font-mono px-1.5 py-0.5 rounded"
-              style={{
-                background: 'var(--color-surface-hover)',
-                color: 'var(--color-text)',
-                border: '1px solid var(--color-border)',
-              }}
-            >
+            <kbd className="font-mono text-[10px] px-2 py-1 rounded-full bg-surface-variant text-on-surface-variant border border-outline-variant">
               {s.keys}
             </kbd>
           </div>

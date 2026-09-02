@@ -1074,22 +1074,13 @@ export function AppShell() {
           onApproveAndMerge={handleApproveAndMerge}
         />
       ) : rightPanelMode === 'approval' ? (
-        <div
-          className="flex flex-col h-full text-xs"
-          style={{ background: 'var(--color-surface)' }}
-        >
-          <div
-            className="flex items-center justify-between px-4 py-3 shrink-0"
-            style={{ borderBottom: '1px solid var(--color-border)' }}
-          >
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-              Approvals
-            </h3>
+        <div className="flex flex-col h-full text-xs bg-surface-container-low">
+          <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-outline-variant">
+            <h3 className="text-title-small text-on-surface">Approvals</h3>
             <button
               onClick={closeRightPanel}
               aria-label="Close approvals panel"
-              className="p-1 rounded-lg cursor-pointer hover:bg-[var(--color-surface-hover)] focus-visible:shadow-[var(--focus-ring)] outline-none transition-colors"
-              style={{ color: 'var(--color-text-tertiary)' }}
+              className="p-1 rounded-full cursor-pointer text-on-surface-variant transition-colors duration-micro ease-emphasized motion-reduce:transition-none hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] focus-visible:shadow-[var(--md-focus-ring)] outline-none"
             >
               <X className="w-4 h-4" aria-hidden="true" />
             </button>
@@ -1120,7 +1111,7 @@ export function AppShell() {
               )}
             {approvableActions.filter((a) => a.status !== 'SUCCEEDED' && a.status !== 'REJECTED')
               .length === 0 && (
-              <p className="text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>
+              <p className="text-label-medium text-on-surface-variant">
                 Nothing is waiting for approval right now.
               </p>
             )}
@@ -1143,13 +1134,7 @@ export function AppShell() {
   );
 
   return (
-    <div
-      className="flex flex-col h-screen w-screen overflow-hidden font-sans"
-      style={{
-        background: 'var(--color-background)',
-        color: 'var(--color-text)',
-      }}
-    >
+    <div className="flex flex-col h-screen w-screen overflow-hidden font-sans bg-background text-on-surface">
       {/* §7 — skip link: first tabbable element; visually hidden until focused */}
       <a
         href="#cm-main-content"
@@ -1354,8 +1339,7 @@ export function AppShell() {
         <main
           id="cm-main-content"
           tabIndex={-1}
-          className="flex-1 flex flex-col min-w-0 overflow-hidden outline-none"
-          style={{ background: 'var(--color-background)' }}
+          className="flex-1 flex flex-col min-w-0 overflow-hidden outline-none bg-surface"
         >
           {activeNavSection === 'chat' && (
             <ErrorBoundary label="Chat">
@@ -1678,12 +1662,13 @@ export function AppShell() {
             />
             <aside
               className={cn(
-                'panel-open h-full flex flex-col shrink-0',
+                'panel-open h-full flex flex-col shrink-0 bg-surface-container-low border-l border-outline-variant',
                 // §95/§248 — the width EXPANSION animates once per open; the
                 // resizer stays immediate afterwards.
-                animatePanelWidth && 'transition-[width] duration-200 ease-out',
+                animatePanelWidth &&
+                  'transition-[width] duration-standard ease-emphasized motion-reduce:transition-none',
               )}
-              style={{ width: rightPanelWidth, background: 'var(--color-surface)' }}
+              style={{ width: rightPanelWidth }}
               aria-label={rightSurfaceTitle}
             >
               {renderRightSurface()}
@@ -1702,6 +1687,7 @@ export function AppShell() {
         side="right"
         title={rightSurfaceTitle}
         showCloseButton={false}
+        className="bg-surface-container-low"
       >
         {showRightSheet ? renderRightSurface() : null}
       </Sheet>
