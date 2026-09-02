@@ -78,7 +78,6 @@ export function TopBar({
   projects,
   onToggleNav,
 }: TopBarProps) {
-  // §15 Group switcher: current + recent groups, unread state, Create Group, Join Group
   const groupMenuItems = [
     ...groups.map((g) => ({
       id: g.id,
@@ -101,7 +100,6 @@ export function TopBar({
     },
   ];
 
-  // §16 Project switcher: name, active status, archive state only when relevant
   const projectMenuItems = projects.map((p) => ({
     id: p.id,
     label: (
@@ -115,9 +113,6 @@ export function TopBar({
     onClick: () => onSelectProject(p),
   }));
 
-  // §272 Profile dropdown — theme + demo replay live here, not the top bar (§325 #12)
-  // 'system' resolves through the OS preference so the label names the theme
-  // a toggle click would switch AWAY from.
   const effectiveDark =
     theme === 'dark' ||
     (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -151,43 +146,28 @@ export function TopBar({
   ];
 
   return (
-    <header
-      className="h-12 border-b flex items-center justify-between px-4 z-40 select-none"
-      style={{
-        borderColor: 'var(--color-border)',
-        background: 'var(--color-surface-raised)',
-      }}
-    >
-      {/* Left: Location Breadcrumbs (§14) */}
-      <div className="flex items-center gap-2 text-xs font-semibold min-w-0" style={{ color: 'var(--color-text)' }}>
-        {/* §13 — off-canvas navigation trigger, only rendered below 900px */}
+    <header className="h-16 border-b border-outline-variant bg-surface flex items-center justify-between px-4 z-40 select-none">
+      {/* Left: Location Breadcrumbs — ClanMind · Group ▸ Project */}
+      <div className="flex items-center gap-2 text-xs font-semibold min-w-0 text-on-surface">
         {onToggleNav && (
           <Tooltip content="Open navigation" side="bottom">
             <button
               onClick={onToggleNav}
               aria-label="Open navigation menu"
-              className="p-2 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface-hover)] focus-visible:shadow-[var(--focus-ring)] outline-none"
-              style={{ color: 'var(--color-text-secondary)' }}
+              className="p-2 rounded-full text-on-surface-variant transition-colors duration-micro ease-emphasized motion-reduce:transition-none cursor-pointer hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] focus-visible:shadow-[var(--md-focus-ring)] outline-none"
             >
               <Menu className="h-5 w-5" aria-hidden="true" />
             </button>
           </Tooltip>
         )}
-        <img
-          src={clanmindMark}
-          alt="ClanMind"
-          className="h-5 w-auto shrink-0 dark:invert"
-        />
-        <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
+        <img src={clanmindMark} alt="ClanMind" className="h-5 w-auto shrink-0 dark:invert" />
+        <ChevronRight className="w-3.5 h-3.5 shrink-0 text-on-surface-variant" aria-hidden="true" />
 
-        {/* Group Switcher (§15) */}
+        {/* Group Switcher — M3 menu */}
         <Dropdown
           align="start"
           trigger={
-            <button
-              className="font-semibold truncate max-w-[140px] cursor-pointer hover:opacity-80 rounded-md outline-none focus-visible:shadow-[var(--focus-ring)]"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
+            <button className="font-medium truncate max-w-[140px] cursor-pointer rounded-full px-2 py-1 text-label-medium text-on-surface-variant transition-colors duration-micro ease-emphasized motion-reduce:transition-none hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] outline-none focus-visible:shadow-[var(--md-focus-ring)]">
               {activeGroup?.name || 'Select Group'}
             </button>
           }
@@ -196,15 +176,11 @@ export function TopBar({
 
         {activeProject && (
           <>
-            <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
-            {/* Project Switcher (§16) — monochrome: no persistent colored accent */}
+            <ChevronRight className="w-3.5 h-3.5 shrink-0 text-on-surface-variant" aria-hidden="true" />
             <Dropdown
               align="start"
               trigger={
-                <button
-                  className="font-semibold truncate max-w-[140px] cursor-pointer hover:underline rounded-md outline-none focus-visible:shadow-[var(--focus-ring)]"
-                  style={{ color: 'var(--color-text)' }}
-                >
+                <button className="font-medium truncate max-w-[140px] cursor-pointer rounded-full px-2 py-1 text-label-medium text-on-surface transition-colors duration-micro ease-emphasized motion-reduce:transition-none hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] outline-none focus-visible:shadow-[var(--md-focus-ring)]">
                   {activeProject.name}
                 </button>
               }
@@ -214,66 +190,49 @@ export function TopBar({
         )}
       </div>
 
-      {/* Center: Global Search Trigger (§61, §175) — monochrome, restrained */}
+      {/* Center: Global Search Trigger — Search (Ctrl+K) */}
       <div className="hidden md:flex items-center justify-center flex-1 max-w-sm px-4">
         <button
           onClick={onOpenSearch}
           aria-label="Search or jump to"
-          className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer outline-none focus-visible:shadow-[var(--focus-ring)]"
-          style={{
-            background: 'var(--color-surface-hover)',
-            color: 'var(--color-text-tertiary)',
-          }}
+          className="w-full flex items-center justify-between px-3 py-1.5 rounded-full text-xs border border-outline-variant bg-surface-container-high text-on-surface-variant transition-colors duration-micro ease-emphasized motion-reduce:transition-none cursor-pointer outline-none focus-visible:shadow-[var(--md-focus-ring)] hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,var(--md-surface-container-high))] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,var(--md-surface-container-high))]"
         >
           <span className="flex items-center gap-2">
             <Search className="w-3.5 h-3.5" />
             <span>Search or jump to…</span>
           </span>
-          <kbd
-            className="font-mono text-[10px] px-1.5 py-0.5 rounded"
-            style={{ background: 'var(--color-surface)', color: 'var(--color-text-secondary)' }}
-          >
+          <kbd className="font-mono text-[10px] px-1.5 py-0.5 rounded-xs bg-surface text-on-surface-variant border border-outline-variant">
             Ctrl+K
           </kbd>
         </button>
       </div>
 
-      {/* Right Actions */}
-      <div className="flex items-center gap-2 shrink-0">
-        {/* §165A.2: hidden entirely when meeting_mode flag is off.
-            Monochrome button — red is reserved for destructive actions (§8). */}
+      {/* Right: sync · notifications · profile */}
+      <div className="flex items-center gap-1 shrink-0">
         {meetingEnabled && !isMeetingActive && (
           <button
             onClick={onStartMeeting}
             aria-label="Start meeting"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors outline-none focus-visible:shadow-[var(--focus-ring)]"
-            style={{
-              color: 'var(--color-text)',
-              background: 'var(--color-surface-hover)',
-              border: '1px solid var(--color-border)',
-            }}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-colors duration-micro ease-emphasized motion-reduce:transition-none outline-none focus-visible:shadow-[var(--md-focus-ring)] border border-outline text-primary hover:bg-[color-mix(in_srgb,var(--md-primary)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-primary)_10%,transparent)]"
           >
             <Video className="w-3.5 h-3.5" aria-hidden="true" />
             <span className="hidden sm:inline">Start Meeting</span>
           </button>
         )}
 
-        {/* Notifications (§14 top bar) — the §171 center opens in place */}
         {notificationCenter ? (
           <Popover
             trigger={
               <button
-                className="relative p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface-hover)] focus-visible:shadow-[var(--focus-ring)] outline-none"
-                style={{ color: 'var(--color-text-secondary)' }}
+                className="relative p-2 rounded-full text-on-surface-variant transition-colors duration-micro ease-emphasized motion-reduce:transition-none cursor-pointer hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] focus-visible:shadow-[var(--md-focus-ring)] outline-none"
                 aria-label={`Notifications${unreadNotificationsCount > 0 ? ` (${unreadNotificationsCount} unread)` : ''}`}
               >
                 <Bell className="w-[18px] h-[18px]" aria-hidden="true" />
-                {/* §277 subtle unread badge on the nav surface */}
                 {unreadNotificationsCount > 0 && (
                   <span
                     data-testid="topbar-unread-dot"
-                    className="absolute top-1 right-1 w-2 h-2 rounded-full"
-                    style={{ background: 'var(--color-info)' }}
+                    className="absolute top-1 right-1 w-2 h-2 rounded-full bg-error"
+                    aria-hidden="true"
                   />
                 )}
               </button>
@@ -288,26 +247,21 @@ export function TopBar({
           <Tooltip content="Activity">
             <button
               onClick={onOpenNotifications}
-              className="relative p-1.5 rounded-lg transition-colors cursor-pointer hover:bg-[var(--color-surface-hover)] focus-visible:shadow-[var(--focus-ring)] outline-none"
-              style={{ color: 'var(--color-text-secondary)' }}
+              className="relative p-2 rounded-full text-on-surface-variant transition-colors duration-micro ease-emphasized motion-reduce:transition-none cursor-pointer hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)] focus-visible:shadow-[var(--md-focus-ring)] outline-none"
               aria-label={`Notifications${unreadNotificationsCount > 0 ? ` (${unreadNotificationsCount} unread)` : ''}`}
             >
               <Bell className="w-[18px] h-[18px]" aria-hidden="true" />
               {unreadNotificationsCount > 0 && (
-                <span
-                  className="absolute top-1 right-1 w-2 h-2 rounded-full"
-                  style={{ background: 'var(--color-info)' }}
-                />
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-error" aria-hidden="true" />
               )}
             </button>
           </Tooltip>
         )}
 
-        {/* §272 Profile */}
         <Dropdown
           align="end"
           trigger={
-            <button aria-label="Open profile menu" className="cursor-pointer rounded-full focus-visible:shadow-[var(--focus-ring)]">
+            <button aria-label="Open profile menu" className="cursor-pointer rounded-full outline-none focus-visible:shadow-[var(--md-focus-ring)]">
               <Avatar name={user.name} size="sm" presence="ONLINE" />
             </button>
           }
