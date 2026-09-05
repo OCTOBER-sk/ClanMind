@@ -112,3 +112,22 @@ Per the PAKKA plan the migration does not advance through a red gate (Rule 0.9).
 
 **ROLLBACK:** `git revert` of this commit. All changes are additive or local; no call-site or contract change.
 
+
+---
+
+## PHASE 1 — Unit 2: IconButton — READY_FOR_REVIEW
+
+**Agent:** Claude Code · **Model:** minimax/minimax-m3:free · **Date:** 2026-09-05
+**Verified by:** Atom (Hermes) — `pnpm vitest run src/design-system/ --pool=threads` → 105/105 PASS; `pnpm build` → PASS; `pnpm lint` → 0 errors
+
+**Files changed:**
+- `clanmind-frontend/src/design-system/components/IconButton.tsx` (rewritten)
+- `clanmind-frontend/src/design-system/components/IconButton.test.tsx` (new, 25 functional)
+- `clanmind-frontend/src/design-system/components/IconButton.a11y.test.tsx` (new, 7 a11y)
+- `docs/migration/M3_MIGRATION_LEDGER.md` (M3-0020 row appended)
+- `docs/migration/M3_DEVIATIONS.md` (D-19 row appended)
+- `docs/migration/M3_PHASE_REPORT.md` (this section)
+
+**API surface preserved:** variant, size, isLoading, aria-label, forwardRef, className — 4 call-site files compile unchanged.
+
+**Next unit:** Unit 3 — Input

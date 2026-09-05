@@ -148,3 +148,11 @@ PHASE_BLOCKER                — must be resolved before the named phase can adv
 **Disposition:** Defer the rename to PHASE 0 Task 0.14 (shape tokens) — that is the formal home for the rename. PHASE 1 Unit 1 (Button) uses the existing scale values directly so `tokens.a11y.test.ts` strict-guard stays green and the 30 call sites compile unchanged.
 **Risk if not fixed:** Cosmetic — no functional impact. The Button's M3 shape contract is satisfied (sm=4 / md=8 / lg=12).
 **Trigger to fix:** Land PAKKA §TASK 0.14 (shape tokens) as a separate migration row. Once that lands, the Button (and every other primitive consuming `var(--radius-*)`) needs a follow-up rename pass.
+
+## D-19 · CONTRACT · IconButton.xs hit area bumped from 24dp to 48dp (PAKKA §BUTTON)
+
+**Surface:** `src/design-system/components/IconButton.tsx`
+**Detail:** Pre-M3 `size="xs"` was `min-w-[24px] min-h-[24px]` (24dp hit area). M3 contract requires 48dp on every size; FE §221's 24×24 floor is a WCAG minimum, not a target for desktop controls.
+**Spec:** PAKKA §BUTTON; WCAG 2.2 §221.
+**Disposition:** ✅ **LANDED.** 2026-09-05 (PHASE 1 Unit 2, M3-0020). Every size is now `min-w-[48px] min-h-[48px]`; visual box sized by `p-*` padding. 8 known call sites (MessageActions, ArtifactPanel, DiagramViewer, GarageView) compile unchanged.
+**Impact:** Visible delta — dense toolbars (composer action row, artifact toolbar) get a 48dp click target. Visual footprint unchanged because the box is sized by `p-*`, not `min-w/min-h`.
