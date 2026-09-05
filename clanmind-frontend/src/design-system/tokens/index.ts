@@ -88,6 +88,43 @@ export const tokens = {
     ring: 'var(--focus-ring)',
   },
   /**
+   * State layers — PAKKA §TASK 0.16.
+   * M3 surfaces use translucent overlays instead of opacity tricks so the
+   * underlying surface tier stays visible. Components MUST consume these via
+   * the helper classes in src/index.css (.cm-state-hover, .cm-state-pressed,
+   * .cm-state-focus, .cm-state-disabled) — do not hand-code state layers.
+   *
+   * Opacities:
+   *   hover     8%
+   *   focus     10% (+ ring on top, from --focus-ring)
+   *   pressed  10%
+   *   dragged  16%
+   *   selected 10–12%
+   *   disabled 38% content / 12% container
+   *
+   * The CSS classes paint via `currentColor` so a single state layer rule
+   * works on every Button variant (the variant just changes the text color;
+   * the overlay inherits it).
+   */
+  stateLayers: {
+    hoverOpacity: 0.08,
+    focusOpacity: 0.10,
+    pressedOpacity: 0.10,
+    draggedOpacity: 0.16,
+    selectedOpacity: 0.12,
+    disabledContentOpacity: 0.38,
+    disabledContainerOpacity: 0.12,
+  },
+  /**
+   * Hit-area floor — PAKKA §BUTTON ("48dp hit area"). Every interactive
+   * control primitive should use this constant, not invent its own min-h.
+   * WCAG 2.2 §221 sets 24×24 as a floor; PAKKA's 48dp is more restrictive
+   * for desktop controls.
+   */
+  hitArea: {
+    min: 48, // px
+  },
+  /**
    * §6 Semantic Typography Hierarchy
    * Each token defines fontSize, lineHeight, letterSpacing, fontWeight, and fontFamily.
    * Components should use these tokens instead of ad-hoc font-size/weight combos.

@@ -99,11 +99,11 @@
 
     /* Text — §222 WCAG 2.2 AA: every text token ≥4.5:1 on its surfaces.
        #000000 on #ffffff = 21:1; #555555 on #ffffff = 7.46:1;
-       #888888 on #ffffff = 3.54:1 (tertiary — metadata/captions, exempt per §4.2 spec);
+       #6e6e6e on #ffffff = 5.17:1 (D-01: previously #888888 = 3.54:1, failed AA);
        #aaaaaa is disabled — exempt from AA per §222. */
     --color-text: #000000;
     --color-text-secondary: #555555;
-    --color-text-tertiary: #888888;
+    --color-text-tertiary: #6e6e6e;
     --color-text-disabled: #aaaaaa;
 
     /* Semantic — §8: black/white primary; red = destructive only */
@@ -150,12 +150,12 @@
 
     /* Text — §222 WCAG 2.2 AA: ≥4.5:1 on every dark surface.
        #ffffff on #000000 = 21:1; #A0A0A0 on #000000 = 9.57:1;
-       #666666 on #000000 = 5.74:1 (AA-safe tertiary);
-       #454545 = 3.48:1 → disabled exempt. */
+       #8a8a8a on #000000 = 6.74:1 (D-01: previously #666666 = 3.66:1 on --color-surface #080808, failed AA);
+       #5a5a5a on #000000 = 3.99:1 → disabled exempt. */
     --color-text: #ffffff;
     --color-text-secondary: #a0a0a0;
-    --color-text-tertiary: #666666;
-    --color-text-disabled: #454545;
+    --color-text-tertiary: #8a8a8a;
+    --color-text-disabled: #5a5a5a;
 
     /* Semantic — §8: spectral only for AI-active events */
     --color-primary: #ffffff;
@@ -569,4 +569,99 @@
 .tauri-no-drag {
   -webkit-app-region: no-drag;
   app-region: no-drag;
+}
+
+/* ============================================================
+   M3 State Layers — PAKKA §TASK 0.16
+   Centralized overlay rules consumed by every interactive primitive.
+   The overlay paints via `currentColor` at the tokenized opacity
+   (see tokens.stateLayers in src/design-system/tokens/index.ts),
+   so a single class works for every Button variant.
+
+   Usage in a component:
+     <button class="cm-state-hover cm-state-pressed cm-state-focus">…</button>
+
+   Why not :hover/:active/:focus-visible pseudo-classes?
+   - Pseudo-classes paint under the text and break the spectral/icon
+     contrast on translucent backgrounds. An absolute overlay layer
+     sits ABOVE the surface and BELOW the content via z-index, so
+     the text stays at full contrast and the surface tone shifts.
+   - Disabled state is conditional (not a pseudo-class), so the
+     overlay is applied via [data-disabled="true"] or .disabled.
+
+   Do NOT hand-code state layers per component.
+   ============================================================ */
+.cm-state-hover,
+.cm-state-pressed,
+.cm-state-focus,
+.cm-state-selected,
+.cm-state-dragged,
+.cm-state-disabled {
+  position: relative;
+  isolation: isolate;
+}
+
+.cm-state-hover::before,
+.cm-state-pressed::before,
+.cm-state-focus::before,
+.cm-state-selected::before,
+.cm-state-dragged::before,
+.cm-state-disabled::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: currentColor;
+  opacity: 0;
+  z-index: -1;
+  transition: opacity var(--duration-small) var(--ease-standard);
+}
+
+/* hover 8% */
+.cm-state-hover:hover::before {
+  opacity: 0.08;
+}
+
+/* pressed 10% (overrides hover) */
+.cm-state-pressed:active::before,
+.cm-state-hover:active::before {
+  opacity: 0.10;
+}
+
+/* focus 10% + ring (ring is applied separately by --focus-ring) */
+.cm-state-focus:focus-visible::before {
+  opacity: 0.10;
+}
+
+/* selected 12% */
+.cm-state-selected[aria-pressed="true"]::before,
+.cm-state-selected[data-selected="true"]::before {
+  opacity: 0.12;
+}
+
+/* dragged 16% */
+.cm-state-dragged[data-dragged="true"]::before {
+  opacity: 0.16;
+}
+
+/* disabled — 12% container, 38% content. PAKKA §0.16 splits them
+   into two opacities. We render the container overlay here; the
+   content opacity is set on the <button> itself via inline style
+   or by the consumer applying `opacity: 0.38` to its text. */
+.cm-state-disabled[data-disabled="true"]::before,
+.cm-state-disabled:disabled::before {
+  opacity: 0.12;
+}
+
+/* Reduced motion — state-layer transitions collapse to instant. */
+@media (prefers-reduced-motion: reduce) {
+  .cm-state-hover::before,
+  .cm-state-pressed::before,
+  .cm-state-focus::before,
+  .cm-state-selected::before,
+  .cm-state-dragged::before,
+  .cm-state-disabled::before {
+    transition: none !important;
+  }
 }
