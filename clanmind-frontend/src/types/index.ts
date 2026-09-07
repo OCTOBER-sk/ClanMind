@@ -497,6 +497,7 @@ export interface Message {
   ai_run_id?: string;
   is_pending?: boolean;
   is_failed?: boolean;
+  is_unread?: boolean;
   created_at: string;
   updated_at: string;
 }

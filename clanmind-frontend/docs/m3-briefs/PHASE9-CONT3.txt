@@ -1,0 +1,65 @@
+# Phase 9 — Continuation 3: Privacy Bug Fixes Only
+
+PROJECT ROOT: /home/santhosh/projects/ClanMind
+MODEL: poolside/laguna-s-2.1:free
+
+SCOPE: TWO privacy bugs. Nothing else. Keep this brief — 2 files, ~20 lines of code.
+
+---
+
+## Bug 1: 0.12 / 7.16 — PRIVATE_AI privacy leak
+
+**File 1**: `clanmind-frontend/src/features/chat/chatSelectors.ts`, line ~49
+
+PROBLEM: The PRIVATE_AI case returns `true` for EVERY PRIVATE_AI message without verifying the local user participates. A foreign user's private AI body gets cached AND rendered in the current user's PRIVATE_AI view.
+
+FIX: Add a sender_id / request_id check. The PRIVATE_AI case must verify the local user is the sender or the requester before returning true.
+
+Read the file first. Look at how PRIVATE_PAIR is gated (it's correct) and apply the same pattern to PRIVATE_AI.
+
+**File 2**: `clanmind-frontend/src/features/realtime/dispatch.ts`, line ~250
+
+PROBLEM: `recipientId === 'ai'` admits ANY user's PRIVATE_AI event into any device's cache.
+
+FIX: Add a dispatch gate — only admit the event if the local user is the sender or the requester.
+
+Per §56–§58, §2.26, §190, §284.
+
+---
+
+## Bug 2: 7.19 — Draft keys omit privacy component
+
+**File**: `clanmind-frontend/src/features/shell/AppShell.tsx`, line ~528
+
+PROBLEM: The draft key is `user:group:project`, omitting the privacy component. Switching visibility does not re-key or clear text.
+
+FIX: Add the privacy component to the draft key. After switching visibility, re-key or clear the text.
+
+Per §58, §190.
+
+---
+
+## Rules
+
+- Token-only: var(--md-*) or src/design-system/tokens/. NO hex, NO px font-size.
+- Dark theme base = #000000.
+- DO NOT touch: src/api/, src/state/, src/realtime/ (except dispatch.ts for the privacy fix), src/sync/, src/local/, src/hooks/, src/config/, src/tauri/, use*Controller.ts.
+- The dispatch.ts fix IS the exception — it's a structural privacy fix the spec explicitly requires.
+
+## Gates (run after work)
+
+  cd /home/santhosh/projects/ClanMind
+  pnpm --filter clanmind-frontend build        -> exit 0, 0 errors
+  pnpm --filter clanmind-frontend test 2>&1 | tee /tmp/test.txt
+    grep -E "Test Files|Tests " /tmp/test.txt
+    comm -13 <(grep "^FAIL" clanmind-frontend/docs/m3-baseline.txt | sed 's/^ *//' | sort) \
+             <(grep "FAIL  src" /tmp/test.txt | sed 's/^ *//' | sort) > /tmp/new_failures.txt
+    test ! -s /tmp/new_failures.txt && echo "PASS: zero new failures"
+
+## Commit
+
+  git add -A
+  git commit -m "fix(m3): phase 9 — PRIVATE_AI privacy leak (dispatch.ts + chatSelectors.ts), draft key privacy component"
+  git push origin main
+
+DO NOT enter plan mode. Execute immediately. This is the ONLY work in this brief.

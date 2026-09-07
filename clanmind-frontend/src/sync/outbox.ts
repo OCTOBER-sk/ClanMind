@@ -170,7 +170,7 @@ async function acquireReplayLock(): Promise<boolean> {
   if (typeof navigator !== 'undefined' && navigator.locks) {
     try {
       const locks = await navigator.locks.query();
-      if (locks.held.some((l) => l.name === REPLAY_LOCK_NAME && l.mode === 'exclusive')) {
+      if (locks.held?.some((l) => l.name === REPLAY_LOCK_NAME && l.mode === 'exclusive')) {
         return false;
       }
     } catch {
