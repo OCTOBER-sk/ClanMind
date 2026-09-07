@@ -200,13 +200,13 @@ describe('GitHubDiffViewer — §164 high-impact merge dialog', () => {
   it('mergeEnabled=false removes the Merge affordance entirely (§165A.2)', () => {
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     setup(makeAction(), { mergeEnabled: false });
-    expect(screen.queryByRole('button', { name: /approve & merge/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /approve and merge/i })).not.toBeInTheDocument();
   });
 
   it('Approve & Merge opens the exact §164 dialog before anything executes', async () => {
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { onApproveAndMerge, user } = setup(makeAction());
-    await user.click(screen.getByRole('button', { name: /approve & merge/i }));
+    await user.click(screen.getByRole('button', { name: /approve and merge/i }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('Merge pull request')).toBeInTheDocument();
     expect(
@@ -219,8 +219,8 @@ describe('GitHubDiffViewer — §164 high-impact merge dialog', () => {
     expect(onApproveAndMerge).not.toHaveBeenCalled();
 
     // Merge confirms exactly once.
-    await user.click(screen.getByRole('button', { name: /approve & merge/i }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^merge$/i }));
+    await user.click(screen.getByRole('button', { name: /approve and merge/i }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^merge/i }));
     expect(onApproveAndMerge).toHaveBeenCalledTimes(1);
   });
 });

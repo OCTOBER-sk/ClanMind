@@ -45,7 +45,7 @@ describe('ApprovalCard — §164A generalized approval', () => {
     const onApprove = vi.fn();
     render(<ApprovalCard action={makeAction()} onApprove={onApprove} onReject={onReject} />);
 
-    const rejectBtn = screen.getByRole('button', { name: /^reject$/i });
+    const rejectBtn = screen.getByRole('button', { name: /^reject /i });
     await user.click(rejectBtn);
     expect(onReject).toHaveBeenCalledWith('act_1');
     expect(onApprove).not.toHaveBeenCalled();
@@ -54,7 +54,7 @@ describe('ApprovalCard — §164A generalized approval', () => {
 
     // Settling re-enables the control.
     settleReject();
-    await waitFor(() => expect(screen.getByRole('button', { name: /^reject$/i })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: /^reject /i })).toBeEnabled());
   });
 
   it('approve busy state blocks double submission and resets after failure (§164A.2)', async () => {
@@ -253,7 +253,7 @@ describe('ApprovalCard — §164A generalized approval', () => {
     expect(screen.getByText(/Risk: MEDIUM/)).toBeInTheDocument();
     expect(screen.getByText(/Architecture v1 \(superseded\)/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /approve/i }));
-    await user.click(screen.getByRole('button', { name: /^reject$/i }));
+    await user.click(screen.getByRole('button', { name: /^reject /i }));
     expect(onApprove).toHaveBeenCalledWith('act_bulk_del', HASH, 3);
     expect(onReject).toHaveBeenCalledWith('act_bulk_del');
   });

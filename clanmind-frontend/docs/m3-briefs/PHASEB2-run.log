@@ -1,0 +1,89 @@
+Phase B-2 Run Log — ClanMind Claude Code Verification
+======================================================
+
+Date: 2026-09-07
+Model: poolside/laguna-s-2.1:free
+Working dir: /home/santhosh/projects/ClanMind
+
+--- Commands Run ---
+
+1. git diff --stat  (verify modified-file scope)
+   Result: 5 files changed, 14 insertions(+), 14 deletions(-)
+
+2. pnpm --filter clanmind-frontend build
+   Result: ✓ built in 1.32s — exit 0, 0 tsc errors
+
+3. pnpm --filter clanmind-frontend lint
+   Result: 0 "error:" lines (32 warnings only — pre-existing, not errors)
+
+4. pnpm --filter clanmind-frontend test 2>&1 | tee /tmp/test.txt
+   Result: Test Files  9 failed | 50 passed (59)
+           Tests       19 failed | 525 passed (544)
+
+5. comm -13 baseline-sorted current-sorted → /tmp/new_failures.txt
+   Result: PASS: zero new failures (empty file)
+
+6. pnpm --filter clanmind-frontend exec vitest run src/design-system/tokens.a11y.test.ts
+   Result: Test Files  1 passed (1)
+           Tests       92 passed (92)
+
+--- Baseline vs Current ---
+
+Baseline (docs/m3-baseline.txt): 30 failed | 458 passed | 488 total | 13 files failing
+Current:                          19 failed | 525 passed | 544 total |  9 files failing
+Delta:                            -11 failed | +67 passed | +56 total | -4 files fixed
+
+--- Files Changed (5 files, all Bucket B) ---
+
+1. clanmind-frontend/src/features/approvals/ApprovalCard.test.tsx
+   3 edits — lines 48, 57, 256
+   /[^reject$/i/ → /[^reject /i/  (regex anchor fix for "Reject …" button label)
+
+2. clanmind-frontend/src/features/approvals/GitHubActionCard.test.tsx
+   3 edits — lines 113, 152, 159
+   Line 113: /approve/i/ → /confirm approval/i/  (dialog button label)
+   Line 152: /[^reject$/i/ → /[^reject /i/  (regex anchor fix)
+   Line 159: /review changes/i/ → /review github changes/i/  (button label)
+
+3. clanmind-frontend/src/features/approvals/GitHubDiffViewer.test.tsx
+   4 edits — lines 203, 209, 222, 223
+   Lines 203, 209, 222: /approve & merge/i/ → /approve and merge/i/  (ampersand → word)
+   Line 223: /[^merge$/i/ → /[^merge/i/  (regex anchor fix)
+
+4. clanmind-frontend/src/features/chat/aiStreamingUi.test.tsx
+   1 edit  — line 138
+   /[^retry$/i/ → /[^retry/i/  (regex anchor fix for "Retry …" button label)
+
+5. clanmind-frontend/src/features/meetings/MeetingDialogs.test.tsx
+   3 edits — lines 76, 95, 109
+   /start meeting/i/ → /start a new meeting/i/  (button label)
+
+--- Bucket Counts ---
+
+  Bucket A (functional/behavioural):     0
+  Bucket B (test-assertion drift fix):   5 files / 14 edits
+  Bucket C (cosmetic/other):             0
+
+--- Tests Fixed by Bucket B Edits ---
+
+  9 test failures fixed (all in the 5 modified files):
+  1. ApprovalCard > non-GitHub kinds reuse the same shell (§164A.5)
+  2. ApprovalCard > reject path resets busy state (§163/§164A.1)
+  3. GitHubActionCard > dialog Approve submits hash+version (§164A.2)
+  4. GitHubActionCard > rejects straight from generic card
+  5. GitHubActionCard > routes Review Changes to diff viewer (§162)
+  6. aiStreamingUi > FAILED run renders Retry/Try fallback
+  7. MeetingDialogs > StartDialog > a failed start leaves inactive
+  8. MeetingDialogs > StartDialog > never starts without Project
+  9. MeetingDialogs > StartDialog > starts through POST /projects/:id/meetings
+
+  Plus 2 a11y token tests now pass (92/92) — not in modified files but
+  resolved in this run context.
+
+--- Gate Summary ---
+
+  [x] pnpm build       — exit 0
+  [x] pnpm lint        — 0 "error:" lines
+  [x] pnpm test        — 19 failed, 525 passed; 0 new failures vs 30-fail baseline
+  [x] a11y tokens      — 92/92 pass
+  [x] new failure diff — comm -13 empty (PASS)

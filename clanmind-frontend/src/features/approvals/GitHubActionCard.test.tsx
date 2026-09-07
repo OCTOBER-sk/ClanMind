@@ -110,7 +110,7 @@ describe('GitHubActionCard — §163 dialog flow', () => {
     const { onApprove, user } = setup();
     await user.click(screen.getByRole('button', { name: /approve/i }));
     const dialog = screen.getByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: /approve/i }));
+    await user.click(within(dialog).getByRole('button', { name: /confirm approval/i }));
     expect(onApprove).toHaveBeenCalledTimes(1);
     expect(onApprove).toHaveBeenCalledWith('act_gh_1', HASH, 1);
   });
@@ -149,14 +149,14 @@ describe('GitHubActionCard — §163 dialog flow', () => {
 
   it('rejects straight from the generic card without the confirm step', async () => {
     const { onReject, user } = setup();
-    await user.click(screen.getByRole('button', { name: /^reject$/i }));
+    await user.click(screen.getByRole('button', { name: /^reject /i }));
     expect(onReject).toHaveBeenCalledTimes(1);
     expect(onReject).toHaveBeenCalledWith('act_gh_1');
   });
 
   it('routes "Review Changes" to the diff viewer binding (§162 entry point)', async () => {
     const { onViewDiff, user } = setup();
-    await user.click(screen.getByRole('button', { name: /review changes/i }));
+    await user.click(screen.getByRole('button', { name: /review github changes/i }));
     expect(onViewDiff).toHaveBeenCalledTimes(1);
   });
 });

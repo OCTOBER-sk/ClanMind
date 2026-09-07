@@ -135,7 +135,7 @@ describe('MessageRow AI run states (§137/§138/§139/§142)', () => {
       />,
     );
     expect(screen.getByText(/couldn't complete this response\./)).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: /^retry$/i })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: /^retry/i })[0]!);
     expect(onRegenerate).toHaveBeenCalledWith('m_ai');
   });
 

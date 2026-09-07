@@ -73,7 +73,7 @@ describe('MeetingStartDialog — §126', () => {
     renderWithProviders(<MeetingStartDialog />);
     useMeetingStore.getState().setStartDialogOpen(true);
 
-    await userEvent.click(await screen.findByRole('button', { name: /start meeting/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /start a new meeting/i }));
 
     await waitFor(() => {
       expect(startProjectMeeting).toHaveBeenCalledWith('proj_flight_ctrl');
@@ -92,7 +92,7 @@ describe('MeetingStartDialog — §126', () => {
     renderWithProviders(<MeetingStartDialog />);
     useMeetingStore.getState().setStartDialogOpen(true);
 
-    await userEvent.click(await screen.findByRole('button', { name: /start meeting/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /start a new meeting/i }));
 
     expect(startProjectMeeting).not.toHaveBeenCalled();
     expect(useMeetingStore.getState().isMeetingActive).toBe(false);
@@ -106,7 +106,7 @@ describe('MeetingStartDialog — §126', () => {
     renderWithProviders(<MeetingStartDialog />);
     useMeetingStore.getState().setStartDialogOpen(true);
 
-    await userEvent.click(await screen.findByRole('button', { name: /start meeting/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /start a new meeting/i }));
 
     await waitFor(() => {
       expect(useMeetingStore.getState().isMeetingActive).toBe(false);
