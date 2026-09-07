@@ -139,6 +139,51 @@ export async function hydrateOutbox(): Promise<number> {
 
 // ─── Replay engine (BE §20.2 bottom half) ────────────────────────────────────
 
+// §307 — multi-window coordination. replayInFlight is module-local — it guards
+// only this tab. Two windows on the same account share the same IndexedDB queue
+// and could both dispatch the same operation, double-flying writes. BroadcastChannel
+// + navigator.locks extend the guard to the account/device session (audit 3.6).
+const REPLAY_LOCK_NAME = 'cm-outbox-replay';
+const REPLAY_CHANNEL = 'cm-outbox-replay';
+let bc: BroadcastChannel | null = null;
+/** true when another tab signalled a replay start via BroadcastChannel. */
+let peerReplaying = false;
+
+if (typeof BroadcastChannel !== 'undefined') {
+  try {
+    bc = new BroadcastChannel(REPLAY_CHANNEL);
+    bc.onmessage = (ev: MessageEvent) => {
+      const type = (ev.data as { type?: string })?.type;
+      if (type === 'replay_start') peerReplaying = true;
+      if (type === 'replay_end') peerReplaying = false;
+    };
+  } catch {
+    bc = null;
+  }
+}
+
+/** §307 — back off if this tab OR another tab is currently replaying. */
+async function acquireReplayLock(): Promise<boolean> {
+  if (replayInFlight || peerReplaying) return false;
+  // navigator.locks query is the atomic cross-tab check — another tab holding
+  // the exclusive lock means we MUST NOT start our own replay cycle.
+  if (typeof navigator !== 'undefined' && navigator.locks) {
+    try {
+      const locks = await navigator.locks.query();
+      if (locks.held.some((l) => l.name === REPLAY_LOCK_NAME && l.mode === 'exclusive')) {
+        return false;
+      }
+    } catch {
+      /* locks API unavailable — fall through to BroadcastChannel-only guard */
+    }
+  }
+  return true;
+}
+
+function broadcastReplayState(phase: 'start' | 'end'): void {
+  bc?.postMessage({ type: `replay_${phase}` });
+}
+
 let replayInFlight = false;
 
 function sortedPending(): SyncOperation[] {
@@ -347,10 +392,13 @@ async function replayOne(op: SyncOperation): Promise<'applied' | 'parked' | 'hal
  */
 export async function replayPendingOperations(): Promise<number> {
   if (replayInFlight) return 0;
+  // §307 — multi-window: back off if another tab is replaying
+  if (!(await acquireReplayLock())) return 0;
   const pending = sortedPending();
   if (pending.length === 0) return 0;
 
   replayInFlight = true;
+  broadcastReplayState('start');
   let settled = 0;
   try {
     for (const original of pending) {
@@ -371,6 +419,7 @@ export async function replayPendingOperations(): Promise<number> {
     }
   } finally {
     replayInFlight = false;
+    broadcastReplayState('end');
   }
 
   // Cycle finished with the queue fully drained → release the §185 banner
@@ -479,5 +528,6 @@ export async function resolveConflictThroughSync(
  */
 export function resetOutboxForTesting(): void {
   replayInFlight = false;
+  peerReplaying = false;
   persistence = new MemoryOutbox();
 }

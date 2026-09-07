@@ -1148,7 +1148,7 @@ export function AppShell() {
 
       {/* §309A.2 CLIENT_UPDATE_REQUIRED — blocking, full-screen state */}
       {protocolMismatch?.isRequired && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6 text-white text-center">
+        <div className="fixed inset-0 z-50 bg-[var(--md-scrim)] flex items-center justify-center p-6 text-[var(--md-on-surface)] text-center">
           <div className="max-w-md bg-[var(--color-surface-raised)] p-8 rounded-2xl border space-y-4" style={{ borderColor: 'var(--color-border)' }}>
             <AlertOctagon className="w-12 h-12 mx-auto" style={{ color: 'var(--color-danger)' }} />
             <h2 className="text-xl font-bold">ClanMind needs an update to continue.</h2>

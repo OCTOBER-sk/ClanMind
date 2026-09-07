@@ -1,0 +1,46 @@
+VERIFY (Atom will run after you finish):
+  cd /home/santhosh/projects/ClanMind && pnpm --filter clanmind-frontend build
+    exit 0, 0 errors
+  cd /home/santhosh/projects/ClanMind && pnpm --filter clanmind-frontend lint
+    count "error:" lines; target 0
+  cd /home/santhosh/projects/ClanMind && pnpm --filter clanmind-frontend test 2>&1 | tee /tmp/test.txt
+    grep -E "Test Files|Tests " /tmp/test.txt
+    comm -13 <(grep "^FAIL" docs/m3-baseline.txt | sed 's/^ *//' | sort) <(grep "FAIL  src" /tmp/test.txt | sed 's/^ *//' | sort) > /tmp/new_failures.txt
+    test ! -s /tmp/new_failures.txt && echo "PASS: zero new failures"
+  pnpm --filter clanmind-frontend exec vitest run src/design-system/tokens.a11y.test.ts
+    92 PASS required
+  grep -rn "spectral-active|spectral-border|odin-working" src/
+    exactly the 6 allowed contexts (Phase 8-A count) + Phase B-1 fixes; no permanent decorative gradient strip outside AuthScreen hero; no indefinite pulse anywhere
+  grep -rn "animate-pulse" src/  → must return only disabled/conditional uses (motion-reduce gates); no loading/skeleton/state affordance pulses.
+  grep -rnE "#[0-9a-fA-F]{3,6}\b" src/features/ src/design-system/components/  → zero hits in feature components, allowed in tokens/index.css only
+
+DELIVERABLES (file-level):
+  - Phase B-2: docs/m3-briefs/PHASEB2-run.log + audit report (counts A/B/C) + any token-only test-assertion edits + zero new test failures.
+  - Phase 9: every FAIL/PARTIAL item above fixed with file:line evidence in PROGRESS.md + peak visual polish demonstrated in docs/screenshots/phase-9/ + docs/m3-briefs/PHASE9-run.log + docs/m3-briefs/PHASE9-report.md (real before/after per surface).
+  - PROGRESS.md at repo root with everything done, file:line evidence, before/after per surface, what remained TODO.
+
+RULES (imperative, from /home/santhosh/projects/ClanMind/CLAUDE.md):
+  - Use ONLY poolside/laguna-s-2.1:free. Atom has pre-set ANTHROPIC_MODEL via ~/.claude/settings.json. If you find yourself wanting --model, STOP — settings.json default is correct.
+  - $0 budget. Verify with /home/santhosh/scripts/or_credit.py pre AND post if you make any tool call that costs (you should make ZERO — :free slug).
+  - NO parallel agents, NO concurrent Claude Code instances (20 RPM OpenRouter cap).
+  - Dark theme base = #000000. Hard requirement.
+  - Token-only changes. NO hex outside tokens/. NO px font-size outside tokens/. NO ad-hoc cubic-bezier outside tokens/.
+  - NO animate-pulse on loading/skeleton/state. Use one-shot keyframes with motion-reduce gates.
+  - WCAG 2.2 AA. tokens.a11y.test.ts 92 PASS required.
+  - Never commit secrets. Supabase URL + publishable key in .env (gitignored). Service-role JWT, OpenRouter, Tavily, BYOK, CF tokens stay on the VPS only.
+  - Git push via SSH: git remote set-url origin 'git@github.com:OCTOBER-sk/ClanMind.git'; GIT_TERMINAL_PROMPT=0 git push origin main. Verify with git ls-remote origin main.
+  - Conventional commits: feat(m3): / fix(m3): / docs(m3): / refactor(m3): prefixes.
+
+WHEN YOU HIT MAX-TURNS:
+  - Write PROGRESS.md at repo root with: completed phases, files changed per phase, what's in flight, what's left, gates run with results, last git SHA, last commit message.
+  - Exit normally. Atom will dispatch a fresh continuation session reading PROGRESS.md.
+  - Do NOT chain --continue. Fresh dispatch with tightened prompt is faster.
+
+EMERGENCY STOP (STOP and report to PROGRESS.md, do not work around):
+  - pnpm build fails and fix is non-trivial.
+  - Test failure count grows above baseline (new regressions).
+  - pnpm install blocks > 5 min.
+  - A change requires touching src/api/, src/state/, src/realtime/, src/sync/, src/local/, src/hooks/, src/config/, src/tauri/, use*Controller.ts beyond the documented exceptions (0.12/7.16 dispatch fix, 3.6 outbox wrap).
+  - Token system conflict — a feature needs a value the M3 spec doesn't provide.
+
+DO NOT enter plan mode. Execute immediately. The plan is approved. This is one shot, peak quality, end-to-end, no batches.

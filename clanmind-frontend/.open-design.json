@@ -1,0 +1,20 @@
+{
+  "project": "clanmind-frontend",
+  "design_system": "clanmind-m3",
+  "design_system_path": "/home/santhosh/projects/ClanMind/clanmind-frontend/src/design-system",
+  "theme": "clanmind-m3-expressive",
+  "skill_ref": "apple-hig",
+  "version": "0.21.1",
+  "engine": "claude-code-v2.1.261",
+  "model": "minimax/minimax-m3:free",
+  "bind_path": "/home/santhosh/projects/ClanMind/clanmind-frontend/src",
+  "proof": [
+    "docs/screenshots/m3-final/",
+    "docs/screenshots/uiux/",
+    "scripts/capture_all.py",
+    "scripts/visual-audit.py",
+    "scripts/capture.py",
+    "scripts/capture_more.py"
+  ],
+  "notes": "ClanMind uses its own M3 Expressive design system defined in /home/santhosh/projects/ClanMind/clanmind-frontend/docs/M3_MIGRATION_SPEC.md (sections 3-10 tokens, 14 surfaces, 17 phased plan). No external palette binding. apple-hig skill provides HIG principles for hierarchy/clarity/typography. Phase 8-A passed 2026-09-03 (28 fail / 12 file baseline, 516 pass / 544). Phase B-1 (3 §10 fixes) in flight. Phase 9 = peak polish across every surface."
+}

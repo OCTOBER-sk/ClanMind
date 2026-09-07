@@ -228,7 +228,7 @@ function MessageRowInner({
               <span
                 className="inline-flex items-center gap-1 text-[10px] font-medium text-on-surface-variant"
               >
-                <Clock className="w-2.5 h-2.5 animate-pulse" aria-hidden="true" />
+                <Clock className="w-2.5 h-2.5 animate-[fade-tick_1.5s_ease-out_infinite] motion-reduce:animate-none" aria-hidden="true" />
                 Sending…
               </span>
             )}

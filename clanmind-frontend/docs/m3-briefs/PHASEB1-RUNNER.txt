@@ -1,0 +1,68 @@
+Phase B-1 — remove the three §10 spectral violations, commit, push.
+Project root: /home/santhosh/projects/ClanMind  (clanmind-frontend is at /home/santhosh/projects/ClanMind/clanmind-frontend)
+
+Standing rules for this run (clanmind-m3-migration skill):
+- Use ONLY model minimax/minimax-m3:free. Never swap.
+- DO NOT touch src/api/, src/state/, src/realtime/, src/sync/, src/local/, src/hooks/, src/config/, src/tauri/, or any use*Controller.ts. Presentation-layer only.
+- Every color / radius / spacing / duration / type value must come from the existing M3 token system (var(--md-*) or src/design-system/tokens). No hardcoded hex, no px font-size, no ad-hoc cubic-bezier.
+- Dark-theme base surface = #000000. Do not weaken that.
+- WCAG 2.2 AA must hold.
+- The work for this phase is ALREADY on disk in three files. Verify, finalize the diff, run gates, commit, push.
+
+Files (exact paths):
+1. /home/santhosh/projects/ClanMind/clanmind-frontend/src/features/auth/AuthScreen.tsx
+   Already changed: the decorative spectral strip is now a static outline-variant divider.
+2. /home/santhosh/projects/ClanMind/clanmind-frontend/src/features/meetings/MeetingActiveHeader.tsx
+   Already changed: meeting dot is bg-error, animate-pulse removed.
+3. /home/santhosh/projects/ClanMind/clanmind-frontend/src/design-system/components/Progress.tsx
+   Already changed: wavy sweep is now ease-out 1-shot, motion-reduce kept.
+
+Read the brief first:
+  /home/santhosh/projects/ClanMind/clanmind-frontend/docs/m3-briefs/PHASEB1-spectral-violations.md
+
+Reference authority (read sections 3-10 and 14):
+  /home/santhosh/projects/ClanMind/clanmind-frontend/docs/M3_MIGRATION_SPEC.md
+
+Existing baseline (source of truth for "no new failures"):
+  /home/santhosh/projects/ClanMind/clanmind-frontend/docs/m3-baseline.txt
+
+Phase 8-A verified state (last good run, 2026-09-03): 28 fail / 12 files, 516 pass / 544, 92 a11y tokens pass, dark base #000000, spectral disciplined in 6 allowed contexts only.
+
+Required execution:
+
+1. cd /home/santhosh/projects/ClanMind
+2. Confirm git working tree state (the three files are M, the rest of the dirty files belong to other work). If there are other unstaged source files beyond those three, do NOT touch them — stop and ask Sandy.
+3. Read the three files. Confirm each diff is the minimum, token-only, §10-correct change. If any change is wrong, fix it minimally. Otherwise leave them.
+4. Run gates:
+     pnpm --filter clanmind-frontend build      -> exit 0
+     pnpm --filter clanmind-frontend lint       -> 0 errors (use oxlint; count "error" lines, exit code alone is misleading)
+     pnpm --filter clanmind-frontend test 2>&1 | tee /tmp/phaseB1-test.txt
+     Then:
+       grep -E "Test Files|Tests " /tmp/phaseB1-test.txt
+       pnpm --filter clanmind-frontend exec vitest run src/design-system/tokens.a11y.test.ts  -> 92 PASS
+     Compare the failing tests to /home/santhosh/projects/ClanMind/clanmind-frontend/docs/m3-baseline.txt:
+       grep "^FAIL" /home/santhosh/projects/ClanMind/clanmind-frontend/docs/m3-baseline.txt | sed 's/^ *//' | sort > /tmp/baseline_sorted.txt
+       grep "FAIL  src" /tmp/phaseB1-test.txt | sed 's/^ *//' | sort > /tmp/current_sorted.txt
+       comm -13 /tmp/baseline_sorted.txt /tmp/current_sorted.txt > /tmp/new_failures.txt
+       test ! -s /tmp/new_failures.txt && echo "PASS: zero new failures"
+5. Verify no other §10 violations remain:
+     grep -rn "spectral-active|spectral-border|odin-working" /home/santhosh/projects/ClanMind/clanmind-frontend/src
+   Expect: same 6 allowed contexts Phase 8-A counted, no permanent decorative gradient strip outside AuthScreen hero, no indefinite pulse anywhere.
+6. Write the run log to /home/santhosh/projects/ClanMind/clanmind-frontend/docs/m3-briefs/PHASEB1-run.log, mirroring PHASE8-A-run.log format (date UTC, model slug, commands run, gate results, files-changed list with line numbers, assertion result).
+7. Append a M3-B1 row to /home/santhosh/projects/ClanMind/docs/migration/M3_MIGRATION_LEDGER.md IF that file exists; otherwise create it at /home/santhosh/projects/ClanMind/clanmind-frontend/docs/M3_MIGRATION_LEDGER.md with a header and the M3-B1 row.
+8. Append a sub-section to /home/santhosh/projects/ClanMind/clanmind-frontend/docs/m3-briefs/PHASE8-A-run.log (the existing phase 8 report) OR a new /home/santhosh/projects/ClanMind/clanmind-frontend/docs/m3-briefs/PHASEB1-report.md summarising the run.
+9. Conventional commit:
+     git add clanmind-frontend/src/features/auth/AuthScreen.tsx clanmind-frontend/src/features/meetings/MeetingActiveHeader.tsx clanmind-frontend/src/design-system/components/Progress.tsx clanmind-frontend/docs/m3-briefs/PHASEB1-run.log docs/migration/M3_MIGRATION_LEDGER.md
+     (or whatever you created at)
+     git commit -m "fix(m3): phase B-1 — remove three §10 spectral violations (auth strip, meeting pulse, progress indefinite sweep)"
+10. Push:
+     git remote set-url origin 'git@github.com:OCTOBER-sk/ClanMind.git'
+     GIT_TERMINAL_PROMPT=0 git push origin main
+     Verify: git ls-remote origin main — must return the new SHA.
+
+If pnpm build fails or any gate regresses (new fail count > baseline), STOP. Do not commit. Report the failure with file paths and line numbers.
+
+If you finish the work but hit max-turns before the READY_FOR_REVIEW sign-off block, append the sign-off block yourself and proceed. The sign-off string is:
+  READY_FOR_REVIEW
+
+DO NOT enter plan mode. Execute immediately. The plan is approved.

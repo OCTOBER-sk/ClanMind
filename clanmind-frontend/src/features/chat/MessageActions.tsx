@@ -11,6 +11,8 @@ import {
   CheckSquare,
   Bookmark,
   Bot,
+  Quote,
+  BellMinus,
 } from 'lucide-react';
 import { IconButton } from '@/design-system/components/IconButton';
 import { Dropdown } from '@/design-system/components/Dropdown';
@@ -32,6 +34,8 @@ export interface MessageActionsProps {
   onCreateTask: (message: Message) => void;
   onCreateDecision: (message: Message) => void;
   onUseAsContext: (message: Message) => void;
+  onQuote?: (message: Message) => void;
+  onMarkUnread?: (message: Message) => void;
 }
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🔥', '🚀', '👀'];
@@ -48,6 +52,8 @@ export function MessageActions({
   onCreateTask,
   onCreateDecision,
   onUseAsContext,
+  onQuote,
+  onMarkUnread,
 }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -107,6 +113,20 @@ export function MessageActions({
       label: 'Use as Odin context',
       icon: <Bot className="w-3.5 h-3.5" />,
       onClick: () => onUseAsContext(message),
+    },
+    {
+      id: 'quote',
+      label: 'Quote message',
+      icon: <Quote className="w-3.5 h-3.5" />,
+      onClick: () => onQuote?.(message),
+      disabled: !onQuote,
+    },
+    {
+      id: 'unread',
+      label: message.is_unread ? 'Mark as read' : 'Mark unread',
+      icon: <BellMinus className="w-3.5 h-3.5" />,
+      onClick: () => onMarkUnread?.(message),
+      disabled: !onMarkUnread,
     },
   ];
 

@@ -66,7 +66,7 @@ function ViewerSkeleton() {
   return (
     <div className="flex flex-1 items-center justify-center p-8 bg-surface-container-low" role="status" aria-label="Loading artifact viewer">
       <div className="flex flex-col items-center gap-3">
-        <div className="h-9 w-9 animate-pulse rounded-md border border-outline-variant bg-surface-container motion-reduce:transition-none" />
+        <div className="h-9 w-9 rounded-md border border-outline-variant bg-surface-container motion-reduce:transition-none animate-[bone-sweep_1.2s_ease-out_infinite] motion-reduce:animate-none" />
         <span className="text-[11px] text-on-surface-variant">Loading viewer…</span>
       </div>
     </div>

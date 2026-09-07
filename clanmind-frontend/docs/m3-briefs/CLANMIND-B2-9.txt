@@ -1,0 +1,22 @@
+# ClanMind Frontend — Phase B-2 + Phase 9, Claude Code Direct
+
+PROJECT ROOT: /home/santhosh/projects/ClanMind
+CLAUDE.md: /home/santhosh/projects/ClanMind/CLAUDE.md (READ FIRST — standing rules, verification contract, forbidden patterns)
+
+MODEL: poolside/laguna-s-2.1:free (verified $0/$0, 256K context)
+BRIEF: single dispatch, no batches, hands-off.
+
+CURRENT STATUS (Atom-verified 2026-09-07):
+- HEAD: b77eecf "fix(m3): phase B-1 — remove three §10 spectral violations" (committed + pushed to remote a344ffc)
+- Phase 0 through 8-A COMPLETE. Phase B-1 COMPLETE.
+- Working tree: CLEAN of source changes. Untracked files are briefs/scripts/screenshots from earlier rounds — leave them alone.
+- Phase B-2 + Phase 9 remain.
+
+SOURCE OF TRUTH (read in this order):
+  1. /home/santhosh/projects/ClanMind/clanmind-frontend/docs/M3_MIGRATION_SPEC.md (810 lines, M3 Expressive spec — authoritative for visuals/UX/tokens)
+  2. /home/santhosh/projects/ClanMind/clanmind-frontend/docs/FRONTEND_TODO.md (652 lines, master TODO — every item verifiable)
+  3. /home/santhosh/projects/ClanMind/clanmind-frontend/docs/FRONTEND_AUDIT2_REPORT.md (613 lines, honest audit with file:line evidence)
+  4. /home/santhosh/projects/ClanMind/clanmind-frontend/docs/m3-baseline.txt (30-fail test baseline — DO NOT regress)
+  5. /home/santhosh/projects/ClanMind/clanmind-frontend/docs/m3-briefs/PHASE*.md (phased briefs 0-8 complete)
+  6. /home/santhosh/projects/ClanMind/ClanMind_Frontend_Master_Implementation_Specification.md (product behaviour, cite as FE §n)
+  7. /home/santhosh/projects/ClanMind/ClanMind Backend — Master Implementation Specification.md (backend contract, cite as BE §n)

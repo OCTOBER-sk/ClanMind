@@ -1,0 +1,73 @@
+# Phase 9 — Continuation 1
+
+PROJECT ROOT: /home/santhosh/projects/ClanMind
+MODEL: poolside/laguna-s-2.1:free
+
+PREVIOUS RUN (proc_69bb9d1edb9b): 67 turns, 429 API error, killed mid-work.
+Three files modified, uncommitted. Diff is clean — no regressions.
+
+DONE (already on disk, do NOT redo):
+  1. tokens/index.ts — spacing scale 7/9/11 added (§1.2)
+  2. MessageActions.tsx — Quote + Mark unread menu items (§6.3)
+  3. AppShell.tsx — bg-black/80 text-white → token-driven (§1.5 catastrophic screen fix)
+
+REMAINING (from CLANMIND-PHASE9-FULL.txt, pick up here):
+
+CRITICAL — privacy bugs (NOT yet done):
+  - 0.12 / 7.16 — dispatch.ts:250 + chatSelectors.ts:49 privacy leak. FIX: add sender_id/request_id check.
+  - 7.19 — AppShell.tsx:528 draft key omits privacy component. FIX: add privacy component to key.
+
+HIGH — audit fixes (NOT yet done):
+  - 1.5 — ProjectPulse.tsx:61–76 amber/blue Tailwind classes → tokens
+  - 1.5 — LeftNav.tsx:370,409 #fff → token
+  - 1.10 — ArtifactPanel dual-width for research/code
+  - 3.6 — outbox.ts multi-window wrap (BroadcastChannel + navigator.locks)
+  - 4.4 / 0.1 — "Loading workspace…" → "Loading your space…" (DONE? verify)
+  - 4.10 — restore last Group/Project route on cold start
+  - 4.11 — re-check for update on every connection attempt
+  - 4.14 — deep-link cold-start resolution
+  - 4.15 — Tauri update flow
+  - 5.1 — TeamView current-project column + Mention + Profile actions
+  - 5.2 — TeamView presence="ONLINE" hardcode → realtime
+  - 5.4 — clickable "N teammates here" dropdown
+  - 5.5 — unified profile surface
+  - 6.12 — chat-level pinned-messages view
+  - 6.14 — mention tokens visually styled
+  - 6.21 — highlight-on-arrival in MessageRow
+  - 8.2 — view-ranked command grouping
+  - 8.4 — server full-text search modes
+  - 8.6 — cross-Group navigation
+  - 8.7 — debounce/AbortController on search
+
+STANDING RULES:
+  - Token-only: var(--md-*) or src/design-system/tokens/. NO hex, NO px font-size, NO ad-hoc cubic-bezier.
+  - Dark theme base = #000000.
+  - NO animate-pulse on loading/skeleton/state.
+  - WCAG 2.2 AA. tokens.a11y.test.ts 92 PASS required.
+  - DO NOT touch: src/api/, src/state/, src/realtime/, src/sync/, src/local/, src/hooks/, src/config/, src/tauri/, use*Controller.ts.
+  - Exceptions: 0.12/7.16 dispatch.ts privacy fix, 3.6 outbox.ts multi-window wrap.
+  - Git push via SSH: git remote set-url origin 'git@github.com:OCTOBER-sk/ClanMind.git'; GIT_TERMINAL_PROMPT=0 git push origin main.
+  - Conventional commits: feat(m3): / fix(m3): / docs(m3): / refactor(m3): prefixes.
+
+GATES (run after work):
+  cd /home/santhosh/projects/ClanMind
+  pnpm --filter clanmind-frontend build        -> exit 0, 0 errors
+  pnpm --filter clanmind-frontend lint          -> count "error:" lines; target 0
+  pnpm --filter clanmind-frontend test 2>&1 | tee /tmp/test.txt
+    grep -E "Test Files|Tests " /tmp/test.txt
+    comm -13 <(grep "^FAIL" clanmind-frontend/docs/m3-baseline.txt | sed 's/^ *//' | sort) \
+             <(grep "FAIL  src" /tmp/test.txt | sed 's/^ *//' | sort) > /tmp/new_failures.txt
+    test ! -s /tmp/new_failures.txt && echo "PASS: zero new failures"
+  pnpm --filter clanmind-frontend exec vitest run src/design-system/tokens.a11y.test.ts
+    -> 92 PASS required
+
+WRITE PROGRESS:
+  docs/m3-briefs/PHASE9-continuation1-run.log — date, model, commands, gate results, files changed with line numbers, honest summary.
+  docs/m3-briefs/PHASE9-continuation1-report.md — audit report.
+
+COMMIT:
+  git add -A
+  git commit -m "fix(m3): phase 9 — privacy leak fixes, token-driven catastrophic screen, spacing scale 7/9/11, MessageActions quote/unread"
+  git push origin main
+
+DO NOT enter plan mode. Execute immediately.

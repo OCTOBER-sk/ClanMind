@@ -564,6 +564,20 @@
   50%       { opacity: 0; }
 }
 
+/* Skeleton shimmer — replaces animate-pulse per §10 (no animate-pulse anywhere).
+   A subtle opacity sweep across a surface-container field, one-shot friendly. */
+@keyframes bone-sweep {
+  0%   { opacity: 0.5; }
+  50%  { opacity: 0.8; }
+  100% { opacity: 0.5; }
+}
+
+/* Clock ticker for sending/pending state — subtle blink, never animate-pulse. */
+@keyframes fade-tick {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
 @keyframes toast-slide-in {
   from { transform: translateX(100%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }

@@ -1,0 +1,49 @@
+# Phase B-2 — Commit + Verify
+
+PROJECT ROOT: /home/santhosh/projects/ClanMind
+MODEL: poolside/laguna-s-2.1:free
+
+CURRENT STATE (Atom-verified 2026-09-07):
+- HEAD: b77eecf "fix(m3): phase B-1 — remove three §10 spectral violations" (committed + pushed)
+- Working tree: 5 modified test files from Phase B-2 audit work, NOT committed
+- The 5 files are Bucket B test-assertion edits (token-name drift fixes). No functional changes.
+
+FILES MODIFIED (git diff --stat):
+  clanmind-frontend/src/features/approvals/ApprovalCard.test.tsx      | 6 +++---
+  clanmind-frontend/src/features/approvals/GitHubActionCard.test.tsx | 6 +++---
+  clanmind-frontend/src/features/approvals/GitHubDiffViewer.test.tsx | 8 ++++----
+  clanmind-frontend/src/features/chat/aiStreamingUi.test.tsx         | 2 +-
+  clanmind-frontend/src/features/meetings/MeetingDialogs.test.tsx    | 6 +++---
+
+YOUR TASK:
+1. Read each of the 5 modified files. Verify each change is a Bucket B test-assertion edit (token-name drift fix, no functional change). If any change is NOT a Bucket B edit, STOP and report.
+2. Run gates:
+     cd /home/santhosh/projects/ClanMind
+     pnpm --filter clanmind-frontend build
+       -> exit 0, 0 errors
+     pnpm --filter clanmind-frontend lint
+       -> count "error:" lines; target 0
+     pnpm --filter clanmind-frontend test 2>&1 | tee /tmp/test.txt
+       grep -E "Test Files|Tests " /tmp/test.txt
+       comm -13 <(grep "^FAIL" clanmind-frontend/docs/m3-baseline.txt | sed 's/^ *//' | sort) \
+                <(grep "FAIL  src" /tmp/test.txt | sed 's/^ *//' | sort) > /tmp/new_failures.txt
+       test ! -s /tmp/new_failures.txt && echo "PASS: zero new failures"
+     pnpm --filter clanmind-frontend exec vitest run src/design-system/tokens.a11y.test.ts
+       -> 92 PASS required
+3. Write docs/m3-briefs/PHASEB2-run.log with: date, model, commands run, gate results, files changed with line numbers, Bucket A/B/C counts, final test count vs 30-fail baseline, one-paragraph honest summary.
+4. Write docs/m3-briefs/PHASEB2-report.md with the audit report (counts A/B/C, files changed, final test count, honest summary).
+5. Conventional commit:
+     git add clanmind-frontend/src/features/approvals/ApprovalCard.test.tsx \
+            clanmind-frontend/src/features/approvals/GitHubActionCard.test.tsx \
+            clanmind-frontend/src/features/approvals/GitHubDiffViewer.test.tsx \
+            clanmind-frontend/src/features/chat/aiStreamingUi.test.tsx \
+            clanmind-frontend/src/features/meetings/MeetingDialogs.test.tsx \
+            clanmind-frontend/docs/m3-briefs/PHASEB2-run.log \
+            clanmind-frontend/docs/m3-briefs/PHASEB2-report.md
+     git commit -m "fix(m3): phase B-2 — baseline-failure audit, Bucket B token-drift test-assertion fixes"
+6. Push:
+     git remote set-url origin 'git@github.com:OCTOBER-sk/ClanMind.git'
+     GIT_TERMINAL_PROMPT=0 git push origin main
+     Verify: git ls-remote origin main — must return the new SHA.
+
+DO NOT enter plan mode. Execute immediately. The plan is approved.
