@@ -6,9 +6,10 @@ import { handleExternalLinkClick } from '@/tauri/externalLinkPolicy';
 export interface ResearchDrawerProps {
   aiName?: string;
   topic: string;
-  summary: string;
-  findings: string[];
-  projectImpact: string;
+  /** Derived from the AI run's tool-call outputs; absent when not yet synthesized. */
+  summary?: string;
+  findings?: string[];
+  projectImpact?: string;
   uncertainty?: string;
   sources: AiSourceCitation[];
   onClose: () => void;
@@ -54,36 +55,42 @@ export function ResearchDrawer({
           <h2 className="text-sm font-bold text-on-surface">{topic}</h2>
         </div>
 
-        {/* Executive Summary — neutral M3 surface */}
-        <div className="p-3.5 rounded-md border border-outline-variant bg-surface-container-low space-y-1.5 motion-reduce:transition-none">
-          <span className="text-[10px] font-bold uppercase tracking-wider block text-on-surface-variant">Summary</span>
-          <p className="text-on-surface leading-relaxed">{summary}</p>
-        </div>
+        {/* Executive Summary — neutral M3 surface (renders only when the run produced one) */}
+        {summary && (
+          <div className="p-3.5 rounded-md border border-outline-variant bg-surface-container-low space-y-1.5 motion-reduce:transition-none">
+            <span className="text-[10px] font-bold uppercase tracking-wider block text-on-surface-variant">Summary</span>
+            <p className="text-on-surface leading-relaxed">{summary}</p>
+          </div>
+        )}
 
         {/* PROJECT IMPACT (§147) — neutral tonal container, NOT spectral fill; left tertiary accent for AI insight */}
-        <div className="p-4 rounded-md border border-outline-variant bg-surface-container-low border-l-[3px] border-l-tertiary space-y-2 motion-reduce:transition-none">
-          <div className="flex items-center gap-1.5 font-bold text-on-surface">
-            <Bot className="w-4 h-4 text-tertiary" aria-hidden="true" />
-            <span>Impact on this Project</span>
+        {projectImpact && (
+          <div className="p-4 rounded-md border border-outline-variant bg-surface-container-low border-l-[3px] border-l-tertiary space-y-2 motion-reduce:transition-none">
+            <div className="flex items-center gap-1.5 font-bold text-on-surface">
+              <Bot className="w-4 h-4 text-tertiary" aria-hidden="true" />
+              <span>Impact on this Project</span>
+            </div>
+            <p className="leading-relaxed text-on-surface-variant">{projectImpact}</p>
           </div>
-          <p className="leading-relaxed text-on-surface-variant">{projectImpact}</p>
-        </div>
+        )}
 
         {/* Key Findings List — tonal rows with state-layer hover */}
-        <div className="space-y-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider block text-on-surface-variant">Key Technical Findings</span>
-          <div className="space-y-1.5">
-            {findings.map((f, i) => (
-              <div
-                key={i}
-                className="p-2.5 rounded-md flex items-start gap-2 border border-outline-variant bg-surface-container-lowest relative isolate overflow-hidden before:absolute before:inset-0 before:bg-[var(--md-on-surface)] before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity before:duration-micro motion-reduce:before:transition-none motion-reduce:transition-none transition-colors duration-micro ease-emphasized"
-              >
-                <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 bg-outline" aria-hidden="true" />
-                <p className="text-on-surface relative">{f}</p>
-              </div>
-            ))}
+        {findings && findings.length > 0 && (
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider block text-on-surface-variant">Key Technical Findings</span>
+            <div className="space-y-1.5">
+              {findings.map((f, i) => (
+                <div
+                  key={i}
+                  className="p-2.5 rounded-md flex items-start gap-2 border border-outline-variant bg-surface-container-lowest relative isolate overflow-hidden before:absolute before:inset-0 before:bg-[var(--md-on-surface)] before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity before:duration-micro motion-reduce:before:transition-none motion-reduce:transition-none transition-colors duration-micro ease-emphasized"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 bg-outline" aria-hidden="true" />
+                  <p className="text-on-surface relative">{f}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Sources Cards Grid (§144) — tonal container with state-layer hover */}
         <div className="space-y-2">

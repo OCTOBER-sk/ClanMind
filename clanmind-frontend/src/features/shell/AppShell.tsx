@@ -953,6 +953,26 @@ export function AppShell() {
     [allMessages, threadRootId],
   );
 
+  // §18.17 — derive the active research run from the live AI-run registry.
+  // A run qualifies when it carries research citations (web_search /
+  // read_project_references tool results) — the real data that powers
+  // ResearchDrawer. When none exists the research branch falls through
+  // to the next panel mode instead of shipping demo fixture strings.
+  const activeResearchRun = useMemo(() => {
+    const RESEARCH_TOOLS = new Set(['web_search', 'read_project_references']);
+    for (let i = scopedMessages.length - 1; i >= 0; i -= 1) {
+      const msg = scopedMessages[i]!;
+      const run = aiRunsByMessage[msg.id];
+      if (!run) continue;
+      const hasSources = run.sources.length > 0;
+      const hasResearchTool = run.tool_calls.some(
+        (tc) => RESEARCH_TOOLS.has(tc.tool_name) && tc.output,
+      );
+      if (hasSources || hasResearchTool) return run;
+    }
+    return null;
+  }, [scopedMessages, aiRunsByMessage]);
+
   if (!user || !groupForRoute) {
     // Live mode before the group/project context resolves; demo hydrates instantly.
     return (
@@ -996,7 +1016,7 @@ export function AppShell() {
   const hasRightSurfaceContent =
     isMeetingActive ||
     (rightPanelMode === 'thread' && activeThreadMessage != null) ||
-    rightPanelMode === 'research' ||
+    (rightPanelMode === 'research' && activeResearchRun != null) ||
     rightPanelMode === 'context' ||
     rightPanelMode === 'diff' ||
     rightPanelMode === 'approval' ||
@@ -1033,34 +1053,11 @@ export function AppShell() {
           onClose={handleCloseThread}
           onSendReply={handleSendThreadReply}
         />
-      ) : rightPanelMode === 'research' ? (
+      ) : rightPanelMode === 'research' && activeResearchRun ? (
         <ResearchDrawer
-          topic="STM32H743 DMA SPI vs I2C Sensor Fusion Latency"
-          summary="Hardware datasheet analysis verifies SPI full-duplex DMA operates at 24 MHz without CPU interrupt locks."
-          findings={[
-            'SPI DMA reduces sensor packet transfer latency from 160 µs to 6.5 µs at 1 kHz ODR.',
-            'I2C bus congestion locks the microcontroller bus for ~16% of the real-time attitude loop.',
-            'DMA1 Stream 0 circular ring buffers in SRAM1 eliminate double-copy memory overhead.',
-          ]}
-          projectImpact="Adopting SPI DMA allows the quadcopter flight controller to execute attitude PID calculations at a rock-solid 1 kHz rate without jitter or dropped frames."
-          sources={[
-            {
-              id: 's1',
-              title: 'ICM-42688P Motion Tracking Datasheet',
-              domain: 'invensense.tdk.com',
-              url: 'https://invensense.tdk.com',
-              snippet: 'High performance 6-axis MEMS IMU with 24 MHz SPI master interface.',
-              retrieved_at: new Date().toISOString(),
-            },
-            {
-              id: 's2',
-              title: 'STM32H7 DMA Architecture Reference',
-              domain: 'st.com',
-              url: 'https://st.com',
-              snippet: 'Master Direct Memory Access (MDMA) and peripheral DMA streams configuration.',
-              retrieved_at: new Date().toISOString(),
-            },
-          ]}
+          aiName={activeGroup?.ai_name}
+          topic={activeResearchRun.prompt}
+          sources={activeResearchRun.sources}
           onClose={closeRightPanel}
         />
       ) : rightPanelMode === 'context' ? (

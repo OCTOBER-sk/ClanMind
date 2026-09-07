@@ -49,5 +49,22 @@ export default defineConfig(({ mode }) => {
   },
     // Tauri env vars should be exposed to the client.
     envPrefix: ['VITE_', 'TAURI_'],
+    build: {
+      // §M6 — keep the entry (App) chunk small by extracting vendor
+      // dependencies into separate chunks. @xyflow/react is the heaviest
+      // transitive dependency (diagram engine) and gets its own chunk so it
+      // only loads when a diagram surface is actually mounted.
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('@xyflow')) return 'vendor-xyflow';
+              if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
+              return 'vendor';
+            }
+          },
+        },
+      },
+    },
   };
 });
