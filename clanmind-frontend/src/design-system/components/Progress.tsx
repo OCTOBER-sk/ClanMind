@@ -44,7 +44,7 @@ export function Progress({ value, variant = 'neutral', size = 'md', className }:
         className={cn(
           'h-full w-full flex-1 transition-all duration-standard ease-emphasized',
           indicatorVariantClasses[variant],
-          isWavy && 'relative after:absolute after:inset-0 after:bg-[repeating-linear-gradient(90deg,transparent_0_6px,var(--md-on-primary)_6px_12px)] after:opacity-20 after:animate-[spectral-sweep_800ms_linear_infinite]',
+          isWavy && 'relative after:absolute after:inset-0 after:bg-[repeating-linear-gradient(90deg,transparent_0_6px,var(--md-on-primary)_6px_12px)] after:opacity-20 after:animate-[spectral-sweep_800ms_ease-out_1] motion-reduce:after:animate-none',
         )}
         style={{ transform: `translateX(-${100 - clampedValue}%)` }}
       />

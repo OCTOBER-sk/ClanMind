@@ -38,8 +38,8 @@ export function MeetingActiveHeader({
     >
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 font-bold text-xs tracking-wider">
-          {/* §52 — active meeting indicator: spectral pulse for a first-class live state */}
-          <span className="w-2.5 h-2.5 rounded-full spectral-active animate-pulse" aria-hidden="true" />
+          {/* §14.12 — meeting dot uses error/live red, not spectral; no indefinite pulse (§10) */}
+          <span className="w-2.5 h-2.5 rounded-full bg-error" aria-hidden="true" />
           <span style={{ color: 'var(--color-text)' }} aria-label="Meeting in progress">MEETING IN PROGRESS</span>
         </div>
         <span

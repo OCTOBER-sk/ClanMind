@@ -61,8 +61,8 @@ function FirstLaunchView({
           alt="ClanMind"
           className="h-10 w-auto dark:invert"
         />
-        {/* Spectral accent line — §69 */}
-        <div className="h-px w-32 spectral-active rounded-full opacity-60" />
+        {/* Static divider — §69 / §10: no permanent spectral strip */}
+        <div className="h-px w-32 bg-outline-variant rounded-full" />
       </div>
 
       {/* Hero — §69 */}
