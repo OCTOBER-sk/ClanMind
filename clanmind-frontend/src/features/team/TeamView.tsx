@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { MessageSquare, Edit3, UserPlus, Sparkles } from 'lucide-react';
+import { MessageSquare, Edit3, UserPlus, Sparkles, AtSign, IdCard } from 'lucide-react';
 import { Avatar } from '@/design-system/components/Avatar';
 import { Button } from '@/design-system/components/Button';
 import { Badge } from '@/design-system/components/Badge';
@@ -21,6 +21,15 @@ export interface TeamViewProps {
   onSetNickname: (userId: string, nickname: string) => void;
   onStartPrivateChat: (member: GroupMember) => void;
   onInviteTeammate: () => void;
+  /** §5.2 — real presence map keyed by user_id; falls back to ONLINE absent. */
+  presenceByUser?: Record<string, PresenceState>;
+  /** §5.1 — current project id so the column can flag who is in this Project. */
+  activeProjectId?: string;
+  /** §5.1 — list of member user_ids participating in the active Project. */
+  projectMemberIds?: string[];
+  /** §5.1 / §5.5 — Mention and Profile actions. */
+  onMention?: (member: GroupMember) => void;
+  onOpenProfile?: (member: GroupMember) => void;
   isLoading?: boolean;
   error?: string | null;
 }
@@ -46,6 +55,11 @@ export function TeamView({
   onSetNickname,
   onStartPrivateChat,
   onInviteTeammate,
+  presenceByUser,
+  activeProjectId,
+  projectMemberIds,
+  onMention,
+  onOpenProfile,
   isLoading,
   error,
 }: TeamViewProps) {
@@ -126,14 +140,15 @@ export function TeamView({
           <div className="px-6 py-3">
             {/* Team members table */}
             <div role="table" aria-label="Team members">
-              {/* Column headers */}
+              {/* Column headers — §5.1 adds a "Project" column when a project is active. */}
               <div
-                className="grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] gap-3 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-on-surface-variant motion-reduce:transition-none"
+                className="grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.6fr)_minmax(0,1.4fr)] gap-3 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-on-surface-variant motion-reduce:transition-none"
                 role="row"
               >
                 <span role="columnheader">Member</span>
                 <span role="columnheader">Role</span>
                 <span role="columnheader">Status</span>
+                <span role="columnheader">Project</span>
                 <span role="columnheader" className="text-right">
                   Actions
                 </span>
@@ -143,7 +158,7 @@ export function TeamView({
               <div className="divide-y divide-outline-variant">
                 {/* AI Teammate row — Odin */}
                 <div
-                  className="grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] items-center gap-3 px-3 py-2.5 rounded-md border border-outline-variant bg-surface-container-low motion-reduce:transition-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity before:duration-micro"
+                  className="grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.6fr)_minmax(0,1.4fr)] items-center gap-3 px-3 py-2.5 rounded-md border border-outline-variant bg-surface-container-low motion-reduce:transition-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity before:duration-micro"
                   role="row"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -160,18 +175,33 @@ export function TeamView({
                     AI
                   </Badge>
                   <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-tertiary-container text-on-tertiary-container motion-reduce:transition-none">Available</span>
-                  <div />
+                  {activeProjectId ? (
+                    <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary-container text-on-primary-container motion-reduce:transition-none">
+                      In project
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-on-surface-variant">—</span>
+                  )}
+                  {/* §5.1 — Odin is always available; no mention button (use
+                      the Composer /mention shortcut instead). Profile / private
+                      actions are not applicable for the AI row. */}
+                  <div className="flex items-center justify-end gap-1" />
                 </div>
 
                 {members.map((member) => {
                   const nickname = memberNicknames[member.user_id] || member.user.name;
                   const isEditing = editingUserId === member.user_id;
-                  const presence: PresenceState = 'ONLINE'; // placeholder — real presence from realtime
+                  // §5.2 — consume the realtime presence envelope; absent map → ONLINE.
+                  const presence: PresenceState = presenceByUser?.[member.user_id] ?? 'ONLINE';
+                  // §5.1 — current-project membership column
+                  const isInProject = activeProjectId
+                    ? projectMemberIds?.includes(member.user_id) ?? false
+                    : null;
 
                   return (
                     <div
                       key={member.user_id}
-                      className="grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] items-center gap-3 px-3 py-2.5 rounded-md border border-transparent bg-surface-container-low hover:bg-surface-container hover:border-outline-variant motion-reduce:transition-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity before:duration-micro transition-colors duration-micro ease-emphasized"
+                      className="grid grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.6fr)_minmax(0,1.4fr)] items-center gap-3 px-3 py-2.5 rounded-md border border-transparent bg-surface-container-low hover:bg-surface-container hover:border-outline-variant motion-reduce:transition-none relative isolate overflow-hidden before:absolute before:inset-0 before:bg-current before:opacity-0 hover:before:opacity-[0.08] before:transition-opacity before:duration-micro transition-colors duration-micro ease-emphasized"
                       role="row"
                       aria-label={`${nickname}, ${member.role}`}
                     >
@@ -218,8 +248,43 @@ export function TeamView({
                       {/* Presence — text label, not colored dot overload — tonal pill */}
                       <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-container text-on-success-container motion-reduce:transition-none">{PRESENCE_LABEL[presence]}</span>
 
-                      {/* Actions */}
+                      {/* §5.1 — current-project membership column */}
+                      {activeProjectId ? (
+                        isInProject ? (
+                          <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary-container text-on-primary-container motion-reduce:transition-none">
+                            In project
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-on-surface-variant">—</span>
+                        )
+                      ) : (
+                        <span className="text-[10px] text-on-surface-variant">All projects</span>
+                      )}
+
+                      {/* Actions — §5.1: Mention, Profile, Private chat */}
                       <div className="flex items-center justify-end gap-1">
+                        {onMention && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            leftIcon={<AtSign className="w-3 h-3" />}
+                            onClick={() => onMention(member)}
+                            aria-label={`Mention ${nickname}`}
+                          >
+                            Mention
+                          </Button>
+                        )}
+                        {onOpenProfile && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            leftIcon={<IdCard className="w-3 h-3" />}
+                            onClick={() => onOpenProfile(member)}
+                            aria-label={`Open profile for ${nickname}`}
+                          >
+                            Profile
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"

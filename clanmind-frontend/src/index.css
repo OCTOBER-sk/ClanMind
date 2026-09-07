@@ -548,6 +548,15 @@
   100% { transform: translateX(400%); }
 }
 
+/* §6.21 — single-shot tonal flash for newly-arrived messages; settles
+ * back to transparent by 1.4s. Replaces a permanent background tint
+ * and respects motion-reduce (the row class disables the animation). */
+@keyframes highlight-arrive {
+  0%   { background-color: color-mix(in srgb, var(--md-primary) 18%, transparent); }
+  60%  { background-color: color-mix(in srgb, var(--md-primary) 10%, transparent); }
+  100% { background-color: transparent; }
+}
+
 @keyframes reaction-pop {
   0%   { transform: scale(0.85); }
   60%  { transform: scale(1.08); }

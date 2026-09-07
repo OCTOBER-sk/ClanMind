@@ -961,7 +961,7 @@ export function AppShell() {
         style={{ background: 'var(--color-background)', color: 'var(--color-text-secondary)' }}
         role="status"
       >
-        Loading your groups…
+        Loading your space…
       </div>
     );
   }

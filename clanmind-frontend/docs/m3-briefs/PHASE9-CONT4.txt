@@ -1,0 +1,88 @@
+# Phase 9 — Continuation 4: Remaining Audit Fixes
+
+PROJECT ROOT: /home/santhosh/projects/ClanMind
+MODEL: minimax/minimax-m3:free (switched from poolside/laguna-s-2.1:free — rate-limited)
+
+STATE (Atom-verified 2026-09-07):
+- HEAD: b616807 (TS build errors fixed), pushed, working tree clean
+- Privacy bugs (0.12/7.16, 7.19): VERIFIED already fixed in bda6bc9 (Aug 25). Audit report was outdated.
+- Phase 9 partial done: 3b858c1 (spacing, MessageActions, catastrophic screen, animate-pulse, outbox) + b616807 (TS fixes)
+
+REMAINING HIGH-PRIORITY AUDIT FIXES (from FRONTEND_AUDIT2_REPORT):
+
+### 1.5 — Hard-coded color literals drift
+  - ProjectPulse.tsx:61–76 — amber/blue Tailwind palette classes → token-driven
+  - LeftNav.tsx:370,409 — `#fff` → token
+
+### 1.10 — Wider content mode for research/code
+  - ArtifactPanel: add explicit dual-width toggle for table/code artifacts
+
+### 4.4 / 0.1 — "Loading workspace…" copy breach
+  - AppShell.tsx:930 — rename to "Loading your space…"
+
+### 4.10 — Restore last Group/Project route on cold start
+  - RootRedirect: persist last route, restore on cold start
+
+### 4.11 — Re-check for update on every connection attempt
+
+### 4.14 — Deep-link cold-start resolution
+  - resolveObjectLocation: fetch-and-route for uncached object IDs
+
+### 5.1 — TeamView missing current-project column, Mention and Profile actions
+
+### 5.2 — TeamView hardcodes presence="ONLINE" for every member
+  - Wire to realtime presence envelope.
+
+### 5.4 — Clickable "N teammates here" list
+  - Implement dropdown member list.
+
+### 5.5 — Dedicated unified profile surface
+
+### 6.12 — Chat-level pinned-messages view
+
+### 6.14 — Mention tokens visually styled
+
+### 6.21 — Highlight-on-arrival styling in MessageRow
+
+### 8.2 — View-ranked command grouping
+
+### 8.4 — Server full-text search modes (§175)
+  - Stub the contract for now.
+
+### 8.6 — Cross-Group navigation + scroll+highlight chain
+
+### 8.7 — Debounce/AbortController on search (200–250ms)
+
+### 4.15 — Tauri update flow
+  - Wire the updater plugin properly. Non-interrupting install.
+
+STANDING RULES:
+  - Token-only: var(--md-*) or src/design-system/tokens/. NO hex, NO px font-size.
+  - Dark theme base = #000000.
+  - NO animate-pulse on loading/skeleton/state.
+  - WCAG 2.2 AA. tokens.a11y.test.ts 92 PASS required.
+  - DO NOT touch: src/api/, src/state/, src/realtime/, src/sync/, src/local/, src/hooks/, src/config/, src/tauri/, use*Controller.ts.
+  - Git push via SSH: git remote set-url origin 'git@github.com/OCTOBER-sk/ClanMind.git'; GIT_TERMINAL_PROMPT=0 git push origin main.
+  - Conventional commits: feat(m3): / fix(m3): / docs(m3): / refactor(m3): prefixes.
+
+GATES (run after work):
+  cd /home/santhosh/projects/ClanMind
+  pnpm --filter clanmind-frontend build        -> exit 0, 0 errors
+  pnpm --filter clanmind-frontend lint          -> count "error:" lines; target 0
+  pnpm --filter clanmind-frontend test 2>&1 | tee /tmp/test.txt
+    grep -E "Test Files|Tests " /tmp/test.txt
+    comm -13 <(grep "^FAIL" clanmind-frontend/docs/m3-baseline.txt | sed 's/^ *//' | sort) \
+             <(grep "FAIL  src" /tmp/test.txt | sed 's/^ *//' | sort) > /tmp/new_failures.txt
+    test ! -s /tmp/new_failures.txt && echo "PASS: zero new failures"
+  pnpm --filter clanmind-frontend exec vitest run src/design-system/tokens.a11y.test.ts
+    -> 92 PASS required
+
+WRITE PROGRESS:
+  docs/m3-briefs/PHASE9-continuation4-run.log — date, model, commands, gate results, files changed with line numbers, honest summary.
+
+COMMIT:
+  git add -A
+  git commit -m "fix(m3): phase 9 — remaining audit fixes (token drift, TeamView, search, deep-link, update flow)"
+  git push origin main
+
+DO NOT enter plan mode. Execute immediately.

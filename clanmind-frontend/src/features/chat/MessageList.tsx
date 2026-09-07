@@ -115,6 +115,26 @@ export function MessageList({
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [unreadNewCount, setUnreadNewCount] = useState(0);
   const lastMessageCountRef = useRef(messages.length);
+  // §6.21 — track ids that appeared since the previous render to flash a
+  // tonal arrival highlight on the row for one cycle. The ref+lazy-state
+  // pattern keeps the derive cheap: a Set per render, cleared in a timer.
+  const prevMessageIdsRef = useRef<Set<string>>(new Set(messages.map((m) => m.id)));
+  const [justArrivedIds, setJustArrivedIds] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const prev = prevMessageIdsRef.current;
+    const next = new Set<string>();
+    for (const m of messages) {
+      if (!prev.has(m.id)) next.add(m.id);
+    }
+    if (next.size > 0) {
+      setJustArrivedIds(next);
+      const t = setTimeout(() => setJustArrivedIds(new Set()), 1500);
+      prevMessageIdsRef.current = new Set(messages.map((m) => m.id));
+      return () => clearTimeout(t);
+    }
+    prevMessageIdsRef.current = new Set(messages.map((m) => m.id));
+    return undefined;
+  }, [messages]);
 
   // ── §202 anchor bookkeeping ─────────────────────────────────────────────
   // When prepending an older page the content above the viewport grows; we
@@ -340,6 +360,7 @@ export function MessageList({
           aiRun={aiRunsByMessage[message.id]}
           aiName={aiName}
           isStreaming={streamingIds.has(message.id)}
+          isNewlyArrived={justArrivedIds.has(message.id)}
           onRetry={onRetry}
           onRegenerate={onRegenerate}
           canModerate={canModerate}

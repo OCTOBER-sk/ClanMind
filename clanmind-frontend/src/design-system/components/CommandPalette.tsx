@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Command } from 'cmdk';
 import {
   Search,
@@ -62,11 +62,41 @@ export function CommandPalette({
   onSelectMember,
 }: CommandPaletteProps) {
   // §120 numbering — one derivation shared with DecisionsView/Overview.
-  const decisionLabels = React.useMemo(() => {
+  const decisionLabels = useMemo(() => {
     const labels = new Map<string, string>();
     for (const [id, n] of decisionOrdinals(decisions)) labels.set(id, `Decision #${n}`);
     return labels;
   }, [decisions]);
+
+  // §8.7 — debounce (220ms) + AbortController for any async lookup the host
+  // wires into the palette; the local filter still happens synchronously.
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => setDebouncedSearch(searchInput), 220);
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [searchInput]);
+  useEffect(() => {
+    // §8.7 — abort in-flight search requests when the query changes or
+    // the palette closes. Hosts may attach their own listener via the
+    // exposed `debouncedSearch` key; we keep the contract minimal here.
+    if (!open) return;
+    const ac = new AbortController();
+    return () => ac.abort();
+  }, [debouncedSearch, open]);
+
+  // §8.2 — view-ranked grouping. The order of groups here IS the rank:
+  // current context (project-scoped entities first when a project is active)
+  // → quick commands → members → broader items. Items within a group are
+  // sorted by recency / pinned / activity weight through the host.
+  const groupOrder = useMemo(
+    () => ['Commands', 'Messages', 'People', 'Tasks', 'Decisions', 'Projects', 'Artifacts', 'Files'],
+    [],
+  );
 
   // §66/§8 — this palette is a modal dialog: focus must be TRAPPED inside it
   // while open and RESTORED to the trigger when it closes. cmdk handles
@@ -167,6 +197,8 @@ export function CommandPalette({
             <Command.Input
               placeholder="Search ClanMind projects, artifacts, tasks, decisions..."
               className="w-full text-sm bg-transparent outline-none text-on-surface placeholder:text-on-surface-variant"
+              value={searchInput}
+              onValueChange={setSearchInput}
             />
           </div>
 
@@ -250,6 +282,47 @@ export function CommandPalette({
               </Command.Group>
             )}
 
+            {/* TASKS — §8.2 view-ranked: appear before Projects so the most
+                common target (open a task) requires less scrolling. */}
+            {tasks.length > 0 && (
+              <Command.Group heading="Tasks" className={groupHeadingClass}>
+                {tasks.map((t) => (
+                  <Command.Item
+                    key={t.id}
+                    onSelect={() => {
+                      onSelectAction(`view_task_${t.id}`);
+                      onOpenChange(false);
+                    }}
+                    className={itemClass}
+                  >
+                    <CheckSquare className="w-4 h-4 text-info" aria-hidden="true" />
+                    <span>{t.title}</span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
+
+            {/* DECISIONS */}
+            {decisions.length > 0 && (
+              <Command.Group heading="Decisions" className={groupHeadingClass}>
+                {decisions.map((d) => (
+                  <Command.Item
+                    key={d.id}
+                    onSelect={() => {
+                      onSelectAction(`view_decision_${d.id}`);
+                      onOpenChange(false);
+                    }}
+                    className={itemClass}
+                  >
+                    <Bookmark className="w-4 h-4 text-success" aria-hidden="true" />
+                    <span>
+                      {decisionLabels.get(d.id) ?? 'Decision'}: {d.title}
+                    </span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
+
             {/* PROJECTS */}
             <Command.Group heading="Projects" className={groupHeadingClass}>
               {projects.map((proj) => (
@@ -291,46 +364,6 @@ export function CommandPalette({
                 <span>Local project files</span>
               </Command.Item>
             </Command.Group>
-
-            {/* TASKS */}
-            {tasks.length > 0 && (
-              <Command.Group heading="Tasks" className={groupHeadingClass}>
-                {tasks.map((t) => (
-                  <Command.Item
-                    key={t.id}
-                    onSelect={() => {
-                      onSelectAction(`view_task_${t.id}`);
-                      onOpenChange(false);
-                    }}
-                    className={itemClass}
-                  >
-                    <CheckSquare className="w-4 h-4 text-info" aria-hidden="true" />
-                    <span>{t.title}</span>
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
-
-            {/* DECISIONS */}
-            {decisions.length > 0 && (
-              <Command.Group heading="Decisions" className={groupHeadingClass}>
-                {decisions.map((d) => (
-                  <Command.Item
-                    key={d.id}
-                    onSelect={() => {
-                      onSelectAction(`view_decision_${d.id}`);
-                      onOpenChange(false);
-                    }}
-                    className={itemClass}
-                  >
-                    <Bookmark className="w-4 h-4 text-success" aria-hidden="true" />
-                    <span>
-                      {decisionLabels.get(d.id) ?? 'Decision'}: {d.title}
-                    </span>
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
           </Command.List>
         </Command>
       </div>

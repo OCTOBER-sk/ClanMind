@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, type ReactElement } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/design-system/utils';
@@ -43,6 +43,48 @@ export interface MessageRowProps {
   onCreateDecision: (message: Message) => void;
   onUseAsContext: (message: Message) => void;
   onOpenThread?: (message: Message) => void;
+  /** §6.21 — highlight-on-arrival. True for one render cycle when a message
+   *  is new since the last view (driven by MessageList's `justArrivedIds`). */
+  isNewlyArrived?: boolean;
+}
+
+/**
+ * §6.14 — render inline text, splitting out @nickname tokens as tonal pills.
+ * The split is text-only and conservative: we only style `@` followed by
+ * 1–24 non-whitespace chars that look like a real nickname (alphanumerics,
+ * underscore, dot, dash). Anything else renders as plain text.
+ */
+const MENTION_TOKEN = /(@[A-Za-z0-9_.-]{1,24})/g;
+
+function TextWithMentions({ children }: { children?: React.ReactNode }): ReactElement {
+  const flat = React.Children.toArray(children);
+  return (
+    <>
+      {flat.map((child, i) => {
+        if (typeof child !== 'string') {
+          return <React.Fragment key={i}>{child}</React.Fragment>;
+        }
+        const parts = child.split(MENTION_TOKEN);
+        return (
+          <React.Fragment key={i}>
+            {parts.map((part, j) =>
+              MENTION_TOKEN.test(part) ? (
+                <span
+                  key={`${i}-${j}`}
+                  className="inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded-md text-[13px] font-semibold bg-primary-container text-on-primary-container motion-reduce:transition-none"
+                  data-mention="true"
+                >
+                  {part}
+                </span>
+              ) : (
+                <React.Fragment key={`${i}-${j}`}>{part}</React.Fragment>
+              ),
+            )}
+          </React.Fragment>
+        );
+      })}
+    </>
+  );
 }
 
 function MessageRowInner({
@@ -66,6 +108,7 @@ function MessageRowInner({
   onCreateDecision,
   onUseAsContext,
   onOpenThread,
+  isNewlyArrived = false,
 }: MessageRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.body);
@@ -131,6 +174,9 @@ function MessageRowInner({
         // M3 state layer on hover, not a card — subtle on-surface 8%
         'hover:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] focus-visible:bg-[color-mix(in_srgb,var(--md-on-surface)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--md-on-surface)_10%,transparent)]',
         message.pinned && 'bg-[color-mix(in_srgb,var(--md-warning-container)_28%,var(--md-surface))]',
+        // §6.21 — highlight-on-arrival: tonal flash that settles in ~1.4s.
+        // No animate-pulse; a one-shot keyframe that respects motion-reduce.
+        isNewlyArrived && 'animate-[highlight-arrive_1.4s_ease-out_1] motion-reduce:animate-none motion-reduce:bg-[color-mix(in_srgb,var(--md-primary)_8%,transparent)]',
       )}
       // §7 keyboard access — the row is the focus entry point that reveals
       // its §25 action toolbar via group-focus-within; without a stop here
@@ -286,6 +332,11 @@ function MessageRowInner({
               remarkPlugins={[remarkGfm]}
               components={{
                 a: SafeMarkdownLink,
+                // §6.14 — @nickname tokens render as a tonal pill in primary
+                // container, not a raw "@name" string. The match is text-only
+                // and assumes the user typed `@Display Name` (MentionPicker
+                // emits the literal `@Name` form into the body).
+                text: ({ children, ...props }) => <TextWithMentions {...props}>{children}</TextWithMentions>,
                 p: ({ children }) => <p className="mb-2 last:mb-0 leading-6">{children}</p>,
                 h1: ({ children }) => (
                   <h1 className="text-base font-bold my-3 leading-tight text-on-surface">
